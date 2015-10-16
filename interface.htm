@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Controlpage for the PicOnGPU Removte Visualization tool</title>
+</head>
+
+<h3>Preview and camera setting</h3>
+<p>Usage:
+<ul>
+<li>Left click + Mouse movement: Change view angle</li>
+<li>Right click + Mouse movement: Change position</li>
+<li>Mousewheel: zoom</li>
+</ul>
+<form>Server URL:<input type="text" id="url" value="127.0.0.1"> Port:<input type="text" id="port" value="2459"><input type="button" value="Connect" id="connect"></form>
+<div id="status">Status: Not connected</div>
+</p>
+<canvas id="preview" width="512" height="512" style="border:1px solid #000000;">
+</canvas>
+<div id="debug">Debug: ---</div><br/>
+<script>
+var element = document.getElementById("preview");
+var width = element.clientWidth;
+var height = element.clientWidth;
+var ctx = element.getContext("2d");
+var socket = null;
+
+var projection = [
+	1, 0, 0, 0,
+	0, 1, 0, 0,
+	0, 0, 1, 0,
+	0, 0, 0, 1
+];
+var modelview = [
+	1, 0, 0, 0,
+	0, 1, 0, 0,
+	0, 0, 1, 0,
+	0, 0, 0, 1
+];
+var rotation = [
+	1, 0, 0, 0,
+	0, 1, 0, 0,
+	0, 0, 1, 0,
+	0, 0, 0, 1
+];
+var znear = 0;
+
+function setFrustum(left, right, bottom, top, znear, zfar )
+{
+	var znear2 = znear * 2;
+	var width = right - left;
+	var height = top - bottom;
+	var zRange = znear - zfar;
+	projection[ 0] = znear2 / width;
+	projection[ 1] = 0;
+	projection[ 2] = 0;
+	projection[ 3] = 0;
+	projection[ 4] = 0;
+	projection[ 5] = znear2 / height;
+	projection[ 6] = 0;
+	projection[ 7] = 0;
+	projection[ 8] = ( right + left ) / width;
+	projection[ 9] = ( top + bottom ) / height;
+	projection[10] = ( zfar + znear) / zRange;
+	projection[11] = -1;
+	projection[12] = 0;
+	projection[13] = 0;
+	projection[14] = ( -znear2 * zfar ) / -zRange;
+	projection[15] = 0;
+}
+
+function setPerspective( fovyInDegrees, aspectRatio, __znear, zfar )
+{
+	znear = __znear;
+	var ymax = znear * Math.tan( fovyInDegrees * Math.PI / 360.0 );
+	var xmax = ymax * aspectRatio;
+	setFrustum( -xmax, xmax, -ymax, ymax, znear, zfar );
+}
+
+function mulMatrix( matrix1 , matrix2)
+{
+	var result = new Array(16);
+	for (x = 0; x < 4; x++)
+		for (y = 0; y < 4; y++)
+			result[y+x*4] = matrix1[y+0*4] * matrix2[0+x*4]
+			              + matrix1[y+1*4] * matrix2[1+x*4]
+			              + matrix1[y+2*4] * matrix2[2+x*4]
+			              + matrix1[y+3*4] * matrix2[3+x*4];
+	return result;
+}
+
+function mulMatrix4(p,matrix)
+{
+	var t = new Array(4);
+	t[0] =  matrix[ 0] * p[0] + matrix[ 4] * p[1] +  matrix[ 8] * p[2] + matrix[12] * p[3];
+	t[1] =  matrix[ 1] * p[0] + matrix[ 5] * p[1] +  matrix[ 9] * p[2] + matrix[13] * p[3];
+	t[2] =  matrix[ 2] * p[0] + matrix[ 6] * p[1] +  matrix[10] * p[2] + matrix[14] * p[3];
+	t[3] =  matrix[ 3] * p[0] + matrix[ 7] * p[1] +  matrix[11] * p[2] + matrix[15] * p[3];
+	return t;
+}
+
+function rotateMatrix( x, y, z, rad )
+{
+	//Rotation matrix:
+	var s = Math.sin( rad * Math.PI / 360.0);
+	var c = Math.cos( rad * Math.PI / 360.0);
+	var l = Math.sqrt( x * x + y * y + z * z);
+	if ( l == 0 )
+		return;
+	x = x / l;
+	y = y / l;
+	z = z / l;
+	var rotate = new Array(16);
+	rotate[ 0] = c + x * x * ( 1 - c );
+	rotate[ 4] = x * y * ( 1 - c ) - z * s;
+	rotate[ 8] = x * z * ( 1 - c ) + y * s;
+	rotate[12] = 0;
+	rotate[ 1] = y * x * ( 1 - c ) + z * s;
+	rotate[ 5] = c + y * y * ( 1 - c );
+	rotate[ 9] = y * z * ( 1 - c ) - x * s;
+	rotate[13] = 0;
+	rotate[ 2] = z * x * ( 1 - c ) - y * s;
+	rotate[ 6] = z * y * ( 1 - c ) + x * s;
+	rotate[10] = c + z * z * ( 1 - c );
+	rotate[14] = 0;
+	rotate[ 3] = 0;
+	rotate[ 7] = 0;
+	rotate[11] = 0;
+	rotate[15] = 1;
+
+	return rotate;
+}
+
+function mulMatrix3(p,matrix)
+{
+	return mulMatrix4([p[0],p[1],p[2],1],matrix);
+}
+
+function translateMatrix(x,y,z)
+{
+	return [1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1];
+}
+
+function project(p)
+{
+	var m = mulMatrix4(mulMatrix3(p,modelview),projection);
+	var t = new Array(2);
+	t[0] = width/2  + m[0] / m[3] * width/2;
+	t[1] = height/2 - m[1] / m[3] * height/2;
+	t[2] = m[2];
+    return t;
+}
+
+function line(p1,p2)
+{
+	var t1 = project(p1);
+	var t2 = project(p2);
+	if ((t1[2] < 0) || (t2[2] < 0))
+		return;
+	ctx.moveTo( t1[0], t1[1] );
+	ctx.lineTo( t2[0], t2[1] );
+}	
+
+function drawUnitCube()
+{
+	var edges = [
+		[ -1,  1,  1 ],
+		[  1,  1,  1 ],
+		[  1, -1,  1 ],
+		[ -1, -1,  1 ],
+		[ -1,  1, -1 ],
+		[  1,  1, -1 ],
+		[  1, -1, -1 ],
+		[ -1, -1, -1 ]
+	]
+	//front
+	line( edges[0], edges[1] );
+	line( edges[1], edges[2] );
+	line( edges[2], edges[3] );
+	line( edges[3], edges[0] );
+	//back
+	line( edges[4], edges[5] );
+	line( edges[5], edges[6] );
+	line( edges[6], edges[7] );
+	line( edges[7], edges[4] );
+	//connetion
+	line( edges[0], edges[4] );
+	line( edges[1], edges[5] );
+	line( edges[2], edges[6] );
+	line( edges[3], edges[7] );
+}
+
+function redraw()
+{
+	ctx.clearRect(0, 0, width, height);
+	var temp = modelview;
+	ctx.beginPath();
+	modelview = mulMatrix(modelview,rotation)
+	drawUnitCube();
+	modelview = temp;
+	ctx.stroke();
+}
+
+function mouseWheelHandler(e)
+{
+	var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
+	modelview = mulMatrix(modelview,translateMatrix(0,0,delta));
+	redraw();
+	ctx.fillText("Delta: " + delta,1,10);
+}
+
+var mousedown = [0,0,0];
+var mousex = 0;
+var mousey = 0;
+function mouseDownHandler(e)
+{
+	mousedown[e.button] = 1;
+	mousex = e.clientX;
+	mousey = e.clientY;
+}
+function mouseUpHandler(e)
+{
+	mousedown[e.button] = 0;
+}
+function mouseResetHandler()
+{
+	mousedown[0] = 0;
+	mousedown[1] = 0;
+	mousedown[2] = 0;
+}
+
+function mouseMoveHandler(e)
+{
+	var dx = e.clientX - mousex;
+	var dy = e.clientY - mousey;
+	if (mousedown[0])
+	{
+		var l = Math.sqrt( dx * dx + dy * dy );
+		dx /= l;
+		dy /= l;
+		rotation = mulMatrix(rotateMatrix(dy,dx,0,l),rotation);
+	}
+	if (mousedown[2] || mousedown[1])
+		modelview = mulMatrix(modelview,translateMatrix(dx/100,-dy/100,0,l));
+	redraw();
+	mousex = e.clientX;
+	mousey = e.clientY;
+}
+
+ctx.font = "10px Arial";
+setPerspective( 45.0, 1, 1, 100 )
+modelview = mulMatrix(modelview,translateMatrix(0,0,-5));
+redraw();
+element.addEventListener("mousewheel", mouseWheelHandler, false);
+element.addEventListener("DOMMouseScroll", mouseWheelHandler, false);
+element.addEventListener("mousemove", mouseMoveHandler, false);
+element.addEventListener("mousedown", mouseDownHandler, false);
+element.addEventListener("mouseup", mouseUpHandler, false);
+element.onmouseout = function(){mouseResetHandler()};
+
+document.getElementById("connect").onclick = function()
+{
+	if (socket) //Close
+		socket.close();
+	else //Open
+	{
+		url = "ws://" + document.getElementById("url").value + ":" + document.getElementById("port").value;
+		if (typeof MozWebSocket != "undefined")
+			socket = new MozWebSocket( url , "dumb-increment-protocol" );
+		else
+			socket = new WebSocket( url , "dumb-increment-protocol" );
+		try
+		{
+			socket.onopen = function()
+			{
+				document.getElementById("status").textContent = "Status: Connected";
+				document.getElementById("connect").value = "Close";
+			};
+			socket.onmessage =function got_packet(msg)
+			{
+				document.getElementById("debug").textContent = msg.data;
+			};
+			socket.onclose = function()
+			{
+				document.getElementById("status").textContent = "Status: Closed";
+				document.getElementById("connect").value = "Connect";
+				socket = null;
+			};
+		}
+		catch(exception)
+		{
+			document.getElementById("status").textContent = "Status: Error" + exception;
+		}
+	}
+};
+
+
+</script>
+
+</html>
