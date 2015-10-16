@@ -1,6 +1,19 @@
 cmake_minimum_required (VERSION 2.6)
 project (isaac)
-add_executable(isaac server/server.cpp)
+
+set(SRCS
+	${CMAKE_SOURCE_DIR}/server/isaac.cpp
+	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.cpp
+	${CMAKE_SOURCE_DIR}/server/Master.cpp
+)
+
+set(HDRS
+	${CMAKE_SOURCE_DIR}/server/Common.hpp
+	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.hpp
+	${CMAKE_SOURCE_DIR}/server/Master.hpp
+)
+
+add_executable(isaac ${HDRS} ${SRCS})
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules")
 find_package(LibWebSockets REQUIRED)

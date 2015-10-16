@@ -15,22 +15,21 @@
 
 #pragma once
 
-#include "Common.hpp"
 #include <string>
-class Master;
+#include <list>
+#include "Common.hpp"
+#include "MetaDataConnector.hpp"
 
-/** This class is used for the connection between the isaac server and
- * some frontend. It defines and abstract interface isaac will use.*/
-class MetaDataConnector
+class Master
 {
 	public:
-		MetaDataConnector();
-		void setMaster(Master* master);
-		virtual errorCode run(int port) = 0;
-		ClientRef addClient();
-		errorCode remClient(ClientRef ref);
-		ObserverRef addObserver(ClientRef ref,std::string simulation);
-		errorCode remObserver(ObserverRef ob_ref);
+		Master(std::string name);
+		~Master();
+		errorCode addDataConnector(MetaDataConnector *dataConnector);
+		errorCode remDataConnector(MetaDataConnector *dataConnector);
+		//TODO: Functions for registration of insitu plugins
+		errorCode run();
 	private:
-		Master* master;
+		std::string name;
+		std::list<MetaDataConnector*> dataConnectorList;
 };

@@ -13,24 +13,38 @@
  * You should have received a copy of the GNU General Public License
  * along with ISAAC.  If not, see <http://www.gnu.org/licenses/>. */
 
-#pragma once
+#include "MetaDataConnector.hpp"
 
-#include "Common.hpp"
-#include <string>
-class Master;
-
-/** This class is used for the connection between the isaac server and
- * some frontend. It defines and abstract interface isaac will use.*/
-class MetaDataConnector
+MetaDataConnector::MetaDataConnector()
 {
-	public:
-		MetaDataConnector();
-		void setMaster(Master* master);
-		virtual errorCode run(int port) = 0;
-		ClientRef addClient();
-		errorCode remClient(ClientRef ref);
-		ObserverRef addObserver(ClientRef ref,std::string simulation);
-		errorCode remObserver(ObserverRef ob_ref);
-	private:
-		Master* master;
-};
+	//TODO
+}
+
+void MetaDataConnector::setMaster(Master* master)
+{
+	this->master = master;
+}
+
+ClientRef MetaDataConnector::addClient()
+{
+	//TODO
+	return 0;
+}
+
+errorCode MetaDataConnector::remClient(ClientRef ref)
+{
+	//TODO
+	return 0;
+}
+
+ObserverRef MetaDataConnector::addObserver(ClientRef ref,std::string simulation)
+{
+	//TODO
+	return 0;
+}
+
+errorCode remObserver(ObserverRef ob_ref)
+{
+	//TODO
+	return 0;
+}
