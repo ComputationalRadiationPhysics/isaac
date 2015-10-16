@@ -19,6 +19,13 @@
 #include <list>
 #include "Common.hpp"
 #include "MetaDataConnector.hpp"
+#include <signal.h>
+
+typedef struct MetaDataConnectorList_struct
+{
+	MetaDataConnector* connector;
+	pthread_t thread;
+} MetaDataConnectorList;
 
 class Master
 {
@@ -26,10 +33,9 @@ class Master
 		Master(std::string name);
 		~Master();
 		errorCode addDataConnector(MetaDataConnector *dataConnector);
-		errorCode remDataConnector(MetaDataConnector *dataConnector);
-		//TODO: Functions for registration of insitu plugins
 		errorCode run();
+		static volatile sig_atomic_t force_exit;
 	private:
 		std::string name;
-		std::list<MetaDataConnector*> dataConnectorList;
+		std::list<MetaDataConnectorList> dataConnectorList;
 };

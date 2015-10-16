@@ -14,6 +14,15 @@
  * along with ISAAC.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include "Master.hpp"
+#include <stdio.h>
+
+volatile sig_atomic_t Master::force_exit = 0;
+
+void sighandler(int sig)
+{
+	printf("\n");
+	Master::force_exit = 1;
+}
 
 Master::Master(std::string name)
 {
@@ -22,20 +31,42 @@ Master::Master(std::string name)
 
 errorCode Master::addDataConnector(MetaDataConnector *dataConnector)
 {
-	dataConnectorList.push_back(dataConnector);
+	MetaDataConnectorList d;
+	d.connector = dataConnector;
+	d.thread = 0;
+	dataConnectorList.push_back(d);
 	dataConnector->setMaster(this);
 	return 0;
 }
 
-errorCode Master::remDataConnector(MetaDataConnector *dataConnector)
+void* run_data_connector(void* ptr)
 {
-	//TODO
-	return 0;
+	MetaDataConnector* dataConnector = (MetaDataConnector*)ptr;
+	dataConnector->run();
 }
 
-errorCode run()
+errorCode Master::run()
 {
-	//TODO
+	printf("Running ISAAC Master\n");
+	signal(SIGINT, sighandler);
+	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+	{
+		printf("Launching %s\n",(*it).connector->getName().c_str());
+		pthread_create(&((*it).thread),NULL,run_data_connector,(*it).connector);
+	}		
+	while (force_exit == 0)
+		usleep(1);
+	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+	{
+		printf("Asking %s to exit\n",(*it).connector->getName().c_str());
+		(*it).connector->addMessage(new MessageContainer(FORCE_EXIT));
+	}
+	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+	{
+		pthread_join((*it).thread,NULL);
+		printf("%s finished\n",(*it).connector->getName().c_str());
+	}
+	signal(SIGINT, SIG_DFL);
 	return 0;
 }
 

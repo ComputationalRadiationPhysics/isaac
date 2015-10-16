@@ -17,7 +17,35 @@
 
 #include "Common.hpp"
 #include <string>
+#include "ThreadList.hpp"
 class Master;
+
+typedef enum
+{
+	FORCE_EXIT = -1,
+	NONE = 0,
+	ADD_CLIENT,
+	REMOVE_CLIENT,
+	ADD_OBSERVER,
+	REMOVE_OBSERVER
+} MessageType;
+
+class MessageContainer
+{
+	public:
+		MessageContainer(MessageType type = NONE,int ref1 = 0,int ref2 = 0,std::string content = "")
+		{
+			this->type = type;
+			this->ref1 = ref1;
+			this->ref2 = ref2;
+			this->content = content;
+		}
+
+		MessageType type;
+		int ref1;
+		int ref2;
+		std::string content;
+};
 
 /** This class is used for the connection between the isaac server and
  * some frontend. It defines and abstract interface isaac will use.*/
@@ -25,12 +53,20 @@ class MetaDataConnector
 {
 	public:
 		MetaDataConnector();
-		void setMaster(Master* master);
-		virtual errorCode run(int port) = 0;
-		ClientRef addClient();
-		errorCode remClient(ClientRef ref);
-		ObserverRef addObserver(ClientRef ref,std::string simulation);
-		errorCode remObserver(ObserverRef ob_ref);
+		
+		//To be used, the message must be freed!
+		MessageContainer* getLastMessage();
+
+		//To be overwritten
+		virtual errorCode init(int port) = 0;
+		virtual errorCode run() = 0;
+		virtual std::string getName() = 0;
+
+		//Called from the Master
+		void setMaster(Master* master);		
+		errorCode addMessage(MessageContainer* message);
+		bool force_exit;
+		ThreadList<MessageContainer*> messages;
 	private:
 		Master* master;
 };

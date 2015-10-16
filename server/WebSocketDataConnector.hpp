@@ -13,27 +13,26 @@
  * You should have received a copy of the GNU General Public License
  * along with ISAAC.  If not, see <http://www.gnu.org/licenses/>. */
 
+#pragma once
+
 #include "MetaDataConnector.hpp"
 
-MetaDataConnector::MetaDataConnector()
-{
-	force_exit = false;
-}
+#include <libwebsockets.h>
 
-errorCode MetaDataConnector::addMessage(MessageContainer* message)
+/** This class is used for the connection between the isaac server and
+ * some frontend. It defines and abstract interface isaac will use.*/
+class WebSocketDataConnector : public MetaDataConnector
 {
-	messages.push_back(message);
-}
+	public:
+		//To implement
+		errorCode init(int port);
+		errorCode run();
+		std::string getName();
 
-void MetaDataConnector::setMaster(Master* master)
-{
-	this->master = master;
-}
-
-MessageContainer* MetaDataConnector::getLastMessage()
-{
-	MessageContainer* message = messages.pop_front();
-	if (message && message->type == FORCE_EXIT)
-		force_exit = true;
-	return message;
-}
+		//Derived from MetaDataConnector
+		//MessageContainer* getLastMessage();
+		//void setMaster(Master* master);		
+		//errorCode addMessage(MessageContainer* message);	
+		//bool force_exit;
+		struct libwebsocket_context *context;
+};
