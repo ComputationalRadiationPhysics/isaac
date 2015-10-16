@@ -25,4 +25,7 @@ set(LIBS ${LIBS} ${LIBWEBSOCKETS_LIBRARIES})
 find_package (Threads)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
+find_package (Jansson)
+set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
+
 target_link_libraries(isaac ${LIBS})

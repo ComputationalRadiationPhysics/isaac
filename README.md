@@ -19,7 +19,12 @@ _on the fly_.
 Requirements
 ------------
 
+Most of these requirements are git submodules and can be found in
+requirement-submodules.
+
 * libwebsockets for the connection between server and client
+* Jansson for the de- and encryption of the JSON used between server and
+  client
 * Alpaka for the abstraction of the acceleration device
 * IceT for combining the visualization created from the in situ plugin
 * MPI for the communication of IceT

@@ -15,6 +15,7 @@
 
 #include "Master.hpp"
 #include <stdio.h>
+#include <jansson.h>
 
 volatile sig_atomic_t Master::force_exit = 0;
 

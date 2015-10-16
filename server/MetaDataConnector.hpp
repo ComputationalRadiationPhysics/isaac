@@ -40,7 +40,7 @@ class MessageContainer
 			this->ref2 = ref2;
 			this->content = content;
 		}
-
+		
 		MessageType type;
 		int ref1;
 		int ref2;
@@ -48,7 +48,7 @@ class MessageContainer
 };
 
 /** This class is used for the connection between the isaac server and
- * some frontend. It defines and abstract interface isaac will use.*/
+ * some frontend. It defines and abstracts an interface isaac will use.*/
 class MetaDataConnector
 {
 	public:

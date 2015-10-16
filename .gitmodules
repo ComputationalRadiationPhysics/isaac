@@ -7,3 +7,6 @@
 [submodule "alpaka"]
 	path = requirement-modules/alpaka
 	url = https://github.com/ComputationalRadiationPhysics/alpaka.git
+[submodule "requirement-modules/jansson"]
+	path = requirement-modules/jansson
+	url = https://github.com/akheron/jansson.git
