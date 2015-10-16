@@ -1,0 +1,9 @@
+[submodule "IceT"]
+	path = requirement-modules/IceT
+	url = git://public.kitware.com/IceT.git
+[submodule "libwebsockets"]
+	path = requirement-modules/libwebsockets
+	url = git://git.libwebsockets.org/libwebsockets
+[submodule "alpaka"]
+	path = requirement-modules/alpaka
+	url = https://github.com/ComputationalRadiationPhysics/alpaka.git
