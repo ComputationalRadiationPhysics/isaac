@@ -12,33 +12,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with ISAAC.  If not, see <http://www.gnu.org/licenses/>. */
-
+ 
 #pragma once
-
-#include <string>
-#include <list>
 #include "Common.hpp"
-#include "MetaDataConnector.hpp"
-#include <signal.h>
 
-typedef struct MetaDataConnectorList_struct
-{
-	MetaDataConnector* connector;
-	pthread_t thread;
-} MetaDataConnectorList;
-
-class Master
+class Runable
 {
 	public:
-		Master(std::string name,int inner_port);
-		~Master();
-		errorCode addDataConnector(MetaDataConnector *dataConnector);
-		errorCode run();
-		static volatile sig_atomic_t force_exit;
-	private:
-		std::string name;
-		std::list<MetaDataConnectorList> dataConnectorList;
-		std::list<int> insituList;
-		int inner_port;
-		pthread_t insituThread;
+		virtual errorCode run() = 0;
+		static void* run_runable(void* ptr);
 };

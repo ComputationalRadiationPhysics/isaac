@@ -266,9 +266,9 @@ document.getElementById("connect").onclick = function()
 	{
 		url = "ws://" + document.getElementById("url").value + ":" + document.getElementById("port").value;
 		if (typeof MozWebSocket != "undefined")
-			socket = new MozWebSocket( url , "dumb-increment-protocol" );
+			socket = new MozWebSocket( url , "isaac-json-protocol" );
 		else
-			socket = new WebSocket( url , "dumb-increment-protocol" );
+			socket = new WebSocket( url , "isaac-json-protocol" );
 		try
 		{
 			socket.onopen = function()
@@ -278,7 +278,8 @@ document.getElementById("connect").onclick = function()
 			};
 			socket.onmessage =function got_packet(msg)
 			{
-				document.getElementById("debug").textContent = msg.data;
+				var obj = JSON.parse(msg.data);
+				document.getElementById("debug").textContent = obj;
 			};
 			socket.onclose = function()
 			{

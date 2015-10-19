@@ -18,38 +18,12 @@
 #include "Common.hpp"
 #include <string>
 #include "ThreadList.hpp"
+#include "Runable.hpp"
 class Master;
-
-typedef enum
-{
-	FORCE_EXIT = -1,
-	NONE = 0,
-	ADD_CLIENT,
-	REMOVE_CLIENT,
-	ADD_OBSERVER,
-	REMOVE_OBSERVER
-} MessageType;
-
-class MessageContainer
-{
-	public:
-		MessageContainer(MessageType type = NONE,int ref1 = 0,int ref2 = 0,std::string content = "")
-		{
-			this->type = type;
-			this->ref1 = ref1;
-			this->ref2 = ref2;
-			this->content = content;
-		}
-		
-		MessageType type;
-		int ref1;
-		int ref2;
-		std::string content;
-};
 
 /** This class is used for the connection between the isaac server and
  * some frontend. It defines and abstracts an interface isaac will use.*/
-class MetaDataConnector
+class MetaDataConnector : public Runable
 {
 	public:
 		MetaDataConnector();

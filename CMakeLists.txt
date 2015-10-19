@@ -5,20 +5,27 @@ set(SRCS
 	${CMAKE_SOURCE_DIR}/server/isaac.cpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/WebSocketDataConnector.cpp
+	${CMAKE_SOURCE_DIR}/server/InsituConnector.cpp
+	${CMAKE_SOURCE_DIR}/server/InsituConnectorMaster.cpp
 	${CMAKE_SOURCE_DIR}/server/Master.cpp
+	${CMAKE_SOURCE_DIR}/server/Runable.cpp
 )
 
 set(HDRS
 	${CMAKE_SOURCE_DIR}/server/Common.hpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.hpp
+	${CMAKE_SOURCE_DIR}/server/InsituConnector.hpp
+	${CMAKE_SOURCE_DIR}/server/InsituConnectorMaster.hpp
 	${CMAKE_SOURCE_DIR}/server/WebSocketDataConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/Master.hpp
 	${CMAKE_SOURCE_DIR}/server/ThreadList.hpp
+	${CMAKE_SOURCE_DIR}/server/Runable.hpp
 )
 
 add_executable(isaac ${HDRS} ${SRCS})
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules")
+
 find_package(LibWebSockets REQUIRED)
 set(LIBS ${LIBS} ${LIBWEBSOCKETS_LIBRARIES})
 
@@ -29,3 +36,25 @@ find_package (Jansson)
 set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
 
 target_link_libraries(isaac ${LIBS})
+
+option(BUILD_EXAMPLE "Build the example." ON)
+
+if (BUILD_EXAMPLE)
+	add_executable(example ${CMAKE_SOURCE_DIR}/insitu/isaac.hpp ${CMAKE_SOURCE_DIR}/insitu/example.cpp)
+
+	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${JANSSON_LIBRARIES})
+
+	find_package (IceT)
+	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${ICET_CORE_LIBS})
+	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${ICET_MPI_LIBS})
+	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${ICET_INCLUDE_DIRS})
+
+	find_package (MPI)
+	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${MPI_C_LIBRARIES})
+	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${MPI_CXX_LIBRARIES})
+	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${MPI_C_INCLUDE_PATH})
+	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${MPI_CXX_INCLUDE_PATH})
+	
+	include_directories(example ${EXAMPLE_INCLUDE})
+	target_link_libraries(example ${EXAMPLE_LIBS})
+endif ()

@@ -15,7 +15,9 @@
 
 #include "Master.hpp"
 #include <stdio.h>
-#include <jansson.h>
+#include "InsituConnectorMaster.hpp"
+#include <pthread.h>
+#include "ThreadList.hpp"
 
 volatile sig_atomic_t Master::force_exit = 0;
 
@@ -25,9 +27,11 @@ void sighandler(int sig)
 	Master::force_exit = 1;
 }
 
-Master::Master(std::string name)
+Master::Master(std::string name,int inner_port)
 {
 	this->name = name;
+	this->inner_port = inner_port;
+	this->insituThread = 0;
 }
 
 errorCode Master::addDataConnector(MetaDataConnector *dataConnector)
@@ -40,23 +44,52 @@ errorCode Master::addDataConnector(MetaDataConnector *dataConnector)
 	return 0;
 }
 
-void* run_data_connector(void* ptr)
-{
-	MetaDataConnector* dataConnector = (MetaDataConnector*)ptr;
-	dataConnector->run();
-}
-
 errorCode Master::run()
 {
 	printf("Running ISAAC Master\n");
 	signal(SIGINT, sighandler);
+	printf("Starting insitu plugin listener\n");
+	InsituConnectorMaster insituMaster = InsituConnectorMaster();
+	if (insituMaster.init(inner_port))
+	{
+		fprintf(stderr,"Error while starting insitu plugin listener\n");
+		signal(SIGINT, SIG_DFL);
+		return -1;
+	}
+	pthread_create(&insituThread,NULL,Runable::run_runable,&insituMaster);
+	
 	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		printf("Launching %s\n",(*it).connector->getName().c_str());
-		pthread_create(&((*it).thread),NULL,run_data_connector,(*it).connector);
+		pthread_create(&((*it).thread),NULL,Runable::run_runable,(*it).connector);
 	}		
+	int c = 0;
 	while (force_exit == 0)
+	{
+		ThreadList<InsituConnectorList>::ThreadListContainer_ptr mom = insituMaster.insituConnectorList.getFront();
+		while (mom)
+		{
+			//Check for new messages for every insituConnector
+			MessageContainer* message = mom->t.connector->getMessage();
+			if (message)
+			{
+				//c++;
+				//printf("Received message %i %i (%.3f)\n",message->type,c,json_real_value(json_object_get(json_object_get(message->json_root, "metadata"), "speed")));
+				if (message->type == REGISTER_PLUGIN) //Saving the metadata description for later
+				{
+					mom->t.initData = message->json_root;
+					for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+					{
+						printf("Telling %s about new plugin\n",(*it).connector->getName().c_str());
+						(*it).connector->addMessage(new MessageContainer(REGISTER_PLUGIN,mom->t.initData));
+					}
+				}
+				free(message);
+			}
+			mom = mom->next;
+		}
 		usleep(1);
+	}
 	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		printf("Asking %s to exit\n",(*it).connector->getName().c_str());

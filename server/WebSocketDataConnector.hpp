@@ -35,4 +35,6 @@ class WebSocketDataConnector : public MetaDataConnector
 		//errorCode addMessage(MessageContainer* message);	
 		//bool force_exit;
 		struct libwebsocket_context *context;
+	private:
+		json_t* last_data;
 };

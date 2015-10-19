@@ -13,32 +13,35 @@
  * You should have received a copy of the GNU General Public License
  * along with ISAAC.  If not, see <http://www.gnu.org/licenses/>. */
 
-#pragma once
+#include "InsituConnector.hpp"
+#include "stdio.h"
 
-#include <string>
-#include <list>
-#include "Common.hpp"
-#include "MetaDataConnector.hpp"
-#include <signal.h>
-
-typedef struct MetaDataConnectorList_struct
+InsituConnector::InsituConnector(int sockfd)
 {
-	MetaDataConnector* connector;
-	pthread_t thread;
-} MetaDataConnectorList;
+	this->sockfd = sockfd;
+	this->sockfile = fdopen(sockfd,"r");
+}
 
-class Master
+errorCode InsituConnector::run()
 {
-	public:
-		Master(std::string name,int inner_port);
-		~Master();
-		errorCode addDataConnector(MetaDataConnector *dataConnector);
-		errorCode run();
-		static volatile sig_atomic_t force_exit;
-	private:
-		std::string name;
-		std::list<MetaDataConnectorList> dataConnectorList;
-		std::list<int> insituList;
-		int inner_port;
-		pthread_t insituThread;
-};
+	//Get init sequence of insitu plugin
+	while (json_t * content = json_loadf(sockfile,JSON_DISABLE_EOF_CHECK,NULL))
+	{
+		messagesOut.push_back(new MessageContainer(NONE,content));
+	}
+}
+
+errorCode InsituConnector::sendMessage(MessageContainer* message)
+{
+	messagesIn.push_back(message);
+}
+
+MessageContainer* InsituConnector::getMessage()
+{
+	return messagesOut.pop_front();
+}
+
+InsituConnector::~InsituConnector()
+{
+	fclose(sockfile);
+}

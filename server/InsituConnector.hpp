@@ -14,31 +14,21 @@
  * along with ISAAC.  If not, see <http://www.gnu.org/licenses/>. */
 
 #pragma once
+#include "Runable.hpp"
+#include "ThreadList.hpp"
 
-#include <string>
-#include <list>
-#include "Common.hpp"
-#include "MetaDataConnector.hpp"
-#include <signal.h>
-
-typedef struct MetaDataConnectorList_struct
-{
-	MetaDataConnector* connector;
-	pthread_t thread;
-} MetaDataConnectorList;
-
-class Master
+class InsituConnector : public Runable
 {
 	public:
-		Master(std::string name,int inner_port);
-		~Master();
-		errorCode addDataConnector(MetaDataConnector *dataConnector);
+		InsituConnector(int sockfd);
+		~InsituConnector();
 		errorCode run();
-		static volatile sig_atomic_t force_exit;
+		//Called from Master
+		errorCode sendMessage(MessageContainer* message);
+		MessageContainer* getMessage();
 	private:
-		std::string name;
-		std::list<MetaDataConnectorList> dataConnectorList;
-		std::list<int> insituList;
-		int inner_port;
-		pthread_t insituThread;
+		int sockfd;
+		FILE *sockfile;
+		ThreadList<MessageContainer*> messagesIn; //From master to the connector
+		ThreadList<MessageContainer*> messagesOut; //From connector to the master
 };

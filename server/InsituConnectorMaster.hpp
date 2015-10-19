@@ -13,3 +13,27 @@
  * You should have received a copy of the GNU General Public License
  * along with ISAAC.  If not, see <http://www.gnu.org/licenses/>. */
 
+#pragma once
+#include "Common.hpp"
+#include "Runable.hpp"
+#include "ThreadList.hpp"
+#include "InsituConnector.hpp"
+
+typedef struct InsituConnectorList_struct
+{
+	InsituConnector* connector;
+	pthread_t thread;
+	json_t* initData;
+} InsituConnectorList;
+
+class InsituConnectorMaster : public Runable
+{
+	public:
+		InsituConnectorMaster();
+		errorCode init(int port);
+		errorCode run();
+
+		ThreadList<InsituConnectorList> insituConnectorList;
+	private:
+		int sockfd;
+};

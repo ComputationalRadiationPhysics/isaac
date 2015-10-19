@@ -85,6 +85,10 @@ template <typename T> class ThreadList
 				usleep(1);
 			}
 		}
+		ThreadListContainer_ptr getFront()
+		{
+			return front;
+		}
 	private:
 		ThreadListContainer_ptr front;
 		ThreadListContainer_ptr last_front;

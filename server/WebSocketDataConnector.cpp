@@ -59,14 +59,12 @@ static int callback_http(
 	return 0;
 }
 
-
-
-struct per_session_data__dumb_increment {
-	int number;
+struct per_session_data__isaac {
+	json_t* content;
 };
 
 static int
-callback_dumb_increment(
+callback_isaac(
 		struct libwebsocket_context *context,
 		struct libwebsocket *wsi,
 		enum libwebsocket_callback_reasons reason,
@@ -78,30 +76,33 @@ callback_dumb_increment(
 	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + 512 +
 						  LWS_SEND_BUFFER_POST_PADDING];
 	unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
-	struct per_session_data__dumb_increment *pss = (struct per_session_data__dumb_increment *)user;
+	struct per_session_data__isaac *pss = (struct per_session_data__isaac *)user;
 
 	switch (reason) {
 
 	case LWS_CALLBACK_ESTABLISHED:
-		lwsl_info("callback_dumb_increment: "
+		lwsl_info("callback_isaac: "
 						 "LWS_CALLBACK_ESTABLISHED\n");
-		pss->number = 0;
+		pss->content = NULL;
 		break;
 
 	case LWS_CALLBACK_SERVER_WRITEABLE:
-		n = sprintf((char *)p, "%d", pss->number++);
-		m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
-		if (m < n) {
-			lwsl_err("ERROR %d writing to socket\n", n);
-			return -1;
+		pss->content = *(json_t**)libwebsocket_context_user(context);
+		if (pss->content)
+		{
+			char* buffer = json_dumps( pss->content, 0 );
+			printf("Write: %s\n",buffer);
+			n = strlen(buffer);
+			m = libwebsocket_write(wsi, (unsigned char*)buffer, n, LWS_WRITE_TEXT);
+			if (m < n) {
+				lwsl_err("ERROR %d writing to socket\n", n);
+				return -1;
+			}
 		}
 		break;
 
 	case LWS_CALLBACK_RECEIVE:
-		if (len < 6)
-			break;
-		if (strcmp((const char *)in, "reset\n") == 0)
-			pss->number = 0;
+		//TODO!
 		break;
 
 	case LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION:
@@ -109,7 +110,7 @@ callback_dumb_increment(
 		char name[256];
 		char rip[256];
 		libwebsockets_get_peer_addresses(context,wsi,libwebsocket_get_socket_fd(wsi),name,256,rip,256);
-		printf("DUMB Connection from %s (%s)!\n",name,rip);
+		printf("ISAAC Connection from %s (%s)!\n",name,rip);
 		break;
 	}
 
@@ -128,9 +129,9 @@ static struct libwebsocket_protocols protocols[] = {
 		0,  /* max frame size / rx buffer */
 	},
 	{
-		"dumb-increment-protocol",
-		callback_dumb_increment,
-		sizeof(struct per_session_data__dumb_increment),
+		"isaac-json-protocol",
+		callback_isaac,
+		sizeof(struct per_session_data__isaac),
 		10,
 	},
 	{ NULL, NULL, 0, 0 } /* terminator */
@@ -147,6 +148,8 @@ errorCode WebSocketDataConnector::init(int port)
 	#ifndef LWS_NO_EXTENSIONS
 		info.extensions = libwebsocket_get_internal_extensions();
 	#endif
+	last_data = NULL;
+	info.user = &last_data;
 	info.port = port;
 	info.gid = -1;
 	info.uid = -1;
@@ -162,21 +165,16 @@ errorCode WebSocketDataConnector::init(int port)
 errorCode WebSocketDataConnector::run()
 {
 	int n = 0;
-	unsigned int ms, oldms = 0;	
-	while (n >= 0 && !force_exit) {
-		struct timeval tv;
-
-		gettimeofday(&tv, NULL);
-
-		ms = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
-		if ((ms - oldms) > 50) {
-			libwebsocket_callback_on_writable_all_protocol(&protocols[1]);
-			oldms = ms;
-		}
+	while (n >= 0 && !force_exit)
+	{
 		n = libwebsocket_service(context, 50);
 		while (MessageContainer* message = getLastMessage())
 		{
-			//Do something with the message
+			if (message->type > NONE)
+			{
+				last_data = message->json_root;
+				libwebsocket_callback_on_writable_all_protocol(&protocols[1]);
+			}
 			delete message;
 		}
 	}
