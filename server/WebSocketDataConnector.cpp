@@ -81,6 +81,7 @@ callback_isaac(
 	struct per_session_data__isaac *pss = (struct per_session_data__isaac *)user;
 	Master* master = *((Master**)libwebsocket_context_user(context));
 	MessageContainer* message;
+	
 	switch (reason) {
 
 	case LWS_CALLBACK_ESTABLISHED:
@@ -95,18 +96,26 @@ callback_isaac(
 			sprintf(p,"%s",buffer);
 			m = libwebsocket_write(wsi, (unsigned char*)p, n, LWS_WRITE_TEXT);
 			free(buffer);
-			if (m < n) {
+			if (m < n)
+			{
 				lwsl_err("ERROR %d writing to socket\n", n);
+				pss->client->clientSendMessage(new MessageContainer(CLOSED,NULL));
 				return -1;
 			}
 		}
 		break;
-
+	//case LWS_CALLBACK_CLOSED:
+	//	pss->client->clientSendMessage(new MessageContainer(CLOSED,NULL));
+	//	return -1;	
 	case LWS_CALLBACK_RECEIVE:
 		if (pss->client)
 		{
 			json_t* input = json_loads((const char *)in, 0, NULL);
-			pss->client->clientSendMessage(new MessageContainer(NONE,input));
+			MessageContainer* message = new MessageContainer(NONE,input);
+			int finish = (message->type == CLOSED);
+			pss->client->clientSendMessage(message);
+			if (finish)
+				return -1;
 		}
 		break;
 

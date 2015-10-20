@@ -19,7 +19,6 @@
 InsituConnector::InsituConnector(int sockfd,int id)
 {
 	this->sockfd = sockfd;
-	this->sockfile = fdopen(sockfd,"r");
 	this->id = id;
 }
 
@@ -28,11 +27,21 @@ int InsituConnector::getID()
 	return id;
 }
 
+int InsituConnector::getSockFD()
+{
+	return sockfd;
+}
+
+size_t json_load_callback (void *buffer, size_t buflen, void *data)
+{
+	return read(*((int*)data),buffer,1);
+}
+
 errorCode InsituConnector::run()
 {
 	MessageContainer* message = NULL;
 	//Get init sequence of insitu plugin
-	while (json_t * content = json_loadf(sockfile,JSON_DISABLE_EOF_CHECK,NULL))
+	while (json_t * content = json_load_callback(json_load_callback,&sockfd,JSON_DISABLE_EOF_CHECK,NULL))
 	{
 		message = new MessageContainer(NONE,content);
 		if (message->type == EXIT_PLUGIN)
@@ -40,17 +49,17 @@ errorCode InsituConnector::run()
 		clientSendMessage(message);
 		message = NULL;
 	}
-	if (!message) //We ended because of closes connection
+	if (!message) //We ended because of closed connection
 	{
 		message = new MessageContainer(EXIT_PLUGIN,json_object());
 		json_object_set_new( message->json_root, "type", json_string( "exit" ) );
 	}
 	json_object_set_new( message->json_root, "id", json_integer( id) );
 	clientSendMessage(message);
-	messagesOut.spin_over_delete();
+	//messagesOut.spin_over_delete();
 }
 
 InsituConnector::~InsituConnector()
 {
-	fclose(sockfile);
+	//fclose(sockfile);
 }

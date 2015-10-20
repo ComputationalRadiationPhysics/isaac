@@ -32,7 +32,7 @@ class IsaacCommunicator
 		{
 			this->url = url;
 			this->port = port;
-			this->sockfile = NULL;
+			this->sockfd = 0;
 		}
 		int serverConnect()
 		{
@@ -43,7 +43,7 @@ class IsaacCommunicator
 				fprintf(stderr,"Could not resolve %s.\n",url.c_str());
 				return -1;
 			}
-			int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+			sockfd = socket(AF_INET, SOCK_STREAM, 0);
 			if (sockfd < 0)
 			{
 				fprintf(stderr,"Could not create socket.\n");
@@ -60,35 +60,33 @@ class IsaacCommunicator
 				fprintf(stderr,"Could not connect to %s.\n",url.c_str());
 				return -3;
 			}
-			sockfile = fdopen(sockfd,"r+");
 			return 0;
 		}
 		int serverSend(std::string content)
 		{
 			const char* c_content = content.c_str();
-			int n = fwrite(c_content,strlen(c_content),1,sockfile);
-			fflush(sockfile);
+			int n = write(sockfd,c_content,strlen(c_content));
 			return n;
 		}
 		std::string serverReceive()
 		{
 			char buffer[MAX_RECEIVE];
-			fread(buffer,MAX_RECEIVE,1,sockfile);
+			read(sockfd,buffer,MAX_RECEIVE);
 			return std::string(buffer);
 		}
 		void serverDisconnect()
 		{
-			fclose(sockfile);
+			close(sockfd);
 		}
 		~IsaacCommunicator()
 		{
-			if (sockfile)
+			if (sockfd)
 				serverDisconnect();
 		}
 	private:
 		std::string url;
 		int port;
-		FILE* sockfile;
+		int sockfd;
 };
 
 class IsaacVisualization 

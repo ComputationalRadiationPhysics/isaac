@@ -67,7 +67,7 @@ InsituConnectorMaster::~InsituConnectorMaster()
 	InsituConnectorList* mom;
 	while (mom = insituConnectorList.pop_front())
 	{
-		fclose(mom->connector->sockfile);
+		close(mom->connector->getSockFD());
 		printf("Waiting for InsituConnectorThread to finish... ");
 		fflush(stdout);
 		pthread_join(mom->thread,NULL);

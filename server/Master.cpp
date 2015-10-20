@@ -146,7 +146,8 @@ errorCode Master::run()
 			//Check for new messages for every client
 			while (MessageContainer* message = client->t->masterGetMessage())
 			{
-				printf("Got message %i!\n",message->type);
+				if (message->type == CLOSED)
+					client->deleted = true;
 				free(message);
 			}
 			client = client->next;

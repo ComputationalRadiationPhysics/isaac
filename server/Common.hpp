@@ -33,6 +33,9 @@ typedef enum
 	REGISTER_PLUGIN,
 	EXIT_PLUGIN,
 	PERIOD_DATA,
+	OBSERVE,
+	STOP,
+	CLOSED,
 	UNKNOWN
 } MessageType;
 
@@ -57,6 +60,15 @@ class MessageContainer
 				else
 				if (strcmp(str,"period") == 0)
 					this->type = PERIOD_DATA;
+				else
+				if (strcmp(str,"observe") == 0)
+					this->type = OBSERVE;
+				else
+				if (strcmp(str,"stop") == 0)
+					this->type = STOP;
+				else
+				if (strcmp(str,"closed") == 0)
+					this->type = CLOSED;
 				else
 					this->type = UNKNOWN;
 			}

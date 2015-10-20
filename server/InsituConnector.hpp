@@ -25,8 +25,7 @@ class InsituConnector : public Runable, public MessageAble
 		~InsituConnector();
 		errorCode run();
 		int getID();
-
-		FILE *sockfile;
+		int getSockFD();
 	private:
 		int id;
 		int sockfd;

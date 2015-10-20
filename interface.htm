@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <title>Controlpage for the PicOnGPU Removte Visualization tool</title>
 </head>
-<h1 id="isaac_name"></h1>
 <h3>Preview and camera setting</h3>
 <p>Usage:
 <ul>
@@ -16,16 +15,17 @@
 <div id="status">Status: Not connected</div>
 </p>
 <table><tr>
-<td valign="top">
+<td id="preview_td" valign="top">
 	<canvas id="preview" width="512" height="512" style="border:1px solid #000000;">
 	</canvas>
 </td>
-<td id="video_td" style="display:none" valign="top">
+<td id="video_td" valign="top">
 	<canvas id="video" width="512" height="512" style="border:1px solid #000000;">
 	</canvas>
 	<form><input type="button" value="Stop observing" id="stop"></form>
 </td>
-<td valign="top">
+<td id="list_td" style="display:none"  valign="top">
+	<h3 id="isaac_name"></h3>
 	<table id="list_table" border="1">
 	<tr>
 		<th>Name</th>
@@ -279,6 +279,9 @@ element.addEventListener("mousedown", mouseDownHandler, false);
 element.addEventListener("mouseup", mouseUpHandler, false);
 element.onmouseout = function(){mouseResetHandler()};
 
+document.getElementById("video_td").style.display = 'none';
+document.getElementById("preview_td").style.display = 'none';
+
 function stopObserverSimulation()
 {
 	if (observe_id < 0)
@@ -306,8 +309,12 @@ function observeSimulation(id)
 
 document.getElementById("connect").onclick = function()
 {
-	if (socket) //Close
+	if (socket != null && socket.readyState == 1)
+	{
+		socket.send(JSON.stringify({"type" : "close"}));
 		socket.close();
+		socket.onclose();
+	}
 	else //Open
 	{
 		url = "ws://" + document.getElementById("url").value + ":" + document.getElementById("port").value;
@@ -332,6 +339,7 @@ document.getElementById("connect").onclick = function()
 					var table = document.getElementById("list_table");
 					while (table.rows.length > 1)
 						table.deleteRow(1);
+					document.getElementById("list_td").style.display = 'table-cell';
 				}
 				if (obj["type"] == "register")
 				{
@@ -356,6 +364,7 @@ document.getElementById("connect").onclick = function()
 					{
 						document.getElementById("debug").textContent = obj["id"];
 						document.getElementById("video_td").style.display = 'table-cell';
+						document.getElementById("preview_td").style.display = 'table-cell';
 						observeSimulation(obj["id"]);
 					};
 					observeCell.appendChild(button);
@@ -375,7 +384,13 @@ document.getElementById("connect").onclick = function()
 			{
 				document.getElementById("status").textContent = "Status: Closed";
 				document.getElementById("connect").value = "Connect";
-				socket = null;
+				document.getElementById("list_td").style.display = 'none';
+				document.getElementById("video_td").style.display = 'none';
+				document.getElementById("preview_td").style.display = 'none';
+			};
+			socket.onerror = function()
+			{
+				alert("An error occured. Wrong address, network done or server not started?");
 			};
 		}
 		catch(exception)
@@ -388,6 +403,7 @@ document.getElementById("connect").onclick = function()
 document.getElementById("stop").onclick = function()
 {
 	document.getElementById("video_td").style.display = 'none';
+	document.getElementById("preview_td").style.display = 'none';
 	stopObserverSimulation();
 }
 
