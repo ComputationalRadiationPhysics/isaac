@@ -13,13 +13,18 @@
  * You should have received a copy of the GNU General Public License
  * along with ISAAC.  If not, see <http://www.gnu.org/licenses/>. */
 
-#pragma once
+#ifndef __MASTER
+#define __MASTER
 
 #include <string>
 #include <list>
 #include "Common.hpp"
 #include "MetaDataConnector.hpp"
 #include <signal.h>
+#include "MetaDataClient.hpp"
+#include "InsituConnectorMaster.hpp"
+
+class MetaDataConnector;
 
 typedef struct MetaDataConnectorList_struct
 {
@@ -33,12 +38,17 @@ class Master
 		Master(std::string name,int inner_port);
 		~Master();
 		errorCode addDataConnector(MetaDataConnector *dataConnector);
+		MetaDataClient* addDataClient();
 		errorCode run();
 		static volatile sig_atomic_t force_exit;
 	private:
+		InsituConnectorMaster insituMaster;
+		json_t* masterHello;
 		std::string name;
 		std::list<MetaDataConnectorList> dataConnectorList;
-		std::list<int> insituList;
+		ThreadList<MetaDataClient*> dataClientList;
 		int inner_port;
 		pthread_t insituThread;
 };
+
+#endif

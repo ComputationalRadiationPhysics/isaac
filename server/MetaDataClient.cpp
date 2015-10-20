@@ -13,31 +13,9 @@
  * You should have received a copy of the GNU General Public License
  * along with ISAAC.  If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef __METADATACONNECTOR
-#define __METADATACONNECTOR
+#include "MetaDataClient.hpp"
 
-#include "Common.hpp"
-#include <string>
-#include "ThreadList.hpp"
-#include "Runable.hpp"
-#include "MessageAble.hpp"
-#include "Master.hpp"
-class Master;
-
-/** This class is used for the connection between the isaac server and
- * some frontend. It defines and abstracts an interface isaac will use.*/
-class MetaDataConnector : public Runable, public MessageAble
+MetaDataClient::MetaDataClient()
 {
-	public:
-		//To be overwritten
-		virtual errorCode init(int port) = 0;
-		virtual errorCode run() = 0;
-		virtual std::string getName() = 0;
-
-		//Called from the Master
-		void setMaster(Master* master);		
-	protected:
-		Master* master;
-};
-
-#endif
+	
+}

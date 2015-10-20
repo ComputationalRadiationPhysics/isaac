@@ -19,12 +19,13 @@
 #include "ThreadList.hpp"
 #include "InsituConnector.hpp"
 
-typedef struct InsituConnectorList_struct
+class InsituConnectorList
 {
-	InsituConnector* connector;
-	pthread_t thread;
-	json_t* initData;
-} InsituConnectorList;
+	public:
+		InsituConnector* connector;
+		pthread_t thread;
+		json_t* initData;
+};
 
 class InsituConnectorMaster : public Runable
 {
@@ -32,8 +33,9 @@ class InsituConnectorMaster : public Runable
 		InsituConnectorMaster();
 		errorCode init(int port);
 		errorCode run();
-
-		ThreadList<InsituConnectorList> insituConnectorList;
+		~InsituConnectorMaster();
+		ThreadList<InsituConnectorList*> insituConnectorList;
 	private:
+		int nextFreeNumber;
 		int sockfd;
 };

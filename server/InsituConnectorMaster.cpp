@@ -23,6 +23,7 @@
 InsituConnectorMaster::InsituConnectorMaster()
 {
 	sockfd = 0;
+	nextFreeNumber = 0;
 }
 
 errorCode InsituConnectorMaster::init(int port)
@@ -51,12 +52,27 @@ errorCode InsituConnectorMaster::run()
 		if (newsockfd >= 0)
 		{
 			printf("New connection from Plugin established\n");
-			InsituConnector* insituConnector = new InsituConnector(newsockfd);
-			InsituConnectorList d;
-			d.connector = insituConnector;
-			d.initData = NULL;
-			pthread_create(&(d.thread),NULL,Runable::run_runable,insituConnector);
+			InsituConnector* insituConnector = new InsituConnector(newsockfd,nextFreeNumber++);
+			InsituConnectorList* d = new InsituConnectorList();
+			d->connector = insituConnector;
+			d->initData = NULL;
+			pthread_create(&(d->thread),NULL,Runable::run_runable,insituConnector);
 			insituConnectorList.push_back(d);
 		}
 	}
 }
+
+InsituConnectorMaster::~InsituConnectorMaster()
+{
+	InsituConnectorList* mom;
+	while (mom = insituConnectorList.pop_front())
+	{
+		fclose(mom->connector->sockfile);
+		printf("Waiting for InsituConnectorThread to finish... ");
+		fflush(stdout);
+		pthread_join(mom->thread,NULL);
+		delete mom;
+		printf("Done\n");
+	}
+}
+

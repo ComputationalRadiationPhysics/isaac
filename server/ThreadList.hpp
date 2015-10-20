@@ -34,7 +34,7 @@ template <typename T> class ThreadList
 		{
 			front = NULL;
 			back = NULL;
-			last_front = NULL;
+			last_front_next = NULL;
 		}
 		void push_back(T t)
 		{
@@ -61,16 +61,21 @@ template <typename T> class ThreadList
 		T pop_front()
 		{
 			T t = NULL;
-			if (last_front != front && front)
+			ThreadListContainer_ptr new_front = last_front_next;
+			if (new_front == NULL)
+				new_front = front;
+			while (new_front && new_front->deleted)
+				new_front = new_front->next;
+			if (new_front)
 			{
-				t = front->t;
-				last_front = front;
+				t = new_front->t;
+				last_front_next = new_front->next;
 				//After the next call push_back can remove "front"
-				front->deleted = true;
+				new_front->deleted = true;
 			}
 			return t;
 		}
-		~ThreadList<T>()
+		void spin_over_delete()
 		{
 			//Busy waiting until all elements are deleted:
 			while (front)
@@ -85,12 +90,16 @@ template <typename T> class ThreadList
 				usleep(1);
 			}
 		}
+		~ThreadList<T>()
+		{
+			spin_over_delete();
+		}
 		ThreadListContainer_ptr getFront()
 		{
 			return front;
 		}
 	private:
 		ThreadListContainer_ptr front;
-		ThreadListContainer_ptr last_front;
+		ThreadListContainer_ptr last_front_next;
 		ThreadListContainer_ptr back;
 };

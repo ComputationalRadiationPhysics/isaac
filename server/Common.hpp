@@ -29,7 +29,9 @@ typedef enum
 {
 	FORCE_EXIT = -1,
 	NONE = 0,
+	MASTER_HELLO,
 	REGISTER_PLUGIN,
+	EXIT_PLUGIN,
 	PERIOD_DATA,
 	UNKNOWN
 } MessageType;
@@ -37,17 +39,21 @@ typedef enum
 class MessageContainer
 {
 	public:
-		MessageContainer(MessageType type = NONE,json_t *json_root = NULL,int ref1 = 0,int ref2 = 0)
+		MessageContainer(MessageType type = NONE,json_t *json_root = NULL)
 		{
-			this->ref1 = ref1;
-			this->ref2 = ref2;
 			this->json_root = json_root;
 			json_t *json_type;
 			if (type == NONE && (json_type = json_object_get(json_root, "type")) && json_is_string(json_type))
 			{
 				const char* str = json_string_value(json_type);
+				if (strcmp(str,"hello") == 0)
+					this->type = MASTER_HELLO;
+				else
 				if (strcmp(str,"register") == 0)
 					this->type = REGISTER_PLUGIN;
+				else
+				if (strcmp(str,"exit") == 0)
+					this->type = EXIT_PLUGIN;
 				else
 				if (strcmp(str,"period") == 0)
 					this->type = PERIOD_DATA;
@@ -58,7 +64,5 @@ class MessageContainer
 				this->type = type;
 		}
 		MessageType type;
-		int ref1;
-		int ref2;
 		json_t *json_root;
 };

@@ -15,20 +15,19 @@
 
 #pragma once
 #include "Runable.hpp"
+#include "MessageAble.hpp"
 #include "ThreadList.hpp"
 
-class InsituConnector : public Runable
+class InsituConnector : public Runable, public MessageAble
 {
 	public:
-		InsituConnector(int sockfd);
+		InsituConnector(int sockfd,int id);
 		~InsituConnector();
 		errorCode run();
-		//Called from Master
-		errorCode sendMessage(MessageContainer* message);
-		MessageContainer* getMessage();
-	private:
-		int sockfd;
+		int getID();
+
 		FILE *sockfile;
-		ThreadList<MessageContainer*> messagesIn; //From master to the connector
-		ThreadList<MessageContainer*> messagesOut; //From connector to the master
+	private:
+		int id;
+		int sockfd;
 };

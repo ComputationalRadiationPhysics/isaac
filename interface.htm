@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Controlpage for the PicOnGPU Removte Visualization tool</title>
 </head>
-
+<h1 id="isaac_name"></h1>
 <h3>Preview and camera setting</h3>
 <p>Usage:
 <ul>
@@ -15,8 +15,28 @@
 <form>Server URL:<input type="text" id="url" value="127.0.0.1"> Port:<input type="text" id="port" value="2459"><input type="button" value="Connect" id="connect"></form>
 <div id="status">Status: Not connected</div>
 </p>
-<canvas id="preview" width="512" height="512" style="border:1px solid #000000;">
-</canvas>
+<table><tr>
+<td valign="top">
+	<canvas id="preview" width="512" height="512" style="border:1px solid #000000;">
+	</canvas>
+</td>
+<td id="video_td" style="display:none" valign="top">
+	<canvas id="video" width="512" height="512" style="border:1px solid #000000;">
+	</canvas>
+	<form><input type="button" value="Stop observing" id="stop"></form>
+</td>
+<td valign="top">
+	<table id="list_table" border="1">
+	<tr>
+		<th>Name</th>
+		<th>ID</th>
+		<th>Max chain</th>
+		<th>Meta data</th>
+		<th>Observe</th>
+	</tr>
+	</table>
+</td>
+</tr></table>
 <div id="debug">Debug: ---</div><br/>
 <script>
 var element = document.getElementById("preview");
@@ -24,6 +44,7 @@ var width = element.clientWidth;
 var height = element.clientWidth;
 var ctx = element.getContext("2d");
 var socket = null;
+var observe_id = -1;
 
 var projection = [
 	1, 0, 0, 0,
@@ -258,6 +279,31 @@ element.addEventListener("mousedown", mouseDownHandler, false);
 element.addEventListener("mouseup", mouseUpHandler, false);
 element.onmouseout = function(){mouseResetHandler()};
 
+function stopObserverSimulation()
+{
+	if (observe_id < 0)
+		return;
+	var obj =
+	{
+		"type" : "stop",
+		"id" : observe_id
+	};
+	socket.send(JSON.stringify(obj));
+	observe_id = -1;
+}
+
+function observeSimulation(id)
+{
+	stopObserverSimulation();
+	observe_id = id;
+	var obj =
+	{
+		"type" : "observe",
+		"id" : observe_id
+	};
+	socket.send(JSON.stringify(obj));
+}
+
 document.getElementById("connect").onclick = function()
 {
 	if (socket) //Close
@@ -276,10 +322,54 @@ document.getElementById("connect").onclick = function()
 				document.getElementById("status").textContent = "Status: Connected";
 				document.getElementById("connect").value = "Close";
 			};
-			socket.onmessage =function got_packet(msg)
+			socket.onmessage = function got_packet(msg)
 			{
 				var obj = JSON.parse(msg.data);
-				document.getElementById("debug").textContent = obj;
+				document.getElementById("debug").textContent = msg.data;//obj["type"];
+				if (obj["type"] == "hello")
+				{
+					document.getElementById("isaac_name").textContent = obj["name"];
+					var table = document.getElementById("list_table");
+					while (table.rows.length > 1)
+						table.deleteRow(1);
+				}
+				if (obj["type"] == "register")
+				{
+					var table = document.getElementById("list_table");					
+					var row = table.insertRow(-1);
+					row.id = obj["id"];
+					row.insertCell(0).innerHTML = obj["name"];
+					row.insertCell(1).innerHTML = obj["id"];
+					row.insertCell(2).innerHTML = obj["max chain"];
+					var metaCell = row.insertCell(3);//.innerHTML = obj["metadata"].toSource();
+					for (element in obj["metadata"])
+					{
+						metaCell.innerHTML += "<b>" + element + ":</b> ";
+						metaCell.innerHTML += obj["metadata"][element];
+						metaCell.innerHTML += "<br/>";
+					}
+					var observeCell = row.insertCell(4);
+					var button = document.createElement("input");
+					button.type = "button";
+					button.value = "Observe";
+					button.onclick = function()
+					{
+						document.getElementById("debug").textContent = obj["id"];
+						document.getElementById("video_td").style.display = 'table-cell';
+						observeSimulation(obj["id"]);
+					};
+					observeCell.appendChild(button);
+				}
+				if (obj["type"] == "exit")
+				{
+					var table = document.getElementById("list_table");					
+					for (var c = 1; c < table.rows.length;c++)
+						if (table.rows[c].id == obj["id"])
+						{
+							table.deleteRow(c);
+							break;
+						}
+				}
 			};
 			socket.onclose = function()
 			{
@@ -295,6 +385,11 @@ document.getElementById("connect").onclick = function()
 	}
 };
 
+document.getElementById("stop").onclick = function()
+{
+	document.getElementById("video_td").style.display = 'none';
+	stopObserverSimulation();
+}
 
 </script>
 

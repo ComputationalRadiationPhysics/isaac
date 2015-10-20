@@ -22,6 +22,8 @@ int main(int argc, char **argv)
 {
 	int outer_port = 2459;
 	int inner_port = 2460;
+	const char __name[] = "ISAAC Visualization server";
+	const char* name = __name;
 	if (argc > 1)
 	{
 		if (strcmp(argv[1],"--help") == 0)
@@ -30,9 +32,10 @@ int main(int argc, char **argv)
 			printf("Usage:\n");
 			printf("\tisaac --help\n");
 			printf("\t\tShows this help\n");
-			printf("\tisaac [outer_port] [inner_port]\n");
+			printf("\tisaac [outer_port] [inner_port] [name]\n");
 			printf("\t\touter_port default: 2459\n");
 			printf("\t\tinner_port default: 2460\n");
+			printf("\t\t      name default: ISAAC Visualization server\n");
 			printf("\tisaac --version\n");
 			printf("\t\tShows the version\n");
 			return 0;
@@ -46,11 +49,13 @@ int main(int argc, char **argv)
 	}
 	if (argc > 2)
 		outer_port = atoi(argv[2]);
+	if (argc > 3)
+		name = argv[3];
 	
 	printf("Using outer_port=%i and inner_port=%i\n",outer_port,inner_port);
 	
 	printf("\n");
-	Master master("ISAAC Test",inner_port);
+	Master master(name,inner_port);
 	WebSocketDataConnector* webSocketDataConnector = new WebSocketDataConnector();
 	if (webSocketDataConnector->init(outer_port))
 		delete webSocketDataConnector;

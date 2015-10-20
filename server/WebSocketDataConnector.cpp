@@ -30,6 +30,8 @@
 
 #include <pthread.h>
 
+#include "MetaDataClient.hpp"
+
 std::string WebSocketDataConnector::getName()
 {
 	return "WebSocketDataConnector";
@@ -60,7 +62,7 @@ static int callback_http(
 }
 
 struct per_session_data__isaac {
-	json_t* content;
+	MetaDataClient* client;
 };
 
 static int
@@ -73,27 +75,26 @@ callback_isaac(
 		size_t len )
 {
 	int n, m;
-	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + 512 +
+	char buf[LWS_SEND_BUFFER_PRE_PADDING + MAX_RECEIVE +
 						  LWS_SEND_BUFFER_POST_PADDING];
-	unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
+	char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 	struct per_session_data__isaac *pss = (struct per_session_data__isaac *)user;
-
+	Master* master = *((Master**)libwebsocket_context_user(context));
+	MessageContainer* message;
 	switch (reason) {
 
 	case LWS_CALLBACK_ESTABLISHED:
-		lwsl_info("callback_isaac: "
-						 "LWS_CALLBACK_ESTABLISHED\n");
-		pss->content = NULL;
+		printf("callback_isaac: LWS_CALLBACK_ESTABLISHED\n");
 		break;
 
 	case LWS_CALLBACK_SERVER_WRITEABLE:
-		pss->content = *(json_t**)libwebsocket_context_user(context);
-		if (pss->content)
+		if (pss->client && (message = pss->client->clientGetMessage())) //New message from master sama!
 		{
-			char* buffer = json_dumps( pss->content, 0 );
-			printf("Write: %s\n",buffer);
+			char* buffer = json_dumps( message->json_root, 0 );
 			n = strlen(buffer);
-			m = libwebsocket_write(wsi, (unsigned char*)buffer, n, LWS_WRITE_TEXT);
+			sprintf(p,"%s",buffer);
+			m = libwebsocket_write(wsi, (unsigned char*)p, n, LWS_WRITE_TEXT);
+			free(buffer);
 			if (m < n) {
 				lwsl_err("ERROR %d writing to socket\n", n);
 				return -1;
@@ -102,7 +103,11 @@ callback_isaac(
 		break;
 
 	case LWS_CALLBACK_RECEIVE:
-		//TODO!
+		if (pss->client)
+		{
+			json_t* input = json_loads((const char *)in, 0, NULL);
+			pss->client->clientSendMessage(new MessageContainer(NONE,input));
+		}
 		break;
 
 	case LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION:
@@ -111,6 +116,7 @@ callback_isaac(
 		char rip[256];
 		libwebsockets_get_peer_addresses(context,wsi,libwebsocket_get_socket_fd(wsi),name,256,rip,256);
 		printf("ISAAC Connection from %s (%s)!\n",name,rip);
+		pss->client = master->addDataClient();
 		break;
 	}
 
@@ -132,7 +138,7 @@ static struct libwebsocket_protocols protocols[] = {
 		"isaac-json-protocol",
 		callback_isaac,
 		sizeof(struct per_session_data__isaac),
-		10,
+		MAX_RECEIVE,
 	},
 	{ NULL, NULL, 0, 0 } /* terminator */
 };
@@ -148,8 +154,7 @@ errorCode WebSocketDataConnector::init(int port)
 	#ifndef LWS_NO_EXTENSIONS
 		info.extensions = libwebsocket_get_internal_extensions();
 	#endif
-	last_data = NULL;
-	info.user = &last_data;
+	info.user = (void*)(&master);
 	info.port = port;
 	info.gid = -1;
 	info.uid = -1;
@@ -165,18 +170,18 @@ errorCode WebSocketDataConnector::init(int port)
 errorCode WebSocketDataConnector::run()
 {
 	int n = 0;
+	bool force_exit = false;
 	while (n >= 0 && !force_exit)
 	{
 		n = libwebsocket_service(context, 50);
-		while (MessageContainer* message = getLastMessage())
+		libwebsocket_callback_on_writable_all_protocol(&protocols[1]);
+		while (MessageContainer* message = clientGetMessage())
 		{
-			if (message->type > NONE)
-			{
-				last_data = message->json_root;
-				libwebsocket_callback_on_writable_all_protocol(&protocols[1]);
-			}
+			if (message->type == FORCE_EXIT)
+				force_exit = true;
 			delete message;
 		}
+		usleep(1);
 	}
 	libwebsocket_context_destroy(context);
 }

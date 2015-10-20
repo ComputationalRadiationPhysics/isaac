@@ -15,7 +15,6 @@
 
 #include "Master.hpp"
 #include <stdio.h>
-#include "InsituConnectorMaster.hpp"
 #include <pthread.h>
 #include "ThreadList.hpp"
 
@@ -32,16 +31,35 @@ Master::Master(std::string name,int inner_port)
 	this->name = name;
 	this->inner_port = inner_port;
 	this->insituThread = 0;
+	masterHello = json_object();
+	json_object_set_new( masterHello, "type", json_string( "hello" ) );
+	json_object_set_new( masterHello, "name", json_string( name.c_str() ) );
 }
 
 errorCode Master::addDataConnector(MetaDataConnector *dataConnector)
 {
+	dataConnector->setMaster(this);
 	MetaDataConnectorList d;
 	d.connector = dataConnector;
 	d.thread = 0;
 	dataConnectorList.push_back(d);
-	dataConnector->setMaster(this);
 	return 0;
+}
+
+MetaDataClient* Master::addDataClient()
+{
+	MetaDataClient* client = new MetaDataClient();
+	dataClientList.push_back(client);
+	client->masterSendMessage(new MessageContainer(MASTER_HELLO,masterHello));
+	//Send all registered visualizations
+	ThreadList<InsituConnectorList*>::ThreadListContainer_ptr mom = insituMaster.insituConnectorList.getFront();
+	while (mom)
+	{
+		if (!mom->deleted)
+			client->masterSendMessage(new MessageContainer(REGISTER_PLUGIN,mom->t->initData));
+		mom = mom->next;
+	}
+	return client;
 }
 
 errorCode Master::run()
@@ -49,7 +67,6 @@ errorCode Master::run()
 	printf("Running ISAAC Master\n");
 	signal(SIGINT, sighandler);
 	printf("Starting insitu plugin listener\n");
-	InsituConnectorMaster insituMaster = InsituConnectorMaster();
 	if (insituMaster.init(inner_port))
 	{
 		fprintf(stderr,"Error while starting insitu plugin listener\n");
@@ -62,38 +79,84 @@ errorCode Master::run()
 	{
 		printf("Launching %s\n",(*it).connector->getName().c_str());
 		pthread_create(&((*it).thread),NULL,Runable::run_runable,(*it).connector);
-	}		
-	int c = 0;
+	}
 	while (force_exit == 0)
 	{
-		ThreadList<InsituConnectorList>::ThreadListContainer_ptr mom = insituMaster.insituConnectorList.getFront();
-		while (mom)
+		/////////////////////////////////////
+		// Iterate over all insitu clients //
+		/////////////////////////////////////
+		ThreadList<InsituConnectorList*>::ThreadListContainer_ptr insitu = insituMaster.insituConnectorList.getFront();
+		while (insitu)
 		{
-			//Check for new messages for every insituConnector
-			MessageContainer* message = mom->t.connector->getMessage();
-			if (message)
+			if (insitu->deleted)
 			{
-				//c++;
-				//printf("Received message %i %i (%.3f)\n",message->type,c,json_real_value(json_object_get(json_object_get(message->json_root, "metadata"), "speed")));
+				insitu = insitu->next;
+				continue;
+			}
+			//Check for new messages for every insituConnector
+			while (MessageContainer* message = insitu->t->connector->masterGetMessage())
+			{
 				if (message->type == REGISTER_PLUGIN) //Saving the metadata description for later
 				{
-					mom->t.initData = message->json_root;
-					for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+					insitu->t->initData = message->json_root;
+					//Adding a field with the number
+					json_object_set_new( insitu->t->initData, "id", json_integer( insitu->t->connector->getID() ) );
+					printf("New connection, giving id %i\n",insitu->t->connector->getID());
+					ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+					while (dc)
 					{
-						printf("Telling %s about new plugin\n",(*it).connector->getName().c_str());
-						(*it).connector->addMessage(new MessageContainer(REGISTER_PLUGIN,mom->t.initData));
+						dc->t->masterSendMessage(new MessageContainer(REGISTER_PLUGIN,insitu->t->initData));
+						dc = dc->next;
 					}
+				}
+				else
+				if (message->type == EXIT_PLUGIN) //Let's tell everybody and remove it from the list
+				{
+					int id = json_integer_value( json_object_get(message->json_root, "id") );
+					printf("Connection %i closed.\n",id);
+					ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+					while (dc)
+					{
+						dc->t->masterSendMessage(new MessageContainer(EXIT_PLUGIN,message->json_root));
+						dc = dc->next;
+					}
+					ThreadList<InsituConnectorList*>::ThreadListContainer_ptr insitu = insituMaster.insituConnectorList.getFront();
+					while (insitu)
+					{
+						if (insitu->t->connector->getID() == id)
+							insitu->deleted = true;
+						insitu = insitu->next;
+					}	
 				}
 				free(message);
 			}
-			mom = mom->next;
+			insitu = insitu->next;
+		}
+		///////////////////////////////////////
+		// Iterate over all metadata clients //
+		///////////////////////////////////////
+		ThreadList<MetaDataClient*>::ThreadListContainer_ptr client = dataClientList.getFront();
+		while (client)
+		{
+			if (client->deleted)
+			{
+				client = client->next;
+				continue;
+			}
+			//Check for new messages for every client
+			while (MessageContainer* message = client->t->masterGetMessage())
+			{
+				printf("Got message %i!\n",message->type);
+				free(message);
+			}
+			client = client->next;
 		}
 		usleep(1);
 	}
 	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		printf("Asking %s to exit\n",(*it).connector->getName().c_str());
-		(*it).connector->addMessage(new MessageContainer(FORCE_EXIT));
+		(*it).connector->masterSendMessage(new MessageContainer(FORCE_EXIT));
 	}
 	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
@@ -106,5 +169,9 @@ errorCode Master::run()
 
 Master::~Master()
 {
+	json_decref( masterHello );
 	dataConnectorList.clear();
+	MetaDataClient* mom;
+	while (mom = dataClientList.pop_front())
+		delete mom;	
 }

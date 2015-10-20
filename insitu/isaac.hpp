@@ -32,7 +32,7 @@ class IsaacCommunicator
 		{
 			this->url = url;
 			this->port = port;
-			this->sockfd = 0;
+			this->sockfile = NULL;
 		}
 		int serverConnect()
 		{
@@ -43,7 +43,7 @@ class IsaacCommunicator
 				fprintf(stderr,"Could not resolve %s.\n",url.c_str());
 				return -1;
 			}
-			sockfd = socket(AF_INET, SOCK_STREAM, 0);
+			int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 			if (sockfd < 0)
 			{
 				fprintf(stderr,"Could not create socket.\n");
@@ -60,37 +60,35 @@ class IsaacCommunicator
 				fprintf(stderr,"Could not connect to %s.\n",url.c_str());
 				return -3;
 			}
+			sockfile = fdopen(sockfd,"r+");
 			return 0;
 		}
 		int serverSend(std::string content)
 		{
 			const char* c_content = content.c_str();
-			//int flag = 1; 
-			//setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
-			int n = write(sockfd,c_content,strlen(c_content));
-			//flag = 0; 
-			//setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
+			int n = fwrite(c_content,strlen(c_content),1,sockfile);
+			fflush(sockfile);
 			return n;
 		}
 		std::string serverReceive()
 		{
 			char buffer[MAX_RECEIVE];
-			read(sockfd,buffer,MAX_RECEIVE);
+			fread(buffer,MAX_RECEIVE,1,sockfile);
 			return std::string(buffer);
 		}
 		void serverDisconnect()
 		{
-			close(sockfd);
+			fclose(sockfile);
 		}
 		~IsaacCommunicator()
 		{
-			if (sockfd)
+			if (sockfile)
 				serverDisconnect();
 		}
 	private:
 		std::string url;
 		int port;
-		int sockfd;
+		FILE* sockfile;
 };
 
 class IsaacVisualization 
@@ -147,6 +145,12 @@ class IsaacVisualization
 		}
 		~IsaacVisualization()
 		{
+			json_decref( json_root );
+			json_root = json_object();
+			json_object_set_new( json_root, "type", json_string( "exit" ) );
+			char* buffer = json_dumps( json_root, 0 );
+			communicator->serverSend(std::string(buffer) + " ");
+			free(buffer);
 			json_decref( json_root );
 			delete communicator;
 		}	

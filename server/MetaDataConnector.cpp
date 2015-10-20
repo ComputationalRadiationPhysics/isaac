@@ -15,25 +15,7 @@
 
 #include "MetaDataConnector.hpp"
 
-MetaDataConnector::MetaDataConnector()
-{
-	force_exit = false;
-}
-
-errorCode MetaDataConnector::addMessage(MessageContainer* message)
-{
-	messages.push_back(message);
-}
-
 void MetaDataConnector::setMaster(Master* master)
 {
 	this->master = master;
-}
-
-MessageContainer* MetaDataConnector::getLastMessage()
-{
-	MessageContainer* message = messages.pop_front();
-	if (message && message->type == FORCE_EXIT)
-		force_exit = true;
-	return message;
 }

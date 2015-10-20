@@ -16,29 +16,38 @@
 #include "InsituConnector.hpp"
 #include "stdio.h"
 
-InsituConnector::InsituConnector(int sockfd)
+InsituConnector::InsituConnector(int sockfd,int id)
 {
 	this->sockfd = sockfd;
 	this->sockfile = fdopen(sockfd,"r");
+	this->id = id;
+}
+
+int InsituConnector::getID()
+{
+	return id;
 }
 
 errorCode InsituConnector::run()
 {
+	MessageContainer* message = NULL;
 	//Get init sequence of insitu plugin
 	while (json_t * content = json_loadf(sockfile,JSON_DISABLE_EOF_CHECK,NULL))
 	{
-		messagesOut.push_back(new MessageContainer(NONE,content));
+		message = new MessageContainer(NONE,content);
+		if (message->type == EXIT_PLUGIN)
+			break;
+		clientSendMessage(message);
+		message = NULL;
 	}
-}
-
-errorCode InsituConnector::sendMessage(MessageContainer* message)
-{
-	messagesIn.push_back(message);
-}
-
-MessageContainer* InsituConnector::getMessage()
-{
-	return messagesOut.pop_front();
+	if (!message) //We ended because of closes connection
+	{
+		message = new MessageContainer(EXIT_PLUGIN,json_object());
+		json_object_set_new( message->json_root, "type", json_string( "exit" ) );
+	}
+	json_object_set_new( message->json_root, "id", json_integer( id) );
+	clientSendMessage(message);
+	messagesOut.spin_over_delete();
 }
 
 InsituConnector::~InsituConnector()
