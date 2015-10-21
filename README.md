@@ -36,5 +36,5 @@ To Do (In fact, it doesn't exist atm at all)
 Licensing
 ---------
 
-ISAAC is licensed under the GPLv3.
+ISAAC is licensed under the LGPLv3.
 

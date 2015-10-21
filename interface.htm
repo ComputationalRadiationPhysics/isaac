@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Controlpage for the PicOnGPU Removte Visualization tool</title>
+<title>ISAAC Control Page</title>
 </head>
 <h3>Preview and camera setting</h3>
 <p>Usage:
@@ -18,11 +18,11 @@
 <td id="preview_td" valign="top">
 	<canvas id="preview" width="512" height="512" style="border:1px solid #000000;">
 	</canvas>
+	<form><input type="button" value="Send example metadada" id="metadata"><input type="button" value="Stop observing" id="stop"></form>
 </td>
 <td id="video_td" valign="top">
 	<canvas id="video" width="512" height="512" style="border:1px solid #000000;">
 	</canvas>
-	<form><input type="button" value="Stop observing" id="stop"></form>
 </td>
 <td id="list_td" style="display:none"  valign="top">
 	<h3 id="isaac_name"></h3>
@@ -266,6 +266,15 @@ function mouseMoveHandler(e)
 	redraw();
 	mousex = e.clientX;
 	mousey = e.clientY;
+	var obj =
+	{
+		"type" : "feedback",
+		"observe id" : observe_id,
+		"projection" : projection,
+		"modelview" : mulMatrix(modelview,rotation)
+	};
+	if (mousedown[2] || mousedown[1] || mousedown[0])
+		socket.send(JSON.stringify(obj));
 }
 
 ctx.font = "10px Arial";
@@ -289,7 +298,7 @@ function stopObserverSimulation()
 	var obj =
 	{
 		"type" : "stop",
-		"id" : observe_id
+		"observe id" : observe_id
 	};
 	socket.send(JSON.stringify(obj));
 	observe_id = -1;
@@ -302,7 +311,7 @@ function observeSimulation(id)
 	var obj =
 	{
 		"type" : "observe",
-		"id" : observe_id
+		"observe id" : observe_id
 	};
 	socket.send(JSON.stringify(obj));
 }
@@ -390,7 +399,7 @@ document.getElementById("connect").onclick = function()
 			};
 			socket.onerror = function()
 			{
-				alert("An error occured. Wrong address, network done or server not started?");
+				alert("An error occured. Wrong address, network gone or server not started?");
 			};
 		}
 		catch(exception)
@@ -406,6 +415,22 @@ document.getElementById("stop").onclick = function()
 	document.getElementById("preview_td").style.display = 'none';
 	stopObserverSimulation();
 }
+
+document.getElementById("metadata").onclick = function()
+{
+	var obj =
+	{
+		"type" : "feedback",
+		"observe id" : observe_id,
+		"metadata" :
+		{
+			"some string" : "Jet fuel doesn't melt steel beams!",
+			"some int" : 42
+		}
+	};
+	socket.send(JSON.stringify(obj));
+}
+
 
 </script>
 

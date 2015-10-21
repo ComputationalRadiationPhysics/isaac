@@ -1,17 +1,17 @@
 /* This file is part of ISAAC.
  *
  * ISAAC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
  * ISAAC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with ISAAC.  If not, see <http://www.gnu.org/licenses/>. */
+ * You should have received a copy of the GNU General Lesser Public
+ * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 #include "Master.hpp"
 #include <stdio.h>
@@ -55,8 +55,7 @@ MetaDataClient* Master::addDataClient()
 	ThreadList<InsituConnectorList*>::ThreadListContainer_ptr mom = insituMaster.insituConnectorList.getFront();
 	while (mom)
 	{
-		if (!mom->deleted)
-			client->masterSendMessage(new MessageContainer(REGISTER_PLUGIN,mom->t->initData));
+		client->masterSendMessage(new MessageContainer(REGISTER_PLUGIN,mom->t->initData));
 		mom = mom->next;
 	}
 	return client;
@@ -88,14 +87,22 @@ errorCode Master::run()
 		ThreadList<InsituConnectorList*>::ThreadListContainer_ptr insitu = insituMaster.insituConnectorList.getFront();
 		while (insitu)
 		{
-			if (insitu->deleted)
-			{
-				insitu = insitu->next;
-				continue;
-			}
+			ThreadList<InsituConnectorList*>::ThreadListContainer_ptr next = insitu->next;
 			//Check for new messages for every insituConnector
 			while (MessageContainer* message = insitu->t->connector->masterGetMessage())
 			{
+				if (message->type == PERIOD_DATA)
+				{
+					//Iterate over all metaDataClient and send to them, which observe
+					ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+					while (dc)
+					{
+						if (dc->t->doesObserve(insitu->t->connector->getID()))
+							dc->t->masterSendMessage(new MessageContainer(PERIOD_DATA,message->json_root));
+						dc = dc->next;
+					}
+				}
+				else
 				if (message->type == REGISTER_PLUGIN) //Saving the metadata description for later
 				{
 					insitu->t->initData = message->json_root;
@@ -120,40 +127,64 @@ errorCode Master::run()
 						dc->t->masterSendMessage(new MessageContainer(EXIT_PLUGIN,message->json_root));
 						dc = dc->next;
 					}
-					ThreadList<InsituConnectorList*>::ThreadListContainer_ptr insitu = insituMaster.insituConnectorList.getFront();
-					while (insitu)
-					{
-						if (insitu->t->connector->getID() == id)
-							insitu->deleted = true;
-						insitu = insitu->next;
-					}	
+					insituMaster.insituConnectorList.remove(insitu);
+					break;
 				}
 				free(message);
 			}
-			insitu = insitu->next;
+			insitu = next;
 		}
 		///////////////////////////////////////
 		// Iterate over all metadata clients //
 		///////////////////////////////////////
-		ThreadList<MetaDataClient*>::ThreadListContainer_ptr client = dataClientList.getFront();
-		while (client)
+		ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+		while (dc)
 		{
-			if (client->deleted)
-			{
-				client = client->next;
-				continue;
-			}
+			ThreadList<MetaDataClient*>::ThreadListContainer_ptr next = dc->next;
 			//Check for new messages for every client
-			while (MessageContainer* message = client->t->masterGetMessage())
+			while (MessageContainer* message = dc->t->masterGetMessage())
 			{
+				if (message->type == FEEDBACK)
+				{
+					json_t* observe_id = json_object_get(message->json_root, "observe id");
+					if (observe_id)
+					{
+						int id = json_integer_value( observe_id );
+						//Send feedback to observing insitu
+						ThreadList<InsituConnectorList*>::ThreadListContainer_ptr insitu = insituMaster.insituConnectorList.getFront();
+						while (insitu)
+						{
+							if ( insitu->t->connector->getID() == id)
+							{
+								char* buffer = json_dumps( message->json_root, 0 );
+								write(insitu->t->connector->getSockFD(),buffer,strlen(buffer));
+								free(buffer);
+								break;
+							}
+							insitu = insitu->next;
+						}					
+					}
+				}
+				if (message->type == OBSERVE)
+					dc->t->observe( json_integer_value( json_object_get(message->json_root, "observe id") ) );
+				if (message->type == STOP)
+					dc->t->stopObserve( json_integer_value( json_object_get(message->json_root, "observe id") ) );
 				if (message->type == CLOSED)
-					client->deleted = true;
+				{
+					dataClientList.remove(dc);
+					break;
+				}
 				free(message);
 			}
-			client = client->next;
+			dc = next;
 		}
 		usleep(1);
 	}
+	printf("Waiting for insitu Master thread to finish... ");
+	fflush(stdout);
+	//Yeah... "finish"
+	pthread_cancel(insituThread);
+	printf("Done\n");
 	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		printf("Asking %s to exit\n",(*it).connector->getName().c_str());
