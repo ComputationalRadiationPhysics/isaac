@@ -24,37 +24,53 @@
 #include <jansson.h>
 #include <pthread.h>
 #include <list>
+#include <mpi.h>
 
 #define MAX_RECEIVE 262144 //256kb
+
+typedef enum
+{
+	META_MERGE = 0,
+	META_MASTER = 1
+} IsaacVisualizationMetaEnum;
 
 class IsaacVisualization 
 {
 	public:
 		IsaacVisualization(
 			std::string name,
+			int master,
 			std::string server_url,
 			int server_port,
 			int framebuffer_count,
 			int framebuffer_size )
 		{
 			this->name = name;
+			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+			MPI_Comm_size(MPI_COMM_WORLD, &numProc);
+			this->master = master;
 			this->server_url = server_url;
 			this->server_port = server_port;
 			this->framebuffer_count = framebuffer_count;
 			this->framebuffer_size = framebuffer_size;
 			this->communicator = new IsaacCommunicator(server_url,server_port);
 			//TODO: Alloc framebuffer
-			recreateJSON(false);
+			recreateJSON();
 			json_object_set_new( json_root, "name", json_string( name.c_str() ) );
-			json_object_set_new( json_root, "framebuffer count",  json_integer ( framebuffer_count ) );
-			json_object_set_new( json_root, "framebuffer size", json_integer ( framebuffer_size ) );
-			//TODO: Read real values
-			json_object_set_new( json_root, "max chain", json_integer( 5 ) );
-			json_t *operators = json_array();
-			json_object_set_new( json_root, "operators", operators );
-			json_array_append( operators, json_string( "dummy1" ) );
-			json_array_append( operators, json_string( "dummy2" ) );
-			json_array_append( operators, json_string( "dummy3" ) );
+			json_object_set_new( json_root, "rank", json_integer( rank ) );
+			if (rank == master)
+			{
+				json_object_set_new( json_root, "nodes", json_integer( numProc ) );
+				json_object_set_new( json_root, "framebuffer count",  json_integer ( framebuffer_count ) );
+				json_object_set_new( json_root, "framebuffer size", json_integer ( framebuffer_size ) );
+				//TODO: Read real values
+				json_object_set_new( json_root, "max chain", json_integer( 5 ) );
+				json_t *operators = json_array();
+				json_object_set_new( json_root, "operators", operators );
+				json_array_append( operators, json_string( "dummy1" ) );
+				json_array_append( operators, json_string( "dummy2" ) );
+				json_array_append( operators, json_string( "dummy3" ) );
+			}
 		}
 		json_t* getJsonMetaRoot()
 		{
@@ -64,14 +80,19 @@ class IsaacVisualization
 		{
 			if (communicator->serverConnect())
 				return -1;
+			if (rank == master)
+				json_object_set_new( json_root, "type", json_string( "register master" ) );
+			else
+				json_object_set_new( json_root, "type", json_string( "register slave" ) );
 			char* buffer = json_dumps( json_root, 0 );
 			communicator->serverSend(std::string(buffer) + " ");
 			free(buffer);
 			json_decref( json_root );
-			recreateJSON(true);
+			recreateJSON();
 			return 0;
 		}
-		void doVisualization()
+		void doVisualization(
+			IsaacVisualizationMetaEnum metaTargets)
 		{
 			//Getting messages
 			while (json_t* message = communicator->getLastMessage())
@@ -82,11 +103,18 @@ class IsaacVisualization
 			//Drawing
 			//TODO: Drawing ;)
 			//Sending messages
-			char* buffer = json_dumps( json_root, 0 );
-			communicator->serverSend(std::string(buffer) + " ");
-			free(buffer);
+			if (metaTargets == META_MERGE || rank == master)
+			{
+				if (metaTargets == META_MERGE)
+					json_object_set_new( json_root, "type", json_string( "period merge" ) );
+				else
+					json_object_set_new( json_root, "type", json_string( "period master" ) );
+				char* buffer = json_dumps( json_root, 0 );
+				communicator->serverSend(std::string(buffer) + " ");
+				free(buffer);
+			}
 			json_decref( json_root );
-			recreateJSON(true);
+			recreateJSON();
 		}
 		json_t* getMeta()
 		{
@@ -95,15 +123,24 @@ class IsaacVisualization
 		~IsaacVisualization()
 		{
 			json_decref( json_root );
-			json_root = json_object();
-			json_object_set_new( json_root, "type", json_string( "exit" ) );
-			char* buffer = json_dumps( json_root, 0 );
-			communicator->serverSend(std::string(buffer) + " ");
-			free(buffer);
-			json_decref( json_root );
+			if (rank == master)
+			{
+				json_root = json_object();
+				json_object_set_new( json_root, "type", json_string( "exit" ) );
+				char* buffer = json_dumps( json_root, 0 );
+				communicator->serverSend(std::string(buffer) + " ");
+				free(buffer);
+				json_decref( json_root );
+			}
 			delete communicator;
 		}	
 	private:
+		void recreateJSON()
+		{
+			json_root = json_object();
+			json_meta_root = json_object();
+			json_object_set_new( json_root, "metadata", json_meta_root );
+		}
 		class IsaacCommunicator
 		{
 			public:
@@ -226,17 +263,6 @@ class IsaacVisualization
 				pthread_mutex_t deleteMessageMutex;
 				pthread_t readThread;
 		};	
-	
-		void recreateJSON(bool period)
-		{
-			json_root = json_object();
-			if (period)
-				json_object_set_new( json_root, "type", json_string( "period" ) );
-			else
-				json_object_set_new( json_root, "type", json_string( "register" ) );
-			json_meta_root = json_object();
-			json_object_set_new( json_root, "metadata", json_meta_root );
-		}
 		std::string name;
 		std::string server_url;
 		int server_port;
@@ -245,4 +271,7 @@ class IsaacVisualization
 		IsaacCommunicator* communicator;
 		json_t *json_root;
 		json_t *json_meta_root;
+		int rank;
+		int master;
+		int numProc;
 };

@@ -18,14 +18,16 @@
 #include "Runable.hpp"
 #include "ThreadList.hpp"
 #include "InsituConnector.hpp"
+#include <memory>
+class InsituConnectorGroup;
 
-class InsituConnectorList
+typedef struct InsituConnectorContainer_struct
 {
-	public:
-		InsituConnector* connector;
-		pthread_t thread;
-		json_t* initData;
-};
+	InsituConnector* connector;
+	pthread_t thread;
+	InsituConnectorGroup* group;
+	int meta_merge_count;
+} InsituConnectorContainer;
 
 class InsituConnectorMaster : public Runable
 {
@@ -34,7 +36,7 @@ class InsituConnectorMaster : public Runable
 		errorCode init(int port);
 		errorCode run();
 		~InsituConnectorMaster();
-		ThreadList<InsituConnectorList*> insituConnectorList;
+		ThreadList< InsituConnectorContainer* > insituConnectorList;
 		int getSockFD();
 	private:
 		int nextFreeNumber;

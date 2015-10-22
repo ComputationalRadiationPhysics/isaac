@@ -20,17 +20,103 @@
 #include <list>
 #include "Common.hpp"
 #include "MetaDataConnector.hpp"
+class MetaDataConnector;
+
 #include <signal.h>
 #include "MetaDataClient.hpp"
 #include "InsituConnectorMaster.hpp"
+#include <memory>
 
-class MetaDataConnector;
-
-typedef struct MetaDataConnectorList_struct
+typedef struct MetaDataConnectorContainer_struct
 {
 	MetaDataConnector* connector;
 	pthread_t thread;
-} MetaDataConnectorList;
+} MetaDataConnectorContainer;
+
+#define MAX_NODES 999999
+
+class InsituConnectorGroup
+{
+	public:
+		InsituConnectorGroup(std::string name)
+		{
+			this->name = name;
+			this->initData = json_object();
+			this->nodes = MAX_NODES;
+			this->id = 0;
+			this->merge_count = 0;
+			this->meta_merge_count = 0;
+			json_object_set_new( initData, "type", json_string( "tell plugin" ) );
+			//name will be merged from mergeJSON(json_t* candidate)
+			//json_object_set_new( json_root, "name", json_string( name.c_str() ) );
+		}
+		int getID()
+		{
+			return id;
+		}
+		void mergeJSON(json_t* result,json_t* candidate,InsituConnectorContainer* myself)
+		{
+			const char *c_key;
+			const char *i_key;
+			json_t *c_value;
+			json_t *i_value;
+			//metadata merge, old values stay, arrays are merged
+			json_t* m_candidate = json_object_get(candidate, "metadata");
+			json_t* m_result = json_object_get(result, "metadata");
+			if (m_candidate && m_result)
+			{
+				json_object_foreach( m_candidate, c_key, c_value )
+				{
+					bool found = false;
+					json_object_foreach( m_result, i_key, i_value )
+					{
+						if (strcmp(i_key,c_key) == 0)
+						{
+							if (json_is_array(i_value) && json_is_array(c_value))
+								json_array_extend(i_value,c_value);
+							found = true;
+							break;
+						}
+					}
+					if (!found)
+						json_object_set_new( m_result, c_key, c_value );
+				}
+			}			
+			//general merge, old values stay
+			json_object_foreach( candidate, c_key, c_value )
+			{
+				bool found = false;
+				json_object_foreach( result, i_key, i_value )
+				{
+					if (strcmp(i_key,c_key) == 0)
+					{
+						found = true;
+						break;
+					}
+				}
+				if (!found)
+				{
+					json_object_set_new( result, c_key, c_value );
+					if (myself && nodes == MAX_NODES && strcmp(c_key, "nodes" ) == 0)
+					{
+						nodes = json_integer_value ( c_value );
+						//This must be the result, so set it:
+						master = myself;
+						id = master->connector->getID();
+					}
+				}
+			}
+		}
+		ThreadList< InsituConnectorContainer* > elements;
+		int nodes;
+		std::string name;
+		json_t* initData;
+		InsituConnectorContainer* master;
+		int id;
+		int merge_count;
+		int meta_merge_count;
+		json_t* mergeData;
+};
 
 class Master
 {
@@ -45,8 +131,9 @@ class Master
 		InsituConnectorMaster insituMaster;
 		json_t* masterHello;
 		std::string name;
-		std::list<MetaDataConnectorList> dataConnectorList;
-		ThreadList<MetaDataClient*> dataClientList;
+		std::list< MetaDataConnectorContainer > dataConnectorList;
+		ThreadList< InsituConnectorGroup* > insituConnectorGroupList;
+		ThreadList< MetaDataClient* > dataClientList;
 		int inner_port;
 		pthread_t insituThread;
 };

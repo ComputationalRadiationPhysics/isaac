@@ -28,16 +28,20 @@ typedef int errorCode;
 typedef enum
 {
 	FORCE_EXIT = -1,
-	NONE = 0,
-	FEEDBACK = 1,
+	FEEDBACK_ALL = 0,
+	FEEDBACK_MASTER = 1,
 	MASTER_HELLO,
-	REGISTER_PLUGIN,
+	REGISTER_MASTER,
+	REGISTER_SLAVE,
+	TELL_PLUGIN,
 	EXIT_PLUGIN,
-	PERIOD_DATA,
+	PERIOD_MERGE,
+	PERIOD_MASTER,
 	OBSERVE,
 	STOP,
 	CLOSED,
-	UNKNOWN
+	NONE,
+	UNKNOWN,
 } MessageType;
 
 class MessageContainer
@@ -53,14 +57,20 @@ class MessageContainer
 				if (strcmp(str,"hello") == 0)
 					this->type = MASTER_HELLO;
 				else
-				if (strcmp(str,"register") == 0)
-					this->type = REGISTER_PLUGIN;
+				if (strcmp(str,"register master") == 0)
+					this->type = REGISTER_MASTER;
+				else
+				if (strcmp(str,"register slave") == 0)
+					this->type = REGISTER_SLAVE;
 				else
 				if (strcmp(str,"exit") == 0)
 					this->type = EXIT_PLUGIN;
 				else
-				if (strcmp(str,"period") == 0)
-					this->type = PERIOD_DATA;
+				if (strcmp(str,"period merge") == 0)
+					this->type = PERIOD_MERGE;
+				else
+				if (strcmp(str,"period master") == 0)
+					this->type = PERIOD_MASTER;
 				else
 				if (strcmp(str,"observe") == 0)
 					this->type = OBSERVE;
@@ -71,8 +81,11 @@ class MessageContainer
 				if (strcmp(str,"closed") == 0)
 					this->type = CLOSED;
 				else
-				if (strcmp(str,"feedback") == 0)
-					this->type = FEEDBACK;
+				if (strcmp(str,"feedback all") == 0)
+					this->type = FEEDBACK_ALL;
+				else
+				if (strcmp(str,"feedback master") == 0)
+					this->type = FEEDBACK_MASTER;
 				else
 					this->type = UNKNOWN;
 			}

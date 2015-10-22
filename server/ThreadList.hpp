@@ -40,6 +40,7 @@ template <typename T> class ThreadList
 			pthread_mutex_init (&remove_mutex, NULL);
 			front = NULL;
 			back = NULL;
+			l = 0;
 		}
 		void push_back(T t)
 		{
@@ -53,6 +54,7 @@ template <typename T> class ThreadList
 			else
 				front = ptr;
 			back = ptr;
+			l++;
 			pthread_mutex_unlock (&remove_mutex);
 		}
 		T pop_front()
@@ -68,9 +70,14 @@ template <typename T> class ThreadList
 				front = next;
 				if (front == NULL)
 					back = NULL;
+				l--;
 				pthread_mutex_unlock (&remove_mutex);
 			}
 			return t;
+		}
+		int length()
+		{
+			return l;
 		}
 		~ThreadList<T>()
 		{
@@ -81,10 +88,11 @@ template <typename T> class ThreadList
 		{
 			return front;
 		}
-		void remove(ThreadListContainer_ptr ptr)
+		T remove(ThreadListContainer_ptr ptr)
 		{
 			if (ptr == NULL)
-				return;
+				return NULL;
+			T t = NULL;
 			//Search before
 			ThreadListContainer_ptr before = NULL;
 			if (ptr != front)
@@ -97,18 +105,24 @@ template <typename T> class ThreadList
 					before = before->next;
 				}
 				if (before == NULL)
-					return;
+					return NULL;
 			}
 			pthread_mutex_lock (&remove_mutex);
 			if (before)
 				before->next = ptr->next;
 			else
 				front = ptr->next;
+			if (ptr == back)
+				back = before;
 			pthread_mutex_unlock (&remove_mutex);
+			t = ptr->t;
 			free(ptr);
+			l--;
+			return t;
 		}
 	private:
 		volatile ThreadListContainer_ptr front;
 		volatile ThreadListContainer_ptr back;
 		pthread_mutex_t remove_mutex;
+		int l;
 };

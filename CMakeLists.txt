@@ -62,7 +62,6 @@ if (BUILD_EXAMPLE)
 	set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")
 	find_package( alpaka )
 	
-	
 	set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wno-literal-suffix" )
 
 	include_directories(example ${EXAMPLE_INCLUDE} ${alpaka_INCLUDE_DIRS})	

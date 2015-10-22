@@ -40,13 +40,13 @@ size_t json_load_callback_function (void *buffer, size_t buflen, void *data)
 errorCode InsituConnector::run()
 {
 	MessageContainer* message = NULL;
-	//Get init sequence of insitu plugin
 	while (json_t * content = json_load_callback(json_load_callback_function,&sockfd,JSON_DISABLE_EOF_CHECK,NULL))
 	{
 		message = new MessageContainer(NONE,content);
 		if (message->type == EXIT_PLUGIN)
 			break;
-		json_object_set_new( message->json_root, "id", json_integer( id) );
+		if (message->type == REGISTER_MASTER)
+			json_object_set_new( message->json_root, "id", json_integer( id) );
 		clientSendMessage(message);
 		message = NULL;
 	}
@@ -55,7 +55,6 @@ errorCode InsituConnector::run()
 		message = new MessageContainer(EXIT_PLUGIN,json_object());
 		json_object_set_new( message->json_root, "type", json_string( "exit" ) );
 	}
-	json_object_set_new( message->json_root, "id", json_integer( id) );
 	clientSendMessage(message);
 	//messagesOut.spin_over_delete();
 }

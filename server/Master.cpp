@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include "ThreadList.hpp"
+#include <sys/socket.h>
 
 volatile sig_atomic_t Master::force_exit = 0;
 
@@ -39,7 +40,7 @@ Master::Master(std::string name,int inner_port)
 errorCode Master::addDataConnector(MetaDataConnector *dataConnector)
 {
 	dataConnector->setMaster(this);
-	MetaDataConnectorList d;
+	MetaDataConnectorContainer d;
 	d.connector = dataConnector;
 	d.thread = 0;
 	dataConnectorList.push_back(d);
@@ -52,10 +53,11 @@ MetaDataClient* Master::addDataClient()
 	dataClientList.push_back(client);
 	client->masterSendMessage(new MessageContainer(MASTER_HELLO,masterHello));
 	//Send all registered visualizations
-	ThreadList<InsituConnectorList*>::ThreadListContainer_ptr mom = insituMaster.insituConnectorList.getFront();
+	ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr mom = insituConnectorGroupList.getFront();
 	while (mom)
 	{
-		client->masterSendMessage(new MessageContainer(REGISTER_PLUGIN,mom->t->initData));
+		if (mom->t->nodes == mom->t->elements.length())
+			client->masterSendMessage(new MessageContainer(TELL_PLUGIN,mom->t->initData));
 		mom = mom->next;
 	}
 	return client;
@@ -74,7 +76,7 @@ errorCode Master::run()
 	}
 	pthread_create(&insituThread,NULL,Runable::run_runable,&insituMaster);
 	
-	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+	for (std::list<MetaDataConnectorContainer>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		printf("Launching %s\n",(*it).connector->getName().c_str());
 		pthread_create(&((*it).thread),NULL,Runable::run_runable,(*it).connector);
@@ -84,50 +86,134 @@ errorCode Master::run()
 		/////////////////////////////////////
 		// Iterate over all insitu clients //
 		/////////////////////////////////////
-		ThreadList<InsituConnectorList*>::ThreadListContainer_ptr insitu = insituMaster.insituConnectorList.getFront();
+		ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr insitu = insituMaster.insituConnectorList.getFront();
 		while (insitu)
 		{
-			ThreadList<InsituConnectorList*>::ThreadListContainer_ptr next = insitu->next;
+			ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr next = insitu->next;
 			//Check for new messages for every insituConnector
 			while (MessageContainer* message = insitu->t->connector->masterGetMessage())
 			{
-				if (message->type == PERIOD_DATA)
+				if (message->type == PERIOD_MASTER)
 				{
 					//Iterate over all metaDataClient and send to them, which observe
 					ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
 					while (dc)
 					{
 						if (dc->t->doesObserve(insitu->t->connector->getID()))
-							dc->t->masterSendMessage(new MessageContainer(PERIOD_DATA,message->json_root));
+							dc->t->masterSendMessage(new MessageContainer(PERIOD_MASTER,message->json_root));
 						dc = dc->next;
 					}
 				}
 				else
-				if (message->type == REGISTER_PLUGIN) //Saving the metadata description for later
+				if (message->type == PERIOD_MERGE)
 				{
-					insitu->t->initData = message->json_root;
-					//Adding a field with the number
-					json_object_set_new( insitu->t->initData, "id", json_integer( insitu->t->connector->getID() ) );
-					printf("New connection, giving id %i\n",insitu->t->connector->getID());
-					ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
-					while (dc)
+					if (insitu->t->group->merge_count == 0)
 					{
-						dc->t->masterSendMessage(new MessageContainer(REGISTER_PLUGIN,insitu->t->initData));
-						dc = dc->next;
+						//Reset merge data
+						json_incref( message->json_root );
+						insitu->t->group->mergeData = message->json_root;
+						insitu->t->group->merge_count++;
+						insitu->t->group->meta_merge_count++;
+						insitu->t->meta_merge_count++;
+					}
+					else
+					if (insitu->t->meta_merge_count < insitu->t->group->meta_merge_count)
+					{
+						insitu->t->group->mergeJSON( insitu->t->group->mergeData, message->json_root, NULL );
+						insitu->t->group->merge_count++;
+						insitu->t->meta_merge_count++;
+					}
+					//Iterate over all metaDataClient and send to them, which observe
+					if (insitu->t->group->merge_count == insitu->t->group->nodes)
+					{
+						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+						while (dc)
+						{
+							if (dc->t->doesObserve(insitu->t->group->getID()))
+								dc->t->masterSendMessage(new MessageContainer(PERIOD_MERGE,insitu->t->group->mergeData));
+							dc = dc->next;
+						}
+						json_decref( insitu->t->group->mergeData );
+						insitu->t->group->merge_count = 0;
+					}
+				}
+				else
+				if (message->type == REGISTER_MASTER || message->type == REGISTER_SLAVE) //Saving the metadata description for later
+				{
+					//Get group
+					std::string name( json_string_value( json_object_get(message->json_root, "name") ) );
+					InsituConnectorGroup* group = NULL;
+					ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
+					while (it)
+					{
+						if (it->t->name == name)
+						{
+							group = it->t;
+							break;
+						}
+						it = it->next;
+					}
+					if (group == NULL)
+					{
+						group = new InsituConnectorGroup(name);
+						insituConnectorGroupList.push_back( group );
+					}
+					insitu->t->group = group;
+					group->mergeJSON( group->initData, message->json_root, insitu->t );
+					group->elements.push_back( insitu->t );
+
+					//Adding a field with the number
+					printf("New connection, giving id %i\n",insitu->t->connector->getID());
+					
+					if (group->nodes == group->elements.length())
+					{
+						printf("Group complete, sending to connected interfaces\n");
+						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+						while (dc)
+						{
+							dc->t->masterSendMessage(new MessageContainer(TELL_PLUGIN,group->initData));
+							dc = dc->next;
+						}
 					}
 				}
 				else
 				if (message->type == EXIT_PLUGIN) //Let's tell everybody and remove it from the list
 				{
-					int id = json_integer_value( json_object_get(message->json_root, "id") );
+					InsituConnectorContainer* insituContainer = insitu->t;
+					int id = insituContainer->connector->getID();
 					printf("Connection %i closed.\n",id);
-					ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
-					while (dc)
+					//Group does still exist?
+					if (insituContainer->group)
 					{
-						dc->t->masterSendMessage(new MessageContainer(EXIT_PLUGIN,message->json_root));
-						dc = dc->next;
+						InsituConnectorGroup* group = insituContainer->group;
+						//Add id of group
+						json_object_set_new( message->json_root, "id", json_integer( group->getID() ) );
+						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+						while (dc)
+						{
+							dc->t->masterSendMessage(new MessageContainer(EXIT_PLUGIN,message->json_root));
+							dc = dc->next;
+						}
+						//Now let's remove the whole group
+						ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr element = group->elements.getFront();
+						while (element)
+						{
+							element->t->group = NULL;
+							element = element->next;
+						}
+						ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
+						printf("Removed group %i\n",group->id);
+						while (it)
+						{
+							if (it->t == group)
+							{
+								delete insituConnectorGroupList.remove(it);
+								break;
+							}
+							it = it->next;
+						}
 					}
-					insituMaster.insituConnectorList.remove(insitu);
+					delete insituMaster.insituConnectorList.remove(insitu);
 					break;
 				}
 				free(message);
@@ -144,25 +230,35 @@ errorCode Master::run()
 			//Check for new messages for every client
 			while (MessageContainer* message = dc->t->masterGetMessage())
 			{
-				if (message->type == FEEDBACK)
+				if (message->type == FEEDBACK_MASTER || message->type == FEEDBACK_ALL)
 				{
 					json_t* observe_id = json_object_get(message->json_root, "observe id");
 					if (observe_id)
 					{
 						int id = json_integer_value( observe_id );
 						//Send feedback to observing insitu
-						ThreadList<InsituConnectorList*>::ThreadListContainer_ptr insitu = insituMaster.insituConnectorList.getFront();
-						while (insitu)
+						ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr group = insituConnectorGroupList.getFront();
+						while (group)
 						{
-							if ( insitu->t->connector->getID() == id)
+							char* buffer = json_dumps( message->json_root, 0 );
+							if ( group->t->master->connector->getID() == id)
 							{
-								char* buffer = json_dumps( message->json_root, 0 );
-								write(insitu->t->connector->getSockFD(),buffer,strlen(buffer));
-								free(buffer);
+								if (message->type == FEEDBACK_MASTER)
+									write(group->t->master->connector->getSockFD(),buffer,strlen(buffer));
+								else //FEEDBACK_ALL
+								{
+									ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr insitu = group->t->elements.getFront();
+									while (insitu)
+									{
+										write(insitu->t->connector->getSockFD(),buffer,strlen(buffer));
+										insitu = insitu->next;
+									}					
+								}
 								break;
 							}
-							insitu = insitu->next;
-						}					
+							free(buffer);
+							group = group->next;
+						}
 					}
 				}
 				if (message->type == OBSERVE)
@@ -180,17 +276,18 @@ errorCode Master::run()
 		}
 		usleep(1);
 	}
+	shutdown(insituMaster.getSockFD(),SHUT_RDWR);
 	printf("Waiting for insitu Master thread to finish... ");
 	fflush(stdout);
 	//Yeah... "finish"
-	pthread_cancel(insituThread);
+	pthread_join(insituThread,NULL);
 	printf("Done\n");
-	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+	for (std::list<MetaDataConnectorContainer>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		printf("Asking %s to exit\n",(*it).connector->getName().c_str());
 		(*it).connector->masterSendMessage(new MessageContainer(FORCE_EXIT));
 	}
-	for (std::list<MetaDataConnectorList>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+	for (std::list<MetaDataConnectorContainer>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		pthread_join((*it).thread,NULL);
 		printf("%s finished\n",(*it).connector->getName().c_str());

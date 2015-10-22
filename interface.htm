@@ -18,7 +18,7 @@
 <td id="preview_td" valign="top">
 	<canvas id="preview" width="512" height="512" style="border:1px solid #000000;">
 	</canvas>
-	<form><input type="button" value="Send example metadada" id="metadata"><input type="button" value="Stop observing" id="stop"></form>
+	<form><input type="button" value="Send example metadada" id="metadata"><input type="button" value="Stop observing" id="stop"><input type="button" value="Stop simulation" id="exit"></form>
 </td>
 <td id="video_td" valign="top">
 	<canvas id="video" width="512" height="512" style="border:1px solid #000000;">
@@ -30,6 +30,7 @@
 	<tr>
 		<th>Name</th>
 		<th>ID</th>
+		<th>Nodes</th>
 		<th>Max chain</th>
 		<th>Meta data</th>
 		<th>Observe</th>
@@ -37,7 +38,6 @@
 	</table>
 </td>
 </tr></table>
-<div id="debug">Debug: ---</div><br/>
 <script>
 var element = document.getElementById("preview");
 var width = element.clientWidth;
@@ -45,6 +45,7 @@ var height = element.clientWidth;
 var ctx = element.getContext("2d");
 var socket = null;
 var observe_id = -1;
+var particles = null;
 
 var projection = [
 	1, 0, 0, 0,
@@ -180,7 +181,16 @@ function line(p1,p2)
 		return;
 	ctx.moveTo( t1[0], t1[1] );
 	ctx.lineTo( t2[0], t2[1] );
+}
+
+function point(p)
+{
+	var t = project(p);
+	if (t[2] < 0)
+		return;
+	ctx.fillRect( t[0], t[1], 3, 3 );
 }	
+
 
 function drawUnitCube()
 {
@@ -214,10 +224,15 @@ function drawUnitCube()
 function redraw()
 {
 	ctx.clearRect(0, 0, width, height);
+	ctx.fillStyle = "#000000";
 	var temp = modelview;
 	ctx.beginPath();
 	modelview = mulMatrix(modelview,rotation)
 	drawUnitCube();
+	for (p in particles)
+	{
+		point( particles[p] );
+	}
 	modelview = temp;
 	ctx.stroke();
 }
@@ -341,7 +356,6 @@ document.getElementById("connect").onclick = function()
 			socket.onmessage = function got_packet(msg)
 			{
 				var obj = JSON.parse(msg.data);
-				document.getElementById("debug").textContent = msg.data;//obj["type"];
 				if (obj["type"] == "hello")
 				{
 					document.getElementById("isaac_name").textContent = obj["name"];
@@ -350,33 +364,38 @@ document.getElementById("connect").onclick = function()
 						table.deleteRow(1);
 					document.getElementById("list_td").style.display = 'table-cell';
 				}
-				if (obj["type"] == "register")
+				if (obj["type"] == "tell plugin")
 				{
 					var table = document.getElementById("list_table");					
 					var row = table.insertRow(-1);
 					row.id = obj["id"];
 					row.insertCell(0).innerHTML = obj["name"];
 					row.insertCell(1).innerHTML = obj["id"];
-					row.insertCell(2).innerHTML = obj["max chain"];
-					var metaCell = row.insertCell(3);//.innerHTML = obj["metadata"].toSource();
+					row.insertCell(2).innerHTML = obj["nodes"];
+					row.insertCell(3).innerHTML = obj["max chain"];
+					var metaCell = row.insertCell(4);//.innerHTML = obj["metadata"].toSource();
 					for (element in obj["metadata"])
 					{
 						metaCell.innerHTML += "<b>" + element + ":</b> ";
 						metaCell.innerHTML += obj["metadata"][element];
 						metaCell.innerHTML += "<br/>";
 					}
-					var observeCell = row.insertCell(4);
+					var observeCell = row.insertCell(5);
 					var button = document.createElement("input");
 					button.type = "button";
 					button.value = "Observe";
 					button.onclick = function()
 					{
-						document.getElementById("debug").textContent = obj["id"];
 						document.getElementById("video_td").style.display = 'table-cell';
 						document.getElementById("preview_td").style.display = 'table-cell';
 						observeSimulation(obj["id"]);
 					};
 					observeCell.appendChild(button);
+				}
+				if (obj["type"] == "period merge")
+				{
+					particles = obj["metadata"]["reference particles"];
+					redraw();
 				}
 				if (obj["type"] == "exit")
 				{
@@ -387,6 +406,11 @@ document.getElementById("connect").onclick = function()
 							table.deleteRow(c);
 							break;
 						}
+					if (observe_id == obj["id"])
+					{
+						document.getElementById("video_td").style.display = 'none';
+						document.getElementById("preview_td").style.display = 'none';
+					}
 				}
 			};
 			socket.onclose = function()
@@ -420,7 +444,7 @@ document.getElementById("metadata").onclick = function()
 {
 	var obj =
 	{
-		"type" : "feedback",
+		"type" : "feedback all",
 		"observe id" : observe_id,
 		"metadata" :
 		{
@@ -429,6 +453,21 @@ document.getElementById("metadata").onclick = function()
 		}
 	};
 	socket.send(JSON.stringify(obj));
+}
+
+document.getElementById("exit").onclick = function()
+{
+	var obj =
+	{
+		"type" : "feedback master",
+		"observe id" : observe_id,
+		"metadata" :
+		{
+			"exit" : 1
+		}
+	};
+	socket.send(JSON.stringify(obj));
+	document.getElementById("stop").onclick();
 }
 
 

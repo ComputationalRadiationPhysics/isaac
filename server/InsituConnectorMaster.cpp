@@ -31,13 +31,18 @@ errorCode InsituConnectorMaster::init(int port)
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0)
 		return -1;
+	int enable = 1;
+	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
 	struct sockaddr_in serv_addr;
 	memset(&serv_addr,0, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	serv_addr.sin_port = htons(port);
-	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) 
+	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+	{
+		printf("Bind failed with error %i\n",errno);
 		return -2;
+	}
 }
 
 int InsituConnectorMaster::getSockFD()
@@ -58,9 +63,9 @@ errorCode InsituConnectorMaster::run()
 		{
 			printf("New connection from Plugin established\n");
 			InsituConnector* insituConnector = new InsituConnector(newsockfd,nextFreeNumber++);
-			InsituConnectorList* d = new InsituConnectorList();
+			InsituConnectorContainer* d = new InsituConnectorContainer();
 			d->connector = insituConnector;
-			d->initData = NULL;
+			d->meta_merge_count = 0;
 			pthread_create(&(d->thread),NULL,Runable::run_runable,insituConnector);
 			insituConnectorList.push_back(d);
 		}
@@ -69,11 +74,11 @@ errorCode InsituConnectorMaster::run()
 
 InsituConnectorMaster::~InsituConnectorMaster()
 {
-	InsituConnectorList* mom;
+	InsituConnectorContainer* mom;
 	while (mom = insituConnectorList.pop_front())
 	{
-		close(mom->connector->getSockFD());
-		printf("Waiting for InsituConnectorThread to finish... ");
+		shutdown(mom->connector->getSockFD(),SHUT_RDWR);
+		printf("Waiting for InsituConnectorThread %i to finish... ",mom->connector->getID());
 		fflush(stdout);
 		pthread_join(mom->thread,NULL);
 		delete mom;
