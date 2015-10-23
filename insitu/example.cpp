@@ -78,10 +78,10 @@ int main(int argc, char **argv)
 		json_object_set_new( visualization.getJsonMetaRoot(), "energy", json_string( "Engery in kJ" ) );
 		json_object_set_new( visualization.getJsonMetaRoot(), "speed", json_string( "Speed in multiplies of the speed of a hare" ) );
 		json_t *particle_array = json_array();
-		json_object_set_new( visualization.getJsonMetaRoot(), "particles", particle_array );
-		json_array_append( particle_array, json_string( "X" ) );
-		json_array_append( particle_array, json_string( "Y" ) );
-		json_array_append( particle_array, json_string( "Z" ) );
+		json_object_set_new( visualization.getJsonMetaRoot(), "reference particles", particle_array );
+		json_array_append_new( particle_array, json_string( "X" ) );
+		json_array_append_new( particle_array, json_string( "Y" ) );
+		json_array_append_new( particle_array, json_string( "Z" ) );
 	}
 
 	//finish init and sending the meta data scription to the isaac server

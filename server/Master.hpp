@@ -41,11 +41,11 @@ class InsituConnectorGroup
 		InsituConnectorGroup(std::string name)
 		{
 			this->name = name;
-			this->initData = json_object();
 			this->nodes = MAX_NODES;
 			this->id = 0;
 			this->merge_count = 0;
 			this->meta_merge_count = 0;
+			this->initData = json_object();
 			json_object_set_new( initData, "type", json_string( "tell plugin" ) );
 			//name will be merged from mergeJSON(json_t* candidate)
 			//json_object_set_new( json_root, "name", json_string( name.c_str() ) );
@@ -57,38 +57,39 @@ class InsituConnectorGroup
 		void mergeJSON(json_t* result,json_t* candidate,InsituConnectorContainer* myself)
 		{
 			const char *c_key;
-			const char *i_key;
+			const char *r_key;
 			json_t *c_value;
-			json_t *i_value;
+			json_t *r_value;
 			//metadata merge, old values stay, arrays are merged
 			json_t* m_candidate = json_object_get(candidate, "metadata");
 			json_t* m_result = json_object_get(result, "metadata");
+			void *temp,*temp2;
 			if (m_candidate && m_result)
 			{
-				json_object_foreach( m_candidate, c_key, c_value )
+				json_object_foreach_safe( m_candidate, temp, c_key, c_value )
 				{
 					bool found = false;
-					json_object_foreach( m_result, i_key, i_value )
+					json_object_foreach_safe( m_result, temp2, r_key, r_value )
 					{
-						if (strcmp(i_key,c_key) == 0)
+						if (strcmp(r_key,c_key) == 0)
 						{
-							if (json_is_array(i_value) && json_is_array(c_value))
-								json_array_extend(i_value,c_value);
+							if (json_is_array(r_value) && json_is_array(c_value))
+								json_array_extend(r_value,c_value);
 							found = true;
 							break;
 						}
 					}
 					if (!found)
-						json_object_set_new( m_result, c_key, c_value );
+						json_object_set( m_result, c_key, c_value );
 				}
 			}			
 			//general merge, old values stay
-			json_object_foreach( candidate, c_key, c_value )
+			json_object_foreach_safe( candidate, temp, c_key, c_value )
 			{
 				bool found = false;
-				json_object_foreach( result, i_key, i_value )
+				json_object_foreach_safe( result, temp2, r_key, r_value )
 				{
-					if (strcmp(i_key,c_key) == 0)
+					if (strcmp(r_key,c_key) == 0)
 					{
 						found = true;
 						break;
@@ -96,7 +97,7 @@ class InsituConnectorGroup
 				}
 				if (!found)
 				{
-					json_object_set_new( result, c_key, c_value );
+					json_object_set( result, c_key, c_value );
 					if (myself && nodes == MAX_NODES && strcmp(c_key, "nodes" ) == 0)
 					{
 						nodes = json_integer_value ( c_value );

@@ -44,7 +44,6 @@ template <typename T> class ThreadList
 		}
 		void push_back(T t)
 		{
-			//Only this function / thread has the permission do add and remove elements
 			ThreadListContainer_ptr ptr = (ThreadListContainer_ptr)malloc(sizeof(ThreadListContainer));
 			ptr->t = t;
 			ptr->next = NULL;

@@ -38,7 +38,9 @@ set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 find_package (Jansson)
 set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
+set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
 
+include_directories(isaac ${INCLUDE})	
 target_link_libraries(isaac ${LIBS})
 
 option(BUILD_EXAMPLE "Build the example." ON)
@@ -46,6 +48,7 @@ option(BUILD_EXAMPLE "Build the example." ON)
 if (BUILD_EXAMPLE)
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${JANSSON_LIBRARIES})
+	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${JANSSON_INCLUDE_DIRS})
 
 	find_package (IceT)
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${ICET_CORE_LIBS})

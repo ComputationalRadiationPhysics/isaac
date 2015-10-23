@@ -88,6 +88,11 @@ class IsaacVisualization
 			communicator->serverSend(std::string(buffer) + " ");
 			free(buffer);
 			json_decref( json_root );
+			//Let's wait for the group completely registered at the server
+			json_t* ready;
+			while ((ready = communicator->getLastMessage()) == NULL)
+				usleep(5000);
+			json_decref( ready ); //Let's just assume the server sends a correct message
 			recreateJSON();
 			return 0;
 		}
@@ -235,12 +240,6 @@ class IsaacVisualization
 					const char* c_content = content.c_str();
 					int n = write(sockfd,c_content,strlen(c_content));
 					return n;
-				}
-				std::string serverReceive()
-				{
-					char buffer[MAX_RECEIVE];
-					read(sockfd,buffer,MAX_RECEIVE);
-					return std::string(buffer);
 				}
 				void serverDisconnect()
 				{

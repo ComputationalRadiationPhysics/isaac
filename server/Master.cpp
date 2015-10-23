@@ -51,17 +51,21 @@ MetaDataClient* Master::addDataClient()
 {
 	MetaDataClient* client = new MetaDataClient();
 	dataClientList.push_back(client);
-	client->masterSendMessage(new MessageContainer(MASTER_HELLO,masterHello));
+	client->masterSendMessage(new MessageContainer(MASTER_HELLO,masterHello,true));
 	//Send all registered visualizations
 	ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr mom = insituConnectorGroupList.getFront();
 	while (mom)
 	{
 		if (mom->t->nodes == mom->t->elements.length())
-			client->masterSendMessage(new MessageContainer(TELL_PLUGIN,mom->t->initData));
+		{
+			json_incref( mom->t->initData );
+			client->masterSendMessage(new MessageContainer(TELL_PLUGIN,mom->t->initData,true));
+		}
 		mom = mom->next;
 	}
 	return client;
 }
+
 
 errorCode Master::run()
 {
@@ -100,12 +104,12 @@ errorCode Master::run()
 					while (dc)
 					{
 						if (dc->t->doesObserve(insitu->t->connector->getID()))
-							dc->t->masterSendMessage(new MessageContainer(PERIOD_MASTER,message->json_root));
+							dc->t->masterSendMessage(new MessageContainer(PERIOD_MASTER,message->json_root,true));
 						dc = dc->next;
 					}
 				}
 				else
-				if (message->type == PERIOD_MERGE)
+				if (message->type == PERIOD_MERGE && insitu->t->group)
 				{
 					if (insitu->t->group->merge_count == 0)
 					{
@@ -130,7 +134,7 @@ errorCode Master::run()
 						while (dc)
 						{
 							if (dc->t->doesObserve(insitu->t->group->getID()))
-								dc->t->masterSendMessage(new MessageContainer(PERIOD_MERGE,insitu->t->group->mergeData));
+								dc->t->masterSendMessage(new MessageContainer(PERIOD_MERGE,insitu->t->group->mergeData,true));
 							dc = dc->next;
 						}
 						json_decref( insitu->t->group->mergeData );
@@ -141,7 +145,7 @@ errorCode Master::run()
 				if (message->type == REGISTER_MASTER || message->type == REGISTER_SLAVE) //Saving the metadata description for later
 				{
 					//Get group
-					std::string name( json_string_value( json_object_get(message->json_root, "name") ) );
+					std::string name( json_string_value( json_object_get( message->json_root, "name" ) ) );
 					InsituConnectorGroup* group = NULL;
 					ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
 					while (it)
@@ -167,11 +171,20 @@ errorCode Master::run()
 					
 					if (group->nodes == group->elements.length())
 					{
+						//Okay, let's tell every element in the group, that it's ready
+						char buffer[] = "{\"type\": \"ready\"}";
+						ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr it = group->elements.getFront();
+						while (it)
+						{
+							write(it->t->connector->getSockFD(),buffer,strlen(buffer));
+							it = it->next;
+						}
+						//And also all yet registered interfaces
 						printf("Group complete, sending to connected interfaces\n");
 						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
 						while (dc)
 						{
-							dc->t->masterSendMessage(new MessageContainer(TELL_PLUGIN,group->initData));
+							dc->t->masterSendMessage(new MessageContainer(TELL_PLUGIN,group->initData,true));
 							dc = dc->next;
 						}
 					}
@@ -191,7 +204,7 @@ errorCode Master::run()
 						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
 						while (dc)
 						{
-							dc->t->masterSendMessage(new MessageContainer(EXIT_PLUGIN,message->json_root));
+							dc->t->masterSendMessage(new MessageContainer(EXIT_PLUGIN,message->json_root,true));
 							dc = dc->next;
 						}
 						//Now let's remove the whole group
@@ -215,11 +228,12 @@ errorCode Master::run()
 					}
 					delete insituMaster.insituConnectorList.remove(insitu);
 					break;
-				}
-				free(message);
+				}				
+				delete message;
 			}
 			insitu = next;
 		}
+
 		///////////////////////////////////////
 		// Iterate over all metadata clients //
 		///////////////////////////////////////
@@ -270,7 +284,7 @@ errorCode Master::run()
 					dataClientList.remove(dc);
 					break;
 				}
-				free(message);
+				delete message;
 			}
 			dc = next;
 		}

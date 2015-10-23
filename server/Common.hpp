@@ -47,9 +47,11 @@ typedef enum
 class MessageContainer
 {
 	public:
-		MessageContainer(MessageType type = NONE,json_t *json_root = NULL)
+		MessageContainer(MessageType type = NONE,json_t *json_root = NULL, bool keep_json = false)
 		{
 			this->json_root = json_root;
+			if (keep_json && json_root)
+				json_incref( json_root );
 			json_t *json_type;
 			if (type == NONE && (json_type = json_object_get(json_root, "type")) && json_is_string(json_type))
 			{
@@ -91,6 +93,11 @@ class MessageContainer
 			}
 			else
 				this->type = type;
+		}
+		~MessageContainer()
+		{
+			if (json_root)
+				json_decref( json_root );
 		}
 		MessageType type;
 		json_t *json_root;

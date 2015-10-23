@@ -99,13 +99,14 @@ callback_isaac(
 			if (m < n)
 			{
 				lwsl_err("ERROR %d writing to socket\n", n);
-				pss->client->clientSendMessage(new MessageContainer(CLOSED,NULL));
+				pss->client->clientSendMessage(new MessageContainer(CLOSED));
 				return -1;
 			}
+			delete message;
 		}
 		break;
 	//case LWS_CALLBACK_CLOSED:
-	//	pss->client->clientSendMessage(new MessageContainer(CLOSED,NULL));
+	//	pss->client->clientSendMessage(new MessageContainer(CLOSED));
 	//	return -1;	
 	case LWS_CALLBACK_RECEIVE:
 		if (pss->client)
