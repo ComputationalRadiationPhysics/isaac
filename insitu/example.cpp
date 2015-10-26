@@ -28,6 +28,14 @@ void recursive_kgv(int* d,int number,int test);
 
 int main(int argc, char **argv)
 {
+	char __server[] = "localhost";
+	char* server = __server;
+	if (argc > 1)
+		server = argv[1];
+	int port = 2460;
+	if (argc > 2)
+		port = atoi(argv[2]);
+	
 	//MPI Init
 	int rank,numProc;
 	MPI_Init(&argc, &argv);
@@ -70,7 +78,7 @@ int main(int argc, char **argv)
 	sprintf(name,"Example_%i",id);
 	
 	//Now we initialize the Isaac Insitu Plugin with the name, the number of the master, the server, it's IP, the count of framebuffer to be created and the size per framebuffer
-	IsaacVisualization visualization = IsaacVisualization(name,MASTER_RANK,"localhost",2460,3,512);
+	IsaacVisualization visualization = IsaacVisualization(name,MASTER_RANK,server,port,3,512);
 	
 	//Setting up the metadata description (only master, but however slaves could then metadata metadata, too, it would be merged)
 	if (rank == MASTER_RANK)
