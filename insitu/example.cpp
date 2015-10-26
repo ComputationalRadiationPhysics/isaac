@@ -21,6 +21,7 @@
 #include <IceTMPI.h>
 #pragma GCC diagnostic pop
 
+#define META_DATA_DIVISOR 1
 #define MASTER_RANK 0
 #define PARTICLES_PER_NODE 8
 
@@ -35,13 +36,13 @@ int main(int argc, char **argv)
 	int port = 2460;
 	if (argc > 2)
 		port = atoi(argv[2]);
-	
+
 	//MPI Init
 	int rank,numProc;
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &numProc);
-	
+
 	//Let's calculate the best spatial distribution of the dimensions so that d[0]*d[1]*d[2] = numProc
 	int d[3] = {1,1,1};
 	recursive_kgv(d,numProc,2);
@@ -125,7 +126,7 @@ int main(int argc, char **argv)
 			json_object_set_new( visualization.getJsonMetaRoot(), "speed", json_real( a*a ) );
 		}
 		//every thread fills "his" particles
-		if (rank % 2 == 0)
+		if (rank % META_DATA_DIVISOR == 0)
 		{
 			json_t *particle_array = json_array();
 			for (int i = 0; i < PARTICLES_PER_NODE; i++)
@@ -144,7 +145,7 @@ int main(int argc, char **argv)
 			json_object_set_new( visualization.getJsonMetaRoot(), "reference particles", particle_array );
 		}
 		//Visualize and send data to the server
-		visualization.doVisualization((rank % 2 == 0)?META_MERGE:META_NONE,(numProc+1)/2);
+		visualization.doVisualization((rank % META_DATA_DIVISOR == 0)?META_MERGE:META_NONE,(numProc+META_DATA_DIVISOR-1)/META_DATA_DIVISOR);
 		//printf("%i: Sent dummy meta data\n",rank);
 		//sync
 		MPI_Bcast((void*)&force_exit,sizeof(force_exit), MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
