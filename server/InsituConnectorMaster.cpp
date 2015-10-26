@@ -65,7 +65,6 @@ errorCode InsituConnectorMaster::run()
 			InsituConnector* insituConnector = new InsituConnector(newsockfd,nextFreeNumber++);
 			InsituConnectorContainer* d = new InsituConnectorContainer();
 			d->connector = insituConnector;
-			d->meta_merge_count = 0;
 			pthread_create(&(d->thread),NULL,Runable::run_runable,insituConnector);
 			insituConnectorList.push_back(d);
 		}

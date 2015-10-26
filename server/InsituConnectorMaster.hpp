@@ -26,7 +26,6 @@ typedef struct InsituConnectorContainer_struct
 	InsituConnector* connector;
 	pthread_t thread;
 	InsituConnectorGroup* group;
-	int meta_merge_count;
 } InsituConnectorContainer;
 
 class InsituConnectorMaster : public Runable

@@ -117,6 +117,7 @@ class InsituConnectorGroup
 		int merge_count;
 		int meta_merge_count;
 		json_t* mergeData;
+		int merge_count_max;
 };
 
 class Master

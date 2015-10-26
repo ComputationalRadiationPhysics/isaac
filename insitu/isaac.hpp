@@ -30,6 +30,7 @@
 
 typedef enum
 {
+	META_NONE = -1,
 	META_MERGE = 0,
 	META_MASTER = 1
 } IsaacVisualizationMetaEnum;
@@ -53,6 +54,7 @@ class IsaacVisualization
 			this->server_port = server_port;
 			this->framebuffer_count = framebuffer_count;
 			this->framebuffer_size = framebuffer_size;
+			this->metaNr = 0;
 			this->communicator = new IsaacCommunicator(server_url,server_port);
 			//TODO: Alloc framebuffer
 			recreateJSON();
@@ -85,7 +87,7 @@ class IsaacVisualization
 			else
 				json_object_set_new( json_root, "type", json_string( "register slave" ) );
 			char* buffer = json_dumps( json_root, 0 );
-			communicator->serverSend(std::string(buffer) + " ");
+			communicator->serverSend(buffer);
 			free(buffer);
 			json_decref( json_root );
 			//Let's wait for the group completely registered at the server
@@ -97,7 +99,8 @@ class IsaacVisualization
 			return 0;
 		}
 		void doVisualization(
-			IsaacVisualizationMetaEnum metaTargets)
+			IsaacVisualizationMetaEnum metaTargets = META_MASTER,
+			int metaCount = -1 )
 		{
 			//Getting messages
 			while (json_t* message = communicator->getLastMessage())
@@ -108,18 +111,23 @@ class IsaacVisualization
 			//Drawing
 			//TODO: Drawing ;)
 			//Sending messages
-			if (metaTargets == META_MERGE || rank == master)
+			if (metaTargets == META_MERGE || (metaTargets == META_MASTER && rank == master))
 			{
 				if (metaTargets == META_MERGE)
 					json_object_set_new( json_root, "type", json_string( "period merge" ) );
 				else
+				if (metaTargets == META_MASTER && rank == master)
 					json_object_set_new( json_root, "type", json_string( "period master" ) );
+				if (metaCount > 0)
+					json_object_set_new( json_root, "count", json_integer( metaCount ) );
+				json_object_set_new( json_root, "meta nr", json_integer( metaNr ) );
 				char* buffer = json_dumps( json_root, 0 );
-				communicator->serverSend(std::string(buffer) + " ");
+				communicator->serverSend(buffer);
 				free(buffer);
 			}
 			json_decref( json_root );
 			recreateJSON();
+			metaNr++;
 		}
 		json_t* getMeta()
 		{
@@ -133,7 +141,7 @@ class IsaacVisualization
 				json_root = json_object();
 				json_object_set_new( json_root, "type", json_string( "exit" ) );
 				char* buffer = json_dumps( json_root, 0 );
-				communicator->serverSend(std::string(buffer) + " ");
+				communicator->serverSend(buffer);
 				free(buffer);
 				json_decref( json_root );
 			}
@@ -235,10 +243,9 @@ class IsaacVisualization
 					pthread_create(&readThread,NULL,run_readAndSetMessages,this);
 					return 0;
 				}
-				int serverSend(std::string content)
+				int serverSend(const char* content)
 				{
-					const char* c_content = content.c_str();
-					int n = write(sockfd,c_content,strlen(c_content));
+					int n = write(sockfd,content,strlen(content));
 					return n;
 				}
 				void serverDisconnect()
@@ -273,4 +280,5 @@ class IsaacVisualization
 		int rank;
 		int master;
 		int numProc;
+		int metaNr;
 };

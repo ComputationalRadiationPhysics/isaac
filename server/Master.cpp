@@ -95,8 +95,12 @@ errorCode Master::run()
 		{
 			ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr next = insitu->next;
 			//Check for new messages for every insituConnector
+			MessageContainer* lastMessage = NULL;
+			if (insitu->t->connector->messagesOut.back)
+				lastMessage = insitu->t->connector->messagesOut.back->t;
 			while (MessageContainer* message = insitu->t->connector->masterGetMessage())
 			{
+				bool delete_message = true;
 				if (message->type == PERIOD_MASTER)
 				{
 					//Iterate over all metaDataClient and send to them, which observe
@@ -110,35 +114,44 @@ errorCode Master::run()
 				}
 				else
 				if (message->type == PERIOD_MERGE && insitu->t->group)
-				{
-					if (insitu->t->group->merge_count == 0)
+				{			
+					int metaNr = json_integer_value( json_object_get(message->json_root, "meta nr") );
+					if (metaNr == insitu->t->group->meta_merge_count)
 					{
-						//Reset merge data
-						json_incref( message->json_root );
-						insitu->t->group->mergeData = message->json_root;
+						if (insitu->t->group->merge_count == 0)
+						{
+							//Reset merge data
+							json_incref( message->json_root );
+							insitu->t->group->mergeData = message->json_root;							
+							json_t* json_count = json_object_get(message->json_root, "count");
+							if (json_is_integer(json_count))
+								insitu->t->group->merge_count_max = json_integer_value( json_count );
+							else
+								insitu->t->group->merge_count_max = insitu->t->group->nodes;
+						}
+						else
+							insitu->t->group->mergeJSON( insitu->t->group->mergeData, message->json_root, NULL );
 						insitu->t->group->merge_count++;
-						insitu->t->group->meta_merge_count++;
-						insitu->t->meta_merge_count++;
+						if (insitu->t->group->merge_count >= insitu->t->group->merge_count_max)
+						{
+							ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+							while (dc)
+							{
+								if (dc->t->doesObserve(insitu->t->group->getID()))
+									dc->t->masterSendMessage(new MessageContainer(PERIOD_MERGE,insitu->t->group->mergeData,true));
+								dc = dc->next;
+							}
+							json_decref( insitu->t->group->mergeData );
+							insitu->t->group->merge_count = 0;
+							insitu->t->group->meta_merge_count++;
+						}
 					}
 					else
-					if (insitu->t->meta_merge_count < insitu->t->group->meta_merge_count)
+					if (metaNr > insitu->t->group->meta_merge_count)
+					//this message is too early!
 					{
-						insitu->t->group->mergeJSON( insitu->t->group->mergeData, message->json_root, NULL );
-						insitu->t->group->merge_count++;
-						insitu->t->meta_merge_count++;
-					}
-					//Iterate over all metaDataClient and send to them, which observe
-					if (insitu->t->group->merge_count == insitu->t->group->nodes)
-					{
-						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
-						while (dc)
-						{
-							if (dc->t->doesObserve(insitu->t->group->getID()))
-								dc->t->masterSendMessage(new MessageContainer(PERIOD_MERGE,insitu->t->group->mergeData,true));
-							dc = dc->next;
-						}
-						json_decref( insitu->t->group->mergeData );
-						insitu->t->group->merge_count = 0;
+						delete_message = false;
+						insitu->t->connector->clientSendMessage(message);
 					}
 				}
 				else
@@ -228,8 +241,11 @@ errorCode Master::run()
 					}
 					delete insituMaster.insituConnectorList.remove(insitu);
 					break;
-				}				
-				delete message;
+				}
+				if (delete_message)	
+					delete message;
+				if (message == lastMessage)
+					break;
 			}
 			insitu = next;
 		}

@@ -119,7 +119,7 @@ template <typename T> class ThreadList
 			l--;
 			return t;
 		}
-	private:
+	//private:
 		volatile ThreadListContainer_ptr front;
 		volatile ThreadListContainer_ptr back;
 		pthread_mutex_t remove_mutex;

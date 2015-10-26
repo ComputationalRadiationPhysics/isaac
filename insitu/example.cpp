@@ -117,23 +117,26 @@ int main(int argc, char **argv)
 			json_object_set_new( visualization.getJsonMetaRoot(), "speed", json_real( a*a ) );
 		}
 		//every thread fills "his" particles
-		json_t *particle_array = json_array();
-		for (int i = 0; i < PARTICLES_PER_NODE; i++)
+		if (rank % 2 == 0)
 		{
-			json_t *position = json_array();
-			json_array_append( particle_array, position );
-			//Recalculate force based on distance to box center and add it
-			for (int j = 0; j < 3; j++)
+			json_t *particle_array = json_array();
+			for (int i = 0; i < PARTICLES_PER_NODE; i++)
 			{
-				float distance = (box_position[j] + box_size[j] / 2.0f) - particles[i][j];
-				forces[i][j] += distance / 10000.0f;
-				particles[i][j] += forces[i][j];
-				json_array_append( position, json_real( particles[i][j] ) );
+				json_t *position = json_array();
+				json_array_append_new( particle_array, position );
+				//Recalculate force based on distance to box center and add it
+				for (int j = 0; j < 3; j++)
+				{
+					float distance = (box_position[j] + box_size[j] / 2.0f) - particles[i][j];
+					forces[i][j] += distance / 10000.0f;
+					particles[i][j] += forces[i][j];
+					json_array_append_new( position, json_real( particles[i][j] ) );
+				}
 			}
+			json_object_set_new( visualization.getJsonMetaRoot(), "reference particles", particle_array );
 		}
-		json_object_set_new( visualization.getJsonMetaRoot(), "reference particles", particle_array );
 		//Visualize and send data to the server
-		visualization.doVisualization(META_MERGE);
+		visualization.doVisualization((rank % 2 == 0)?META_MERGE:META_NONE,(numProc+1)/2);
 		//printf("%i: Sent dummy meta data\n",rank);
 		//sync
 		MPI_Bcast((void*)&force_exit,sizeof(force_exit), MPI_INT, MASTER_RANK, MPI_COMM_WORLD);

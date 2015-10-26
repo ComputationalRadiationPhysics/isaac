@@ -28,7 +28,7 @@ class MessageAble
 		//Called from Master
 		errorCode masterSendMessage(MessageContainer* message);
 		MessageContainer* masterGetMessage();
-	protected:
+	//protected:
 		ThreadList<MessageContainer*> messagesIn; //From master to the client
 		ThreadList<MessageContainer*> messagesOut; //From client to the master
 

@@ -286,7 +286,7 @@ function mouseMoveHandler(e)
 	mousey = e.clientY;
 	var obj =
 	{
-		"type" : "feedback",
+		"type" : "feedback all",
 		"observe id" : observe_id,
 		"projection" : projection,
 		"modelview" : mulMatrix(modelview,rotation)
@@ -418,7 +418,8 @@ document.getElementById("connect").onclick = function()
 			};
 			socket.onclose = function()
 			{
-				document.getElementById("status").textContent = "Status: Closed";
+				if (document.getElementById("status").textContent != "Status: An error occured. Wrong address, network gone or server not started?")
+					document.getElementById("status").textContent = "Status: Closed";
 				document.getElementById("connect").value = "Connect";
 				document.getElementById("list_td").style.display = 'none';
 				document.getElementById("video_td").style.display = 'none';
@@ -426,7 +427,7 @@ document.getElementById("connect").onclick = function()
 			};
 			socket.onerror = function()
 			{
-				alert("An error occured. Wrong address, network gone or server not started?");
+				document.getElementById("status").textContent = "Status: An error occured. Wrong address, network gone or server not started?";
 			};
 		}
 		catch(exception)
