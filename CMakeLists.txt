@@ -34,11 +34,11 @@ find_package(LibWebSockets REQUIRED)
 set(LIBS ${LIBS} ${LIBWEBSOCKETS_LIBRARIES})
 set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIR})
 
-find_package (Threads)
+find_package (Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 find_package (Jansson)
-set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
+set(LIBS ${LIBS} ${JANSSON_LIBRARIES} REQUIRED)
 set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
 
 include_directories(isaac ${INCLUDE})	
@@ -51,12 +51,12 @@ if (BUILD_EXAMPLE)
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${JANSSON_LIBRARIES})
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${JANSSON_INCLUDE_DIRS})
 
-	find_package (IceT)
+	find_package (IceT REQUIRED)
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${ICET_CORE_LIBS})
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${ICET_MPI_LIBS})
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${ICET_INCLUDE_DIRS})
 
-	find_package (MPI)
+	find_package (MPI REQUIRED)
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${MPI_C_LIBRARIES})
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${MPI_CXX_LIBRARIES})
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${MPI_C_INCLUDE_PATH})
@@ -64,7 +64,7 @@ if (BUILD_EXAMPLE)
 	
 	set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/requirement-modules/alpaka/" CACHE STRING  "The location of the alpaka library")
 	set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")
-	find_package( alpaka )
+	find_package( alpaka  REQUIRED)
 	
 	set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wno-literal-suffix" )
 
