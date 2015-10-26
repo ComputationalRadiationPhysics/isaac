@@ -37,8 +37,8 @@ set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIR})
 find_package (Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
-find_package (Jansson)
-set(LIBS ${LIBS} ${JANSSON_LIBRARIES} REQUIRED)
+find_package (Jansson REQUIRED)
+set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
 set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
 
 include_directories(isaac ${INCLUDE})	
