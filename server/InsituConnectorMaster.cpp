@@ -15,20 +15,24 @@
 
 #include "InsituConnectorMaster.hpp"
 #include <jansson.h>
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/poll.h>
 #include <netinet/in.h>
 #include <string.h>
 #include <pthread.h>
+#include <vector>
 
 InsituConnectorMaster::InsituConnectorMaster()
 {
 	sockfd = 0;
 	nextFreeNumber = 0;
+	force_exit = false;
 }
 
 errorCode InsituConnectorMaster::init(int port)
 {
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	if (sockfd < 0)
 		return -1;
 	int enable = 1;
@@ -50,25 +54,122 @@ int InsituConnectorMaster::getSockFD()
 	return sockfd;
 }
 
+typedef struct
+{
+	char buffer[MAX_RECEIVE];
+	int pos;
+	int count;
+} json_load_callback_struct;
+
+size_t json_load_callback_function (void *buffer, size_t buflen, void *data)
+{
+	json_load_callback_struct* jlcb = (json_load_callback_struct*)data;
+	if (jlcb->pos < jlcb->count)
+	{
+		((char*)buffer)[0] = jlcb->buffer[jlcb->pos];
+		jlcb->pos++;
+		return 1;
+	}
+	return 0;
+	//return recv(jlcb->sockfd,buffer,1,MSG_DONTWAIT);
+}
+
 errorCode InsituConnectorMaster::run()
 {
+	json_load_callback_struct jlcb;
+	
 	listen(sockfd,5);
 	struct sockaddr_in cli_addr;
 	socklen_t clilen = sizeof(cli_addr);
-	int newsockfd = 1;
-	while (newsockfd >= 0)
+	
+	struct pollfd fd_array[MAX_SOCKETS];
+	memset(fd_array,0,sizeof(fd_array));
+	std::vector< InsituConnectorContainer* > con_array = std::vector< InsituConnectorContainer* >(MAX_SOCKETS,NULL);
+	
+	fd_array[0].fd = sockfd;
+	fd_array[0].events = POLLIN;
+	int fdnum = 1;
+	
+	while (!force_exit)
 	{
-		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-		if (newsockfd >= 0)
+		int rv = poll(fd_array, fdnum, 1000); //1s timeout
+		if (rv < 0)
 		{
-			printf("New connection from Plugin established\n");
-			InsituConnector* insituConnector = new InsituConnector(newsockfd,nextFreeNumber++);
-			InsituConnectorContainer* d = new InsituConnectorContainer();
-			d->connector = insituConnector;
-			pthread_create(&(d->thread),NULL,Runable::run_runable,insituConnector);
-			insituConnectorList.push_back(d);
+			fprintf(stderr,"Error while calling poll\n");
+			return -1;
+		}
+		if (rv)
+		{
+			//First some extra sausage for the listening sockfd
+			if (fd_array[0].revents == POLLIN)
+			{
+				int newsockfd = 1;
+				while (newsockfd >= 0)
+				{
+					newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+					if (newsockfd >= 0)
+					{
+						printf("New connection from Plugin established\n");
+						InsituConnector* insituConnector = new InsituConnector(newsockfd,nextFreeNumber++);
+						InsituConnectorContainer* d = new InsituConnectorContainer();
+						d->connector = insituConnector;
+						con_array[fdnum] = d;
+						fd_array[fdnum].fd = newsockfd;
+						fd_array[fdnum].events = POLLIN;
+						insituConnectorList.push_back(d);
+						fdnum++;
+					}
+				}
+			}
+			for (int i = 1; i < fdnum; i++)
+			{
+				if (fd_array[i].revents == POLLIN)
+				{
+					jlcb.pos = 0;
+					jlcb.count = recv(fd_array[i].fd,jlcb.buffer,MAX_RECEIVE,MSG_DONTWAIT);
+					bool closed = false;
+					if (jlcb.count > 0)
+					{
+						jlcb.buffer[jlcb.count] = 0;
+						while (json_t * content = json_load_callback(json_load_callback_function,&jlcb,JSON_DISABLE_EOF_CHECK,NULL))
+						{
+							MessageContainer* message = new MessageContainer(NONE,content);
+							MessageType type = message->type;
+							if (type == REGISTER_MASTER)
+								json_object_set_new( message->json_root, "id", json_integer( con_array[i]->connector->getID() ) );
+							con_array[i]->connector->clientSendMessage(message);
+							if (type == EXIT_PLUGIN)
+							{
+								closed = true;
+								break;
+							}
+						}
+					}
+					else //Closed
+					{
+						MessageContainer* message = new MessageContainer(EXIT_PLUGIN,json_object());
+						json_object_set_new( message->json_root, "type", json_string( "exit" ) );
+						con_array[i]->connector->clientSendMessage(message);
+						closed = true;
+					}
+					if (closed)
+					{
+						fdnum--;
+						for (int j = i; j < fdnum; j++)
+						{
+							fd_array[j] = fd_array[j+1];
+							con_array[j] = con_array[j+1];
+						}
+					}
+				}
+			}
 		}
 	}
+}
+
+void InsituConnectorMaster::setExit()
+{
+	force_exit = true;
 }
 
 InsituConnectorMaster::~InsituConnectorMaster()
@@ -79,7 +180,6 @@ InsituConnectorMaster::~InsituConnectorMaster()
 		shutdown(mom->connector->getSockFD(),SHUT_RDWR);
 		printf("Waiting for InsituConnectorThread %i to finish... ",mom->connector->getID());
 		fflush(stdout);
-		pthread_join(mom->thread,NULL);
 		delete mom;
 		printf("Done\n");
 	}

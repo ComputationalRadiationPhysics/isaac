@@ -21,10 +21,11 @@
 #include <memory>
 class InsituConnectorGroup;
 
+#define MAX_SOCKETS 32768
+
 typedef struct InsituConnectorContainer_struct
 {
 	InsituConnector* connector;
-	pthread_t thread;
 	InsituConnectorGroup* group;
 } InsituConnectorContainer;
 
@@ -37,7 +38,9 @@ class InsituConnectorMaster : public Runable
 		~InsituConnectorMaster();
 		ThreadList< InsituConnectorContainer* > insituConnectorList;
 		int getSockFD();
+		void setExit();
 	private:
 		int nextFreeNumber;
 		int sockfd;
+		volatile bool force_exit;
 };

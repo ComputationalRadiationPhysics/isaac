@@ -18,12 +18,11 @@
 #include "MessageAble.hpp"
 #include "ThreadList.hpp"
 
-class InsituConnector : public Runable, public MessageAble
+class InsituConnector : public MessageAble
 {
 	public:
 		InsituConnector(int sockfd,int id);
 		~InsituConnector();
-		errorCode run();
 		int getID();
 		int getSockFD();
 	private:

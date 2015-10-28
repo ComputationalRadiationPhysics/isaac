@@ -189,7 +189,7 @@ errorCode Master::run()
 						ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr it = group->elements.getFront();
 						while (it)
 						{
-							write(it->t->connector->getSockFD(),buffer,strlen(buffer));
+							send(it->t->connector->getSockFD(),buffer,strlen(buffer),0);
 							it = it->next;
 						}
 						//And also all yet registered interfaces
@@ -274,13 +274,13 @@ errorCode Master::run()
 							if ( group->t->master->connector->getID() == id)
 							{
 								if (message->type == FEEDBACK_MASTER)
-									write(group->t->master->connector->getSockFD(),buffer,strlen(buffer));
+									send(group->t->master->connector->getSockFD(),buffer,strlen(buffer),0);
 								else //FEEDBACK_ALL
 								{
 									ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr insitu = group->t->elements.getFront();
 									while (insitu)
 									{
-										write(insitu->t->connector->getSockFD(),buffer,strlen(buffer));
+										send(insitu->t->connector->getSockFD(),buffer,strlen(buffer),0);
 										insitu = insitu->next;
 									}					
 								}
@@ -306,7 +306,8 @@ errorCode Master::run()
 		}
 		usleep(1);
 	}
-	shutdown(insituMaster.getSockFD(),SHUT_RDWR);
+	//shutdown(insituMaster.getSockFD(),SHUT_RDWR);
+	insituMaster.setExit();
 	printf("Waiting for insitu Master thread to finish... ");
 	fflush(stdout);
 	//Yeah... "finish"
