@@ -80,24 +80,24 @@ How to use
 TODO: Writing FindISAAC.cmake or similar.
 
 ISAAC uses CMake. So just do:
-> mkdir build
-> cd build
-> cmake ..
+	mkdir build
+	cd build
+	cmake ..
 to create the Makefiles. Missing dependencies and variables will be
 reported. If everything is setup, just call
-> make
+	make
 to build isaac (and the optional example)
 Now you can just start ISAAC with
-> ./isaac
+	./isaac
 The Paraneter --help will give you some options like the used ports to
 setup up. The default port for the client is 2459 (the year when the
 Serenity laid keel) and for the insitu connections 2560.
 
 If you build the example you can also start one or multiple instances
 with
-> ./example
+	./example
 or
-> mpirun -c COUNT ./example
+	mpirun -c COUNT ./example
 
 If you open the interface.htm in the subfolder client you should be
 able to connect to ISAAC, to see the running example and observe it. For
@@ -114,7 +114,7 @@ to use this library. A CMakeFile to check for this is in work.
 
 In the setup code of your simulation you need to create an instance of
 IsaacVisualization:
-> IsaacVisualization* myVisualization = new IsaacVisualization( … );
+	IsaacVisualization* myVisualization = new IsaacVisualization( … );
 
 TODO: Finish this explanation. :P
 
