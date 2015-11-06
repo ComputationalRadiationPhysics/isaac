@@ -15,6 +15,9 @@
 
 #include "Master.hpp"
 #include "WebSocketDataConnector.hpp"
+#ifdef ISAAC_SDL
+	#include "SDLImageConnector.hpp"
+#endif
 
 #define ISAAC_VERSION "1.0"
 
@@ -61,6 +64,13 @@ int main(int argc, char **argv)
 		delete webSocketDataConnector;
 	else
 		master.addDataConnector(webSocketDataConnector);
+	#ifdef ISAAC_SDL
+		SDLImageConnector* sDLImageConnector = new SDLImageConnector();
+		if (sDLImageConnector->init(0))
+			delete sDLImageConnector;
+		else
+			master.addImageConnector(sDLImageConnector);
+	#endif
 	if (master.run())
 	{
 		printf("Error while running isaac\n");

@@ -128,6 +128,7 @@ errorCode InsituConnectorMaster::run()
 					jlcb.pos = 0;
 					jlcb.count = recv(fd_array[i].fd,jlcb.buffer,MAX_RECEIVE,MSG_DONTWAIT);
 					bool closed = false;
+					bool reused = false;
 					if (jlcb.count > 0)
 					{
 						jlcb.buffer[jlcb.count] = 0;
@@ -137,6 +138,11 @@ errorCode InsituConnectorMaster::run()
 							MessageType type = message->type;
 							if (type == REGISTER_MASTER)
 								json_object_set_new( message->json_root, "id", json_integer( con_array[i]->connector->getID() ) );
+							if (type == REGISTER_VIDEO)
+							{
+								closed = true;
+								reused = true;
+							}
 							con_array[i]->connector->clientSendMessage(message);
 							if (type == EXIT_PLUGIN)
 							{
@@ -154,12 +160,15 @@ errorCode InsituConnectorMaster::run()
 					}
 					if (closed)
 					{
+						if (!reused)
+							close(fd_array[i].fd);
 						fdnum--;
 						for (int j = i; j < fdnum; j++)
 						{
 							fd_array[j] = fd_array[j+1];
 							con_array[j] = con_array[j+1];
 						}
+						memset(&(fd_array[fdnum]),0,sizeof(fd_array[fdnum]));
 					}
 				}
 			}

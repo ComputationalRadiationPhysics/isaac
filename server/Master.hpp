@@ -22,6 +22,9 @@
 #include "MetaDataConnector.hpp"
 class MetaDataConnector;
 
+#include "ImageConnector.hpp"
+class ImageConnector;
+
 #include <signal.h>
 #include "MetaDataClient.hpp"
 #include "InsituConnectorMaster.hpp"
@@ -33,16 +36,25 @@ typedef struct MetaDataConnectorContainer_struct
 	pthread_t thread;
 } MetaDataConnectorContainer;
 
+typedef struct ImageConnectorContainer_struct
+{
+	ImageConnector* connector;
+	pthread_t thread;
+} ImageConnectorContainer;
+
 #define MAX_NODES 999999
 
 class InsituConnectorGroup
 {
+	friend class Master;
 	public:
 		InsituConnectorGroup(std::string name)
 		{
 			this->name = name;
 			this->nodes = MAX_NODES;
 			this->id = 0;
+			this->video = NULL;
+			this->video_buffer_size = 0;
 			this->merge_count = 0;
 			this->meta_merge_count = 0;
 			this->initData = json_object();
@@ -54,12 +66,34 @@ class InsituConnectorGroup
 		{
 			return id;
 		}
+		int getVideoBufferSize()
+		{
+			return video_buffer_size;
+		}
+		int getFramebufferWidth()
+		{
+			return framebuffer_width;
+		}
+		int getFramebufferHeight()
+		{
+			return framebuffer_height;
+		}
 		void mergeJSON(json_t* result,json_t* candidate,InsituConnectorContainer* myself)
 		{
 			const char *c_key;
 			const char *r_key;
 			json_t *c_value;
 			json_t *r_value;
+			//search for framebuffer size:
+			if (c_value = json_object_get(candidate, "framebuffer width"))
+			{
+				framebuffer_width = json_integer_value( c_value );
+				if (c_value = json_object_get(candidate, "framebuffer height"))
+				{
+					framebuffer_height = json_integer_value( c_value );
+					video_buffer_size = framebuffer_width*framebuffer_height*4;
+				}
+			}
 			//metadata merge, old values stay, arrays are merged
 			json_t* m_candidate = json_object_get(candidate, "metadata");
 			json_t* m_result = json_object_get(result, "metadata");
@@ -108,7 +142,12 @@ class InsituConnectorGroup
 				}
 			}
 		}
+		~InsituConnectorGroup()
+		{
+		}
+	private:
 		ThreadList< InsituConnectorContainer* > elements;
+		InsituConnectorContainer* video;
 		int nodes;
 		std::string name;
 		json_t* initData;
@@ -116,8 +155,11 @@ class InsituConnectorGroup
 		int id;
 		int merge_count;
 		int meta_merge_count;
+		int framebuffer_width;
+		int framebuffer_height;
 		json_t* mergeData;
 		int merge_count_max;
+		size_t video_buffer_size;
 };
 
 class Master
@@ -126,7 +168,9 @@ class Master
 		Master(std::string name,int inner_port);
 		~Master();
 		errorCode addDataConnector(MetaDataConnector *dataConnector);
+		errorCode addImageConnector(ImageConnector *imageConnector);
 		MetaDataClient* addDataClient();
+		size_t receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer);
 		errorCode run();
 		static volatile sig_atomic_t force_exit;
 	private:
@@ -134,6 +178,7 @@ class Master
 		json_t* masterHello;
 		std::string name;
 		std::list< MetaDataConnectorContainer > dataConnectorList;
+		std::list< ImageConnectorContainer > imageConnectorList;
 		ThreadList< InsituConnectorGroup* > insituConnectorGroupList;
 		ThreadList< MetaDataClient* > dataClientList;
 		int inner_port;

@@ -30,13 +30,17 @@ typedef enum
 	FORCE_EXIT = -1,
 	FEEDBACK_ALL = 0,
 	FEEDBACK_MASTER = 1,
+	FEEDBACK_ALL_NEIGHBOUR,
+	FEEDBACK_MASTER_NEIGHBOUR,
 	MASTER_HELLO,
 	REGISTER_MASTER,
+	REGISTER_VIDEO,
 	REGISTER_SLAVE,
 	TELL_PLUGIN,
 	EXIT_PLUGIN,
 	PERIOD_MERGE,
 	PERIOD_MASTER,
+	PERIOD_VIDEO,
 	OBSERVE,
 	STOP,
 	CLOSED,
@@ -56,11 +60,26 @@ class MessageContainer
 			if (type == NONE && (json_type = json_object_get(json_root, "type")) && json_is_string(json_type))
 			{
 				const char* str = json_string_value(json_type);
+				if (strcmp(str,"feedback all") == 0)
+					this->type = FEEDBACK_ALL;
+				else
+				if (strcmp(str,"feedback master") == 0)
+					this->type = FEEDBACK_MASTER;
+				else
+				if (strcmp(str,"feedback all neighbour") == 0)
+					this->type = FEEDBACK_ALL_NEIGHBOUR;
+				else
+				if (strcmp(str,"feedback master neighbour") == 0)
+					this->type = FEEDBACK_MASTER_NEIGHBOUR;
+				else
 				if (strcmp(str,"hello") == 0)
 					this->type = MASTER_HELLO;
 				else
 				if (strcmp(str,"register master") == 0)
 					this->type = REGISTER_MASTER;
+				else
+				if (strcmp(str,"register video") == 0)
+					this->type = REGISTER_VIDEO;
 				else
 				if (strcmp(str,"register slave") == 0)
 					this->type = REGISTER_SLAVE;
@@ -68,11 +87,14 @@ class MessageContainer
 				if (strcmp(str,"exit") == 0)
 					this->type = EXIT_PLUGIN;
 				else
-				if (strcmp(str,"period merge") == 0)
-					this->type = PERIOD_MERGE;
+				if (strcmp(str,"period video") == 0)
+					this->type = PERIOD_VIDEO;
 				else
 				if (strcmp(str,"period master") == 0)
 					this->type = PERIOD_MASTER;
+				else
+				if (strcmp(str,"period merge") == 0)
+					this->type = PERIOD_MERGE;
 				else
 				if (strcmp(str,"observe") == 0)
 					this->type = OBSERVE;
@@ -82,12 +104,6 @@ class MessageContainer
 				else
 				if (strcmp(str,"closed") == 0)
 					this->type = CLOSED;
-				else
-				if (strcmp(str,"feedback all") == 0)
-					this->type = FEEDBACK_ALL;
-				else
-				if (strcmp(str,"feedback master") == 0)
-					this->type = FEEDBACK_MASTER;
 				else
 					this->type = UNKNOWN;
 			}
@@ -102,3 +118,50 @@ class MessageContainer
 		MessageType type;
 		json_t *json_root;
 };
+
+
+typedef enum
+{
+	IMG_FORCE_EXIT = -1,
+	UPDATE_BUFFER = 0,
+	GROUP_FINISHED = 1,
+} ImageBufferType;
+
+class InsituConnectorGroup;
+
+class ImageBufferContainer
+{
+	public:
+		ImageBufferContainer(ImageBufferType type,uint8_t* buffer,InsituConnectorGroup* group,int ref_count)
+		{
+			this->type = type;
+			this->buffer = buffer;
+			this->group = group;
+			this->ref_count = ref_count;
+			pthread_mutex_init (&ref_mutex, NULL);
+		}
+		~ImageBufferContainer()
+		{
+		}
+		void suicide()
+		{
+			bool do_it = false;
+			pthread_mutex_lock (&ref_mutex);
+			ref_count--;
+			if (ref_count <= 0)
+			{
+				pthread_mutex_unlock (&ref_mutex);
+				free(buffer);
+				delete this;
+			}
+			else
+				pthread_mutex_unlock (&ref_mutex);
+		}
+		
+		ImageBufferType type;
+		uint8_t* buffer;
+		InsituConnectorGroup* group;
+		int ref_count;
+		pthread_mutex_t ref_mutex;
+};
+	

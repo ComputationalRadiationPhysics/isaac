@@ -18,7 +18,7 @@
 #include "MessageAble.hpp"
 #include <list>
 
-class MetaDataClient : public MessageAble
+class MetaDataClient : public MessageAble<MessageContainer>
 {
 	public:
 		MetaDataClient();

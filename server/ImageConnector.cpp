@@ -13,19 +13,9 @@
  * You should have received a copy of the GNU General Lesser Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
-#pragma once
-#include "Runable.hpp"
-#include "MessageAble.hpp"
-#include "ThreadList.hpp"
+#include "ImageConnector.hpp"
 
-class InsituConnector : public MessageAble<MessageContainer>
+void ImageConnector::setMaster(Master* master)
 {
-	public:
-		InsituConnector(int sockfd,int id);
-		~InsituConnector();
-		int getID();
-		int getSockFD();
-	private:
-		int id;
-		int sockfd;
-};
+	this->master = master;
+}

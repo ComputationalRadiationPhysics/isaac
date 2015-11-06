@@ -13,19 +13,28 @@
  * You should have received a copy of the GNU General Lesser Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
-#pragma once
+#ifndef __IMAGECONNECTOR
+#define __IMAGECONNECTOR
+
+
 #include "Runable.hpp"
 #include "MessageAble.hpp"
 #include "ThreadList.hpp"
+#include "Master.hpp"
+class Master;
 
-class InsituConnector : public MessageAble<MessageContainer>
+class ImageConnector : public Runable, public MessageAble<ImageBufferContainer>
 {
 	public:
-		InsituConnector(int sockfd,int id);
-		~InsituConnector();
-		int getID();
-		int getSockFD();
-	private:
-		int id;
-		int sockfd;
+		//To be overwritten
+		virtual errorCode init(int port) = 0;
+		virtual errorCode run() = 0;
+		virtual std::string getName() = 0;
+
+		//Called from the Master
+		void setMaster(Master* master);		
+	protected:
+		Master* master;
 };
+
+#endif

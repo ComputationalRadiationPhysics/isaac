@@ -24,15 +24,10 @@
 class WebSocketDataConnector : public MetaDataConnector
 {
 	public:
-		//To implement
+		WebSocketDataConnector();
 		errorCode init(int port);
 		errorCode run();
 		std::string getName();
-
-		//Derived from MetaDataConnector
-		//MessageContainer* getLastMessage();
-		//void setMaster(Master* master);		
-		//errorCode addMessage(MessageContainer* message);	
-		//bool force_exit;
+	private:
 		struct libwebsocket_context *context;
 };

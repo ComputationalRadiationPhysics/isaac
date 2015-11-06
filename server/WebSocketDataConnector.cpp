@@ -32,6 +32,11 @@
 
 #include "MetaDataClient.hpp"
 
+WebSocketDataConnector::WebSocketDataConnector()
+{
+	context = NULL;
+}
+
 std::string WebSocketDataConnector::getName()
 {
 	return "WebSocketDataConnector";

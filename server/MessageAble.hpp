@@ -18,18 +18,37 @@
 #include "Common.hpp"
 #include "ThreadList.hpp"
 
+template <typename MessageTemplate>
 class MessageAble
 {
 	public:
-		virtual ~MessageAble();
+		virtual ~MessageAble()
+		{
+			MessageTemplate* mom;
+			while (mom = messagesIn.pop_front())
+				delete mom;
+			while (mom = messagesOut.pop_front())
+				delete mom;
+		}
 		//Called from MetaDataConnector / Client
-		errorCode clientSendMessage(MessageContainer* message);
-		MessageContainer* clientGetMessage();
+		errorCode clientSendMessage(MessageTemplate* message)
+		{
+			messagesOut.push_back(message);
+		}
+		MessageTemplate* clientGetMessage()
+		{
+			return messagesIn.pop_front();
+		}
 		//Called from Master
-		errorCode masterSendMessage(MessageContainer* message);
-		MessageContainer* masterGetMessage();
+		errorCode masterSendMessage(MessageTemplate* message)
+		{
+			messagesIn.push_back(message);
+		}
+		MessageTemplate* masterGetMessage()
+		{
+			return messagesOut.pop_front();
+		}
 	//protected:
-		ThreadList<MessageContainer*> messagesIn; //From master to the client
-		ThreadList<MessageContainer*> messagesOut; //From client to the master
-
+		ThreadList<MessageTemplate*> messagesIn; //From master to the client
+		ThreadList<MessageTemplate*> messagesOut; //From client to the master
 };

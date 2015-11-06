@@ -15,16 +15,15 @@
 <div id="status">Status: Not connected</div>
 </p>
 <table><tr>
+<td id="video_td" valign="top">
+	<canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas>
+</td>
 <td id="preview_td" valign="top">
-	<canvas id="preview" width="512" height="512" style="border:1px solid #000000;">
-	</canvas>
+	<canvas id="preview" width="512" height="512" style="border:1px solid #000000;"></canvas>
 	<form><input type="button" value="Send example metadada" id="metadata"><input type="button" value="Stop observing" id="stop"><input type="button" value="Stop simulation" id="exit"></form>
 </td>
-<td id="video_td" valign="top">
-	<canvas id="video" width="512" height="512" style="border:1px solid #000000;">
-	</canvas>
-</td>
-<td id="list_td" style="display:none"  valign="top">
+</tr></table>
+<div id="list_td" style="display:none">
 	<h3 id="isaac_name"></h3>
 	<table id="list_table" border="1">
 	<tr>
@@ -32,17 +31,18 @@
 		<th>ID</th>
 		<th>Nodes</th>
 		<th>Max chain</th>
+		<th>Dimension</th>
+		<th>Sources</th>
 		<th>Meta data</th>
 		<th>Observe</th>
 	</tr>
 	</table>
-</td>
-</tr></table>
+	<div contentEditable="true" id="debug">Debug Infos</div>
+</div>
 <script>
-var element = document.getElementById("preview");
-var width = element.clientWidth;
-var height = element.clientWidth;
-var ctx = element.getContext("2d");
+var preview = document.getElementById("preview");
+var video = document.getElementById("video");
+var ctx = preview.getContext("2d");
 var socket = null;
 var observe_id = -1;
 var particles = null;
@@ -67,36 +67,10 @@ var rotation = [
 ];
 var znear = 0;
 
-function setFrustum(left, right, bottom, top, znear, zfar )
-{
-	var znear2 = znear * 2;
-	var width = right - left;
-	var height = top - bottom;
-	var zRange = znear - zfar;
-	projection[ 0] = znear2 / width;
-	projection[ 1] = 0;
-	projection[ 2] = 0;
-	projection[ 3] = 0;
-	projection[ 4] = 0;
-	projection[ 5] = znear2 / height;
-	projection[ 6] = 0;
-	projection[ 7] = 0;
-	projection[ 8] = ( right + left ) / width;
-	projection[ 9] = ( top + bottom ) / height;
-	projection[10] = ( zfar + znear) / zRange;
-	projection[11] = -1;
-	projection[12] = 0;
-	projection[13] = 0;
-	projection[14] = ( -znear2 * zfar ) / -zRange;
-	projection[15] = 0;
-}
 
-function setPerspective( fovyInDegrees, aspectRatio, __znear, zfar )
+function updateZNear()
 {
-	znear = __znear;
-	var ymax = znear * Math.tan( fovyInDegrees * Math.PI / 360.0 );
-	var xmax = ymax * aspectRatio;
-	setFrustum( -xmax, xmax, -ymax, ymax, znear, zfar );
+	znear = projection[ 0] * preview.clientWidth / 2;
 }
 
 function mulMatrix( matrix1 , matrix2)
@@ -167,8 +141,8 @@ function project(p)
 {
 	var m = mulMatrix4(mulMatrix3(p,modelview),projection);
 	var t = new Array(2);
-	t[0] = width/2  + m[0] / m[3] * width/2;
-	t[1] = height/2 - m[1] / m[3] * height/2;
+	t[0] = preview.clientWidth/2  + m[0] / m[3] * preview.clientWidth/2;
+	t[1] = preview.clientHeight/2 - m[1] / m[3] * preview.clientHeight/2;
 	t[2] = m[2];
     return t;
 }
@@ -223,7 +197,7 @@ function drawUnitCube()
 
 function redraw()
 {
-	ctx.clearRect(0, 0, width, height);
+	ctx.clearRect(0, 0, preview.clientWidth, preview.clientHeight);
 	ctx.fillStyle = "#000000";
 	var temp = modelview;
 	ctx.beginPath();
@@ -237,12 +211,24 @@ function redraw()
 	ctx.stroke();
 }
 
+function sendMatrix(name,matrix)
+{
+	var obj =
+	{
+		"type" : "feedback all neighbour",
+		"observe id" : observe_id
+	};
+	obj[name] = matrix;
+	socket.send(JSON.stringify(obj));
+}
+
 function mouseWheelHandler(e)
 {
 	var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
 	modelview = mulMatrix(modelview,translateMatrix(0,0,delta));
 	redraw();
 	ctx.fillText("Delta: " + delta,1,10);
+	sendMatrix("modelview",modelview);
 }
 
 var mousedown = [0,0,0];
@@ -269,6 +255,7 @@ function mouseMoveHandler(e)
 {
 	var dx = e.clientX - mousex;
 	var dy = e.clientY - mousey;
+	var obj;
 	if (mousedown[0])
 	{
 		var l = Math.sqrt( dx * dx + dy * dy );
@@ -278,33 +265,26 @@ function mouseMoveHandler(e)
 			dy /= l;
 			rotation = mulMatrix(rotateMatrix(dy,dx,0,l),rotation);
 		}
+		sendMatrix("rotation",rotation);
 	}
 	if (mousedown[2] || mousedown[1])
+	{
 		modelview = mulMatrix(modelview,translateMatrix(dx/100,-dy/100,0,l));
+		sendMatrix("modelview",modelview);
+	}
 	redraw();
 	mousex = e.clientX;
 	mousey = e.clientY;
-	var obj =
-	{
-		"type" : "feedback all",
-		"observe id" : observe_id,
-		"projection" : projection,
-		"modelview" : mulMatrix(modelview,rotation)
-	};
-	if (mousedown[2] || mousedown[1] || mousedown[0])
-		socket.send(JSON.stringify(obj));
 }
 
 ctx.font = "10px Arial";
-setPerspective( 45.0, 1, 1, 100 )
-modelview = mulMatrix(modelview,translateMatrix(0,0,-5));
 redraw();
-element.addEventListener("mousewheel", mouseWheelHandler, false);
-element.addEventListener("DOMMouseScroll", mouseWheelHandler, false);
-element.addEventListener("mousemove", mouseMoveHandler, false);
-element.addEventListener("mousedown", mouseDownHandler, false);
-element.addEventListener("mouseup", mouseUpHandler, false);
-element.onmouseout = function(){mouseResetHandler()};
+preview.addEventListener("mousewheel", mouseWheelHandler, false);
+preview.addEventListener("DOMMouseScroll", mouseWheelHandler, false);
+preview.addEventListener("mousemove", mouseMoveHandler, false);
+preview.addEventListener("mousedown", mouseDownHandler, false);
+preview.addEventListener("mouseup", mouseUpHandler, false);
+preview.onmouseout = function(){mouseResetHandler()};
 
 document.getElementById("video_td").style.display = 'none';
 document.getElementById("preview_td").style.display = 'none';
@@ -365,10 +345,17 @@ document.getElementById("connect").onclick = function()
 					var table = document.getElementById("list_table");
 					while (table.rows.length > 1)
 						table.deleteRow(1);
-					document.getElementById("list_td").style.display = 'table-cell';
+					document.getElementById("list_td").style.display = 'initial';
 				}
 				if (obj["type"] == "tell plugin")
 				{
+					projection = obj["projection"];
+					modelview = obj["modelview"];
+					rotation = obj["rotation"];
+					preview.width = obj["framebuffer width"]
+					preview.height = obj["framebuffer height"]
+					video.width = obj["framebuffer width"]
+					video.height = obj["framebuffer height"]
 					var table = document.getElementById("list_table");					
 					var row = table.insertRow(-1);
 					row.id = obj["id"];
@@ -376,14 +363,28 @@ document.getElementById("connect").onclick = function()
 					row.insertCell(1).innerHTML = obj["id"];
 					row.insertCell(2).innerHTML = obj["nodes"];
 					row.insertCell(3).innerHTML = obj["max chain"];
-					var metaCell = row.insertCell(4);//.innerHTML = obj["metadata"].toSource();
+					var cell = row.insertCell(4);
+					var d = obj["dimension"];
+					cell.innerHTML += obj["width"];
+					if (d > 1)
+						cell.innerHTML += " * " + obj["height"];
+					if (d > 2)
+						cell.innerHTML += " * " + obj["depth"];
+					var cell = row.insertCell(5);
+					for (element in obj["sources"])
+					{
+						var e = obj["sources"][element]
+						cell.innerHTML += "<b>" + e["name"] + ":</b><br/>";
+						cell.innerHTML += " Feature dimension(" + e["feature dimension"] + ")<br/>";
+					}
+					var cell = row.insertCell(6);//.innerHTML = obj["metadata"].toSource();
 					for (element in obj["metadata"])
 					{
-						metaCell.innerHTML += "<b>" + element + ":</b> ";
-						metaCell.innerHTML += obj["metadata"][element];
-						metaCell.innerHTML += "<br/>";
+						cell.innerHTML += "<b>" + element + ":</b> ";
+						cell.innerHTML += obj["metadata"][element];
+						cell.innerHTML += "<br/>";
 					}
-					var observeCell = row.insertCell(5);
+					var observeCell = row.insertCell(7);
 					var button = document.createElement("input");
 					button.type = "button";
 					button.value = "Observe";
@@ -391,13 +392,25 @@ document.getElementById("connect").onclick = function()
 					{
 						document.getElementById("video_td").style.display = 'table-cell';
 						document.getElementById("preview_td").style.display = 'table-cell';
+						document.getElementById("debug").textContent = "Debug Infos";
 						observeSimulation(obj["id"]);
 					};
 					observeCell.appendChild(button);
 				}
-				if (obj["type"] == "period merge")
+				if (obj["type"] == "period merge" || obj["type"] == "period master" || obj["type"] == "feedback master neighbour" || obj["type"] == "feedback all neighbour")
 				{
-					particles = obj["metadata"]["reference particles"];
+					if (obj.hasOwnProperty("metadata"))
+					{
+						if (obj["metadata"].hasOwnProperty("reference particles"))
+							particles = obj["metadata"]["reference particles"];
+						document.getElementById("debug").innerHTML = JSON.stringify(obj["metadata"]).replace(/{/g,"<br/>{").replace(/}/g,"}<br/>");
+					}
+					if (obj.hasOwnProperty("projection"))
+						projection = obj["projection"];
+					if (obj.hasOwnProperty("modelview"))
+						modelview = obj["modelview"];
+					if (obj.hasOwnProperty("rotation"))
+						rotation = obj["rotation"];
 					redraw();
 				}
 				if (obj["type"] == "exit")
@@ -411,8 +424,8 @@ document.getElementById("connect").onclick = function()
 						}
 					if (observe_id == obj["id"])
 					{
-						document.getElementById("video_td").style.display = 'none';
-						document.getElementById("preview_td").style.display = 'none';
+						//document.getElementById("video_td").style.display = 'none';
+						//document.getElementById("preview_td").style.display = 'none';
 					}
 				}
 			};
@@ -475,6 +488,37 @@ document.getElementById("exit").onclick = function()
 }
 
 
-</script>
+/*function setFrustum(left, right, bottom, top, znear, zfar )
+{
+	var znear2 = znear * 2;
+	var width = right - left;
+	var height = top - bottom;
+	var zRange = znear - zfar;
+	projection[ 0] = znear2 / width;
+	projection[ 1] = 0;
+	projection[ 2] = 0;
+	projection[ 3] = 0;
+	projection[ 4] = 0;
+	projection[ 5] = znear2 / height;
+	projection[ 6] = 0;
+	projection[ 7] = 0;
+	projection[ 8] = ( right + left ) / width;
+	projection[ 9] = ( top + bottom ) / height;
+	projection[10] = ( zfar + znear) / zRange;
+	projection[11] = -1;
+	projection[12] = 0;
+	projection[13] = 0;
+	projection[14] = ( -znear2 * zfar ) / -zRange;
+	projection[15] = 0;
+}
 
+function setPerspective( fovyInDegrees, aspectRatio, __znear, zfar )
+{
+	znear = __znear;
+	var ymax = znear * Math.tan( fovyInDegrees * Math.PI / 360.0 );
+	var xmax = ymax * aspectRatio;
+	setFrustum( -xmax, xmax, -ymax, ymax, znear, zfar );
+}*/
+
+</script>
 </html>

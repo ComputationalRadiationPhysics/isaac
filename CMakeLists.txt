@@ -5,6 +5,7 @@ set(SRCS
 	${CMAKE_SOURCE_DIR}/server/isaac.cpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/WebSocketDataConnector.cpp
+	${CMAKE_SOURCE_DIR}/server/ImageConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnectorMaster.cpp
 	${CMAKE_SOURCE_DIR}/server/Master.cpp
@@ -16,6 +17,7 @@ set(SRCS
 set(HDRS
 	${CMAKE_SOURCE_DIR}/server/Common.hpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.hpp
+	${CMAKE_SOURCE_DIR}/server/ImageConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnectorMaster.hpp
 	${CMAKE_SOURCE_DIR}/server/WebSocketDataConnector.hpp
@@ -25,6 +27,16 @@ set(HDRS
 	${CMAKE_SOURCE_DIR}/server/MessageAble.hpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataClient.hpp
 )
+
+option(ISAAC_SDL "Build SDL ImageConnector" OFF)
+if (ISAAC_SDL)
+	find_package(SDL REQUIRED)
+	set(INCLUDE ${INCLUDE} ${SDL_INCLUDE_DIR})
+	set(LIBS ${LIBS} ${SDL_LIBRARY})
+	add_definitions(-DISAAC_SDL)
+	set(SRCS ${SRCS} ${CMAKE_SOURCE_DIR}/server/SDLImageConnector.cpp)
+	set(HDRS ${HDRS} ${CMAKE_SOURCE_DIR}/server/SDLImageConnector.hpp)
+endif ()
 
 add_executable(isaac ${HDRS} ${SRCS})
 
@@ -40,6 +52,11 @@ set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 find_package (Jansson REQUIRED)
 set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
 set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
+
+find_package (GStreamer REQUIRED)
+set(LIBS ${LIBS} ${GSTREAMER_LIBARIES})
+set(INCLUDE ${INCLUDE} ${GSTREAMER_INCLUDE_DIRS})
+
 
 include_directories(isaac ${INCLUDE})	
 target_link_libraries(isaac ${LIBS})
@@ -61,12 +78,21 @@ if (BUILD_EXAMPLE)
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${MPI_CXX_LIBRARIES})
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${MPI_C_INCLUDE_PATH})
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${MPI_CXX_INCLUDE_PATH})
+
+	find_package(Boost REQUIRED)
+	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${Boost_INCLUDE_DIR})
+	add_definitions(-DBOOST_ALL_NO_LIB)
 	
 	set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/requirement-modules/alpaka/" CACHE STRING  "The location of the alpaka library")
 	set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")
 	find_package( alpaka  REQUIRED)
 	
 	set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wno-literal-suffix" )
+	
+	option(ISAAC_THREADING "Do the vizualisation in background. May be buggy. Needs MPI_threading intialisation!" OFF)
+	if (ISAAC_THREADING)
+		add_definitions(-DISAAC_THREADING)
+	endif ()
 
 	include_directories(example ${EXAMPLE_INCLUDE} ${alpaka_INCLUDE_DIRS})	
 	add_definitions( ${alpaka_DEFINITIONS} ${ALPAKA_DEV_COMPILE_OPTIONS})

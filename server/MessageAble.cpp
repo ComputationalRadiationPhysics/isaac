@@ -14,32 +14,3 @@
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 #include "MessageAble.hpp"
-
-errorCode MessageAble::masterSendMessage(MessageContainer* message)
-{
-	messagesIn.push_back(message);
-}
-
-MessageContainer* MessageAble::masterGetMessage()
-{
-	return messagesOut.pop_front();
-}
-
-errorCode MessageAble::clientSendMessage(MessageContainer* message)
-{
-	messagesOut.push_back(message);
-}
-
-MessageContainer* MessageAble::clientGetMessage()
-{
-	return messagesIn.pop_front();
-}
-
-MessageAble::~MessageAble()
-{
-	MessageContainer* mom;
-	while (mom = messagesIn.pop_front())
-		delete mom;
-	while (mom = messagesOut.pop_front())
-		delete mom;
-}

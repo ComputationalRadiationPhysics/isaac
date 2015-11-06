@@ -14,18 +14,18 @@
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 #pragma once
-#include "Runable.hpp"
-#include "MessageAble.hpp"
-#include "ThreadList.hpp"
 
-class InsituConnector : public MessageAble<MessageContainer>
+#include "ImageConnector.hpp"
+#include <SDL.h>
+
+class SDLImageConnector : public ImageConnector
 {
 	public:
-		InsituConnector(int sockfd,int id);
-		~InsituConnector();
-		int getID();
-		int getSockFD();
+		SDLImageConnector();
+		errorCode init(int port);
+		errorCode run();
+		std::string getName();
 	private:
-		int id;
-		int sockfd;
+		SDL_Surface* window;
+		InsituConnectorGroup* group;
 };

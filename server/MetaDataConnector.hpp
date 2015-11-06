@@ -26,7 +26,7 @@ class Master;
 
 /** This class is used for the connection between the isaac server and
  * some frontend. It defines and abstracts an interface isaac will use.*/
-class MetaDataConnector : public Runable, public MessageAble
+class MetaDataConnector : public Runable, public MessageAble<MessageContainer>
 {
 	public:
 		//To be overwritten
