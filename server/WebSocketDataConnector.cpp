@@ -54,15 +54,17 @@ static int callback_http(
 	{
 		case LWS_CALLBACK_HTTP:
 		{
-			char universal_response[] = "Please use websockets to connect to this server";
-			libwebsocket_write(wsi, (unsigned char*) universal_response, strlen(universal_response), LWS_WRITE_HTTP);
+			char buf[LWS_SEND_BUFFER_PRE_PADDING + 512 + LWS_SEND_BUFFER_POST_PADDING];
+			char* use = &(buf[LWS_SEND_BUFFER_PRE_PADDING]);
+			sprintf(use,"HTTP/1.1 200 OK\n\nv=0\nm=video 5000 RTP/AVP 96\nc=IN IP4 127.0.0.1\na=rtpmap:96 H264/90000\n");
+			libwebsocket_write(wsi, (unsigned char*) use, strlen(use), LWS_WRITE_HTTP);
 			char name[256];
 			char rip[256];
 			libwebsockets_get_peer_addresses(context,wsi,libwebsocket_get_socket_fd(wsi),name,256,rip,256);
 			printf("HTTP Connection from %s (%s)!\n",name,rip);
 			return -1;
 		}
-	}	
+	}
 	return 0;
 }
 

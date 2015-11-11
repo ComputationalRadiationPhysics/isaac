@@ -6,6 +6,7 @@ set(SRCS
 	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/WebSocketDataConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/ImageConnector.cpp
+	${CMAKE_SOURCE_DIR}/server/RTPImageConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnectorMaster.cpp
 	${CMAKE_SOURCE_DIR}/server/Master.cpp
@@ -18,6 +19,7 @@ set(HDRS
 	${CMAKE_SOURCE_DIR}/server/Common.hpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/ImageConnector.hpp
+	${CMAKE_SOURCE_DIR}/server/RTPImageConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnectorMaster.hpp
 	${CMAKE_SOURCE_DIR}/server/WebSocketDataConnector.hpp
@@ -42,6 +44,12 @@ add_executable(isaac ${HDRS} ${SRCS})
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules")
 
+find_package (PkgConfig REQUIRED)
+
+find_package (Jansson REQUIRED)
+set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
+set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
+
 find_package(LibWebSockets REQUIRED)
 set(LIBS ${LIBS} ${LIBWEBSOCKETS_LIBRARIES})
 set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIR})
@@ -49,14 +57,10 @@ set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIR})
 find_package (Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
-find_package (Jansson REQUIRED)
-set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
-set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
-
-find_package (GStreamer REQUIRED)
-set(LIBS ${LIBS} ${GSTREAMER_LIBARIES})
+#find_package (GStreamer REQUIRED)
+pkg_search_module(GSTREAMER REQUIRED gstreamer-1.0)
+set(LIBS ${LIBS} ${GSTREAMER_LIBRARIES})
 set(INCLUDE ${INCLUDE} ${GSTREAMER_INCLUDE_DIRS})
-
 
 include_directories(isaac ${INCLUDE})	
 target_link_libraries(isaac ${LIBS})

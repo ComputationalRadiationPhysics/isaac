@@ -31,6 +31,8 @@
 #include <IceT.h>
 #include <IceTMPI.h>
 #include <math.h>
+#include <alpaka/alpaka.hpp>
+#include <stdio.h>
 
 #define MAX_RECEIVE 262144 //256kb
 
@@ -41,9 +43,10 @@ typedef enum
 	META_MASTER = 1
 } IsaacVisualizationMetaEnum;
 
+template <typename TDevAcc,typename TAccDim>
 class IsaacSource
 {
-	friend class IsaacVisualization;
+	template <typename THost__,typename TAcc__,typename TStream__,typename TAccDim__,typename TSimDim__> friend class IsaacVisualization;
 	public:
 		IsaacSource(std::string name,float* ptr,unsigned int f_dim)
 		{
@@ -54,7 +57,7 @@ class IsaacSource
 	private:
 		std::string name;
 		float* ptr;
-		int f_dim;
+		unsigned int f_dim;
 };
 
 #define ISAAC_SET_IDENTITY(matrix) \
@@ -78,63 +81,62 @@ class IsaacSource
 	#define ISAAC_WAIT_VISUALIZATION BOOST_PP_EMPTY
 #endif
 
+template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim>
 class IsaacVisualization 
 {
 	public:
+		using TDevAcc  = alpaka::dev::Dev<TAcc>;
+		using TFraDim = alpaka::dim::DimInt<1>;
 		IsaacVisualization(
+			THost host,
+			TDevAcc acc,
+			TStream stream,
 			std::string name,
 			int master,
 			std::string server_url,
 			int server_port,
 			int framebuffer_width,
 			int framebuffer_height,
-			unsigned int g_width,
-			unsigned int g_height,
-			unsigned int g_depth,
-			unsigned int l_width,
-			unsigned int l_height,
-			unsigned int l_depth,
-			unsigned int x,
-			unsigned int y = 0,
-			unsigned int z = 0)
+			const alpaka::Vec<TSimDim, size_t> global_size,
+			const alpaka::Vec<TSimDim, size_t> local_size,
+			const alpaka::Vec<TSimDim, size_t> position) :
+			host(host),
+			acc(acc),
+			stream(stream),
+			global_size(global_size),
+			local_size(local_size),
+			position(position),
+			name(name),
+			master(master),
+			server_url(server_url),
+			server_port(server_port),
+			framebuffer_width(framebuffer_width),
+			framebuffer_height(framebuffer_height),
+			metaNr(0),
+			visualizationThread(0),
+			framebuffer_vec(size_t(framebuffer_width) * size_t(framebuffer_height)),
+			framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_vec))
 		{
 			//INIT
 			myself = this;
-			this->name = name;
 			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 			MPI_Comm_size(MPI_COMM_WORLD, &numProc);
-			this->master = master;
-			this->server_url = server_url;
-			this->server_port = server_port;
-			this->framebuffer_width = framebuffer_width;
-			this->framebuffer_height = framebuffer_height;
-			this->metaNr = 0;
 			this->communicator = new IsaacCommunicator(server_url,server_port);
 			if (rank == master)
 				this->video_communicator = new IsaacCommunicator(server_url,server_port);
 			else
 				this->video_communicator = NULL;
-			this->visualizationThread = 0;
-			this->sources_g_size[0] = g_width;
-			this->sources_g_size[1] = g_height;
-			this->sources_g_size[2] = g_depth;
-			this->sources_l_size[0] = l_width;
-			this->sources_l_size[1] = l_height;
-			this->sources_l_size[2] = l_depth;
-			this->sources_pos[0] = x;
-			this->sources_pos[1] = y;
-			this->sources_pos[2] = z;
-			if (l_height == 0)
-				this->dim = 1;
-			else
-			if (l_depth == 0)
-				this->dim = 2;
-			else
-				this->dim = 3;
 			setPerspective( 45.0f, (float)framebuffer_width/(float)framebuffer_height,1.0f, 100.0f);
 			ISAAC_SET_IDENTITY(modelview)
 			modelview[14] = -5.0f; //glTranslate(0,0,-5);
 			ISAAC_SET_IDENTITY(rotation)
+						
+			//Fill framebuffer with test values:
+			alpaka::mem::buf::Buf<THost, uint32_t, TFraDim, size_t> framebuffer_host(alpaka::mem::buf::alloc<uint32_t, size_t>(host, framebuffer_vec));
+			uint32_t value = (255 << 24) | (rank*255/numProc << 16) | (255 - rank*255/numProc << 8) | 0;
+			for (size_t i = 0; i < framebuffer_vec.prod(); ++i)
+				alpaka::mem::view::getPtrNative(framebuffer_host)[i] = value;
+			alpaka::mem::view::copy(stream, framebuffer, framebuffer_host, framebuffer_vec);
 			
 			//ISAAC:
 			IceTCommunicator icetComm;
@@ -148,13 +150,19 @@ class IsaacVisualization
 			icetSetDepthFormat(ICET_IMAGE_DEPTH_NONE);
 			icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
 			
-			int max = g_width > g_height ? g_width : g_height;
-			float f_l_width = (float)l_width/(float)max * 2.0f;
-			float f_l_height = (float)l_height/(float)max * 2.0f;
-			float f_l_depth = (float)l_depth/(float)max * 2.0f;
-			float f_x = (float)x/(float)max * 2.0f - 1.0f;
-			float f_y = (float)y/(float)max * 2.0f - 1.0f;
-			float f_z = (float)z/(float)max * 2.0f - 1.0f;
+			size_t max = global_size[0] > global_size[1] ? global_size[0] : global_size[1];
+			if (TAccDim::value > 2)
+				max = global_size[2] > max ? global_size[2] : max;
+			float f_l_width = (float)local_size[0]/(float)max * 2.0f;
+			float f_l_height = (float)local_size[1]/(float)max * 2.0f;
+			float f_l_depth = 0.0f;
+			if (TAccDim::value > 2)
+				f_l_depth = (float)local_size[2]/(float)max * 2.0f;
+			float f_x = (float)position[0]/(float)max * 2.0f - (float)global_size[0]/(float)max;
+			float f_y = (float)position[1]/(float)max * 2.0f - (float)global_size[1]/(float)max;
+			float f_z = 0.0f;
+			if (TAccDim::value > 2)
+				f_z = (float)position[2]/(float)max * 2.0f - (float)global_size[2]/(float)max;
 			icetBoundingBoxf( f_x, f_x + f_l_width, f_y, f_y + f_l_height, f_z, f_z + f_l_depth);
 			icetPhysicalRenderSize(framebuffer_width, framebuffer_height);
 			icetDrawCallback( drawCallBack );
@@ -188,20 +196,20 @@ class IsaacVisualization
 				json_sources_array = json_array();
 				json_object_set_new( json_root, "sources", json_sources_array );
 
-				json_object_set_new( json_root, "dimension", json_integer ( dim ) );
-				json_object_set_new( json_root, "width", json_integer ( sources_g_size[0] ) );
-				if (dim > 1)
-					json_object_set_new( json_root, "height", json_integer ( sources_g_size[1] ) );
-				if (dim > 2)
-					json_object_set_new( json_root, "depth", json_integer ( sources_g_size[2] ) );
+				json_object_set_new( json_root, "dimension", json_integer ( TAccDim::value ) );
+				json_object_set_new( json_root, "width", json_integer ( global_size[0] ) );
+				if (TAccDim::value > 1)
+					json_object_set_new( json_root, "height", json_integer ( global_size[1] ) );
+				if (TAccDim::value > 2)
+					json_object_set_new( json_root, "depth", json_integer ( global_size[2] ) );
 
 			}
 		}
 		
 		void registerSource(std::string name,float* ptr,unsigned int f_dim)
 		{
-			IsaacSource* source = new IsaacSource(name,ptr,f_dim);
-			sources.push_back(std::shared_ptr< IsaacSource >( source ) );
+			IsaacSource<TDevAcc,TAccDim>* source = new IsaacSource<TDevAcc,TAccDim>(name,ptr,f_dim);
+			sources.push_back(std::shared_ptr< IsaacSource<TDevAcc,TAccDim> >( source ) );
 			if (rank == master)
 			{
 				json_t *content = json_object();
@@ -257,9 +265,9 @@ class IsaacVisualization
 			thr_metaTargets = metaTargets;
 			thr_metaCount = metaCount;
 			#ifdef ISAAC_THREADING
-				pthread_create(&visualizationThread,NULL,viszualisationFunction,NULL);
+				pthread_create(&visualizationThread,NULL,visualizationFunction,NULL);
 			#else
-				viszualisationFunction(NULL);
+				visualizationFunction(NULL);
 			#endif
 		}
 		json_t* getMeta()
@@ -283,7 +291,20 @@ class IsaacVisualization
 			icetDestroyContext(icetContext);
 			delete communicator;
 		}	
-	private:
+	//private:
+		struct FillRectKernel
+		{
+			template <typename TAcc__, typename __TBuffer, typename __TValue>
+			ALPAKA_FN_ACC void operator()( TAcc__ const &acc, __TBuffer pixels, __TValue value, size_t framebuffer_width, size_t start, size_t length) const
+			{
+				auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+				size_t local_start = start + threadIdx[2] * framebuffer_width;
+				for(size_t i = local_start; i < local_start+length; i++)
+					pixels[i] = value;
+				pixels[local_start] = (255 << 24) | (255 << 16) | (0 << 8) | 0;
+				pixels[local_start+length-1] = (255 << 24) | (255 << 16) | (255 << 8) | 0;
+			}
+		};
 		static IsaacVisualization *myself;
 		static void drawCallBack(
 			const IceTDouble * projection_matrix,
@@ -292,19 +313,35 @@ class IsaacVisualization
 			const IceTInt * readback_viewport,
 			IceTImage result)
 		{
+			FillRectKernel fillRectKernel;
+			uint32_t value = (255 << 24) | (myself->rank*255/myself->numProc << 16) | (255 - myself->rank*255/myself->numProc << 8) | 255;
+			
+			const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+			const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(1), size_t(readback_viewport[3]));
+			const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(1), size_t(1));
+			auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
+			/*auto const workdiv(
+				alpaka::workdiv::getValidWorkDiv<TAcc>(
+					myself->acc,
+					blocks,
+					blocks,
+					false,
+					alpaka::workdiv::GridBlockExtentSubDivRestrictions::Unrestricted));*/
+			auto const test (alpaka::exec::create<TAcc> (workdiv,
+				fillRectKernel,
+				alpaka::mem::view::getPtrNative(myself->framebuffer),
+				value,
+				myself->framebuffer_width,
+				readback_viewport[0]+readback_viewport[1]*myself->framebuffer_width,
+				readback_viewport[2]));
+			alpaka::stream::enqueue(myself->stream, test);
+			
 			IceTUByte* pixels = icetImageGetColorub(result);
-			int w = icetImageGetWidth(result);
-			for (int x = readback_viewport[0]; x < readback_viewport[0]+readback_viewport[2]; x++)
-				for (int y = readback_viewport[1]; y < readback_viewport[1]+readback_viewport[3]; y++)
-				{
-					int base = (x+y*w)*4;
-					pixels[base + 0] = 0; //B
-					pixels[base + 1] = myself->rank*255/myself->numProc; //G
-					pixels[base + 2] = 255-myself->rank*255/myself->numProc; //R
-					pixels[base + 3] = 255; //A
-				}
+			alpaka::mem::buf::BufPlainPtrWrapper<THost, uint32_t, TFraDim, size_t> result_buffer((uint32_t*)(pixels), myself->host, myself->framebuffer_vec);
+			alpaka::mem::view::copy(myself->stream, result_buffer, myself->framebuffer, myself->framebuffer_vec);
+			//alpaka::wait::wait(myself->stream);
 		}
-		static void* viszualisationFunction(void* dummy)
+		static void* visualizationFunction(void* dummy)
 		{
 			//Handle messages
 			while (json_t* message = myself->communicator->getLastMessage())
@@ -515,16 +552,20 @@ class IsaacVisualization
 				std::list<json_t*> messageList;
 				pthread_mutex_t deleteMessageMutex;
 				pthread_t readThread;
-		};	
+		};
+		THost host;
+		TDevAcc acc;
+		TStream stream;
 		std::string name;
 		std::string server_url;
 		int server_port;
 		int framebuffer_width;
 		int framebuffer_height;
-		int sources_g_size[3];
-		int sources_l_size[3];
-		int sources_pos[3];
-		int dim;
+		alpaka::Vec<TFraDim, size_t> framebuffer_vec;
+		alpaka::Vec<TSimDim, size_t> global_size;
+		alpaka::Vec<TSimDim, size_t> local_size;
+		alpaka::Vec<TSimDim, size_t> position;
+		alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t> framebuffer;
 		IceTDouble projection[16];
 		IceTDouble modelview[16];
 		IceTDouble rotation[16];
@@ -537,11 +578,12 @@ class IsaacVisualization
 		int master;
 		int numProc;
 		int metaNr;
-		std::vector< std::shared_ptr< IsaacSource > > sources;
+		std::vector< std::shared_ptr< IsaacSource<TDevAcc,TAccDim> > > sources;
 		IceTContext icetContext;
 		IsaacVisualizationMetaEnum thr_metaTargets;
 		int thr_metaCount;
 		pthread_t visualizationThread;
 };
 
-IsaacVisualization* IsaacVisualization::myself = NULL;
+template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim>
+IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim>::myself = NULL;

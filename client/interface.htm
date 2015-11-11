@@ -16,7 +16,8 @@
 </p>
 <table><tr>
 <td id="video_td" valign="top">
-	<canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas>
+	<!--canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas-->
+	<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls=false/>
 </td>
 <td id="preview_td" valign="top">
 	<canvas id="preview" width="512" height="512" style="border:1px solid #000000;"></canvas>
@@ -46,6 +47,9 @@ var ctx = preview.getContext("2d");
 var socket = null;
 var observe_id = -1;
 var particles = null;
+
+var plugins = new Array();
+
 
 var projection = [
 	1, 0, 0, 0,
@@ -349,13 +353,7 @@ document.getElementById("connect").onclick = function()
 				}
 				if (obj["type"] == "tell plugin")
 				{
-					projection = obj["projection"];
-					modelview = obj["modelview"];
-					rotation = obj["rotation"];
-					preview.width = obj["framebuffer width"]
-					preview.height = obj["framebuffer height"]
-					video.width = obj["framebuffer width"]
-					video.height = obj["framebuffer height"]
+					plugins.push(obj);
 					var table = document.getElementById("list_table");					
 					var row = table.insertRow(-1);
 					row.id = obj["id"];
@@ -393,6 +391,16 @@ document.getElementById("connect").onclick = function()
 						document.getElementById("video_td").style.display = 'table-cell';
 						document.getElementById("preview_td").style.display = 'table-cell';
 						document.getElementById("debug").textContent = "Debug Infos";
+						projection = obj["projection"];
+						modelview = obj["modelview"];
+						rotation = obj["rotation"];
+						preview.width = obj["framebuffer width"];
+						preview.height = obj["framebuffer height"];
+						video.width = obj["framebuffer width"];
+						video.height = obj["framebuffer height"];
+						video.playlist.items.clear();
+						video.playlist.add("http://127.0.0.1:2459");
+						video.playlist.play();
 						observeSimulation(obj["id"]);
 					};
 					observeCell.appendChild(button);
@@ -424,8 +432,9 @@ document.getElementById("connect").onclick = function()
 						}
 					if (observe_id == obj["id"])
 					{
-						//document.getElementById("video_td").style.display = 'none';
-						//document.getElementById("preview_td").style.display = 'none';
+						document.getElementById("video_td").style.display = 'none';
+						document.getElementById("preview_td").style.display = 'none';
+						video.playlist.stop();
 					}
 				}
 			};

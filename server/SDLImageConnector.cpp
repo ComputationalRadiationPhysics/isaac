@@ -52,9 +52,11 @@ errorCode SDLImageConnector::run()
 			if (message->type == GROUP_FINISHED)
 			{
 				if (group == message->group)
+				{
 					group = NULL;
-				SDL_FreeSurface(window);
-				window = SDL_SetVideoMode( 512, 512, 32, SDL_HWSURFACE );
+					SDL_FreeSurface(window);
+					window = SDL_SetVideoMode( 512, 512, 32, SDL_HWSURFACE );
+				}
 			}
 			else
 			{

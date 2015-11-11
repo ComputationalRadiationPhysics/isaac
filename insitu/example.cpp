@@ -30,7 +30,7 @@
 	#define PARTICLES_PER_NODE 8
 #endif
 
-void recursive_kgv(int* d,int number,int test);
+void recursive_kgv(size_t* d,int number,int test);
 
 int main(int argc, char **argv)
 {
@@ -49,9 +49,9 @@ int main(int argc, char **argv)
 	MPI_Comm_size(MPI_COMM_WORLD, &numProc);
 
 	//Let's calculate the best spatial distribution of the dimensions so that d[0]*d[1]*d[2] = numProc
-	int d[3] = {1,1,1};
+	size_t d[3] = {1,1,1};
 	recursive_kgv(d,numProc,2);
-	int p[3] = { rank % d[0], (rank / d[0]) % d[1],  (rank / d[0] / d[1]) % d[2] };
+	size_t p[3] = { rank % d[0], (rank / d[0]) % d[1],  (rank / d[0] / d[1]) % d[2] };
 	
 	//Let's use this to create some random particles inside my box
 	#ifdef SEND_PARTICLES
@@ -86,20 +86,42 @@ int main(int argc, char **argv)
 	sprintf(name,"Example_%i",id);
 	
 	//Now we initialize the Isaac Insitu Plugin with the name, the number of the master, the server, it's IP, the count of framebuffer to be created and the size per framebuffer
-	IsaacVisualization visualization = IsaacVisualization(name,MASTER_RANK,server,port,1024,768,d[0]*64,d[1]*64,d[2]*64,64,64,64,p[0]*64,p[1]*64,p[2]*64);
+	using AccDim = alpaka::dim::DimInt<3>;
+	using SimDim = alpaka::dim::DimInt<3>;
+	using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
+	using Stream  = alpaka::stream::StreamCudaRtSync;
+	//using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
+	//using Stream  = alpaka::stream::StreamCpuSync;
+	using DevAcc = alpaka::dev::Dev<Acc>;
+	using DevHost = alpaka::dev::DevCpu;
+	typedef float float3_t[3];
+
+	DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(0));
+	DevHost devHost (alpaka::dev::cpu::getDev());
+	Stream  stream  (devAcc);
 	
-	float* source = (float*)malloc(sizeof(float)*3*64*64*64*d[0]*d[1]*d[2]); //64³ block per node
+	const alpaka::Vec<SimDim, size_t> global_size(d[0]*64,d[1]*64,d[2]*64);
+	const alpaka::Vec<SimDim, size_t> local_size(size_t(64),size_t(64),size_t(64));
+	const alpaka::Vec<SimDim, size_t> position(p[0]*64,p[1]*64,p[2]*64);
+	IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim> visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,800,600,global_size,local_size,position);
 	
-	for (int x = 0; x < 64; x++)
-		for (int y = 0; y < 64; y++)
-			for (int z = 0; z < 64; z++)
-			{
-				source[x+y*64+z*64*64*3 + 0] = 1.0f;
-				source[x+y*64+z*64*64*3 + 1] = (float)(rank+1)/(float)numProc;
-				source[x+y*64+z*64*64*3 + 2] = 1.0f-(float)(rank+1)/(float)numProc;
-			}
+	//Init Alpake & Device memory:
+	alpaka::mem::buf::Buf<DevHost, float3_t, SimDim, size_t> hostBuffer1   ( alpaka::mem::buf::alloc<float3_t, size_t>(devHost, local_size));
+	alpaka::mem::buf::Buf<DevAcc, float3_t, SimDim, size_t>  deviceBuffer1 ( alpaka::mem::buf::alloc<float3_t, size_t>(devAcc,  local_size));
+	alpaka::mem::buf::Buf<DevHost, float, SimDim, size_t> hostBuffer2   ( alpaka::mem::buf::alloc<float, size_t>(devHost, local_size));
+	alpaka::mem::buf::Buf<DevAcc, float, SimDim, size_t>  deviceBuffer2 ( alpaka::mem::buf::alloc<float, size_t>(devAcc,  local_size));
+	for (size_t i = 0; i < local_size.prod(); ++i)
+	{
+		alpaka::mem::view::getPtrNative(hostBuffer1)[i][0] = 1.0f;
+		alpaka::mem::view::getPtrNative(hostBuffer1)[i][1] = (float)(rank+1)/(float)numProc;
+		alpaka::mem::view::getPtrNative(hostBuffer1)[i][2] = 1.0f-(float)(rank+1)/(float)numProc;
+		alpaka::mem::view::getPtrNative(hostBuffer2)[i] = (float)(rank+1)/(float)numProc;
+	}
+	alpaka::mem::view::copy(stream, deviceBuffer1, hostBuffer1, local_size);
+	alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, local_size);
 	
-	visualization.registerSource("example source",source,3);
+	visualization.registerSource("source1",reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(deviceBuffer1)),3);
+	visualization.registerSource("source1",reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(deviceBuffer2)),1);
 	
 	//Setting up the metadata description (only master, but however slaves could then metadata metadata, too, it would be merged)
 	if (rank == MASTER_RANK)
@@ -182,15 +204,13 @@ int main(int argc, char **argv)
 	MPI_Barrier(MPI_COMM_WORLD);
 	printf("%i finished\n",rank);
 	
-	free(source);
-	
 	MPI_Finalize();
 	return 0;
 }
 
 // Not necessary, just for the example
 
-void mul_to_smallest_d(int *d,int nr)
+void mul_to_smallest_d(size_t *d,int nr)
 {
 	if (d[0] < d[1]) // 0 < 1
 	{
@@ -208,7 +228,7 @@ void mul_to_smallest_d(int *d,int nr)
 	}
 }
 
-void recursive_kgv(int* d,int number,int test)
+void recursive_kgv(size_t* d,int number,int test)
 {
 	if (number == 1)
 		return;
