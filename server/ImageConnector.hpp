@@ -27,7 +27,7 @@ class ImageConnector : public Runable, public MessageAble<ImageBufferContainer>
 {
 	public:
 		//To be overwritten
-		virtual errorCode init(int port) = 0;
+		virtual errorCode init(int minport,int maxport) = 0;
 		virtual errorCode run() = 0;
 		virtual std::string getName() = 0;
 

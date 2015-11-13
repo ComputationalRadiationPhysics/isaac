@@ -28,18 +28,13 @@ typedef int errorCode;
 typedef enum
 {
 	FORCE_EXIT = -1,
-	FEEDBACK_ALL = 0,
-	FEEDBACK_MASTER = 1,
-	FEEDBACK_ALL_NEIGHBOUR,
-	FEEDBACK_MASTER_NEIGHBOUR,
+	FEEDBACK = 0,
+	FEEDBACK_NEIGHBOUR,
 	MASTER_HELLO,
-	REGISTER_MASTER,
+	REGISTER,
 	REGISTER_VIDEO,
-	REGISTER_SLAVE,
-	TELL_PLUGIN,
 	EXIT_PLUGIN,
-	PERIOD_MERGE,
-	PERIOD_MASTER,
+	PERIOD,
 	PERIOD_VIDEO,
 	OBSERVE,
 	STOP,
@@ -60,29 +55,20 @@ class MessageContainer
 			if (type == NONE && (json_type = json_object_get(json_root, "type")) && json_is_string(json_type))
 			{
 				const char* str = json_string_value(json_type);
-				if (strcmp(str,"feedback all") == 0)
-					this->type = FEEDBACK_ALL;
+				if (strcmp(str,"feedback") == 0)
+					this->type = FEEDBACK;
 				else
-				if (strcmp(str,"feedback master") == 0)
-					this->type = FEEDBACK_MASTER;
-				else
-				if (strcmp(str,"feedback all neighbour") == 0)
-					this->type = FEEDBACK_ALL_NEIGHBOUR;
-				else
-				if (strcmp(str,"feedback master neighbour") == 0)
-					this->type = FEEDBACK_MASTER_NEIGHBOUR;
+				if (strcmp(str,"feedback neighbour") == 0)
+					this->type = FEEDBACK_NEIGHBOUR;
 				else
 				if (strcmp(str,"hello") == 0)
 					this->type = MASTER_HELLO;
 				else
-				if (strcmp(str,"register master") == 0)
-					this->type = REGISTER_MASTER;
+				if (strcmp(str,"register") == 0)
+					this->type = REGISTER;
 				else
 				if (strcmp(str,"register video") == 0)
 					this->type = REGISTER_VIDEO;
-				else
-				if (strcmp(str,"register slave") == 0)
-					this->type = REGISTER_SLAVE;
 				else
 				if (strcmp(str,"exit") == 0)
 					this->type = EXIT_PLUGIN;
@@ -90,11 +76,8 @@ class MessageContainer
 				if (strcmp(str,"period video") == 0)
 					this->type = PERIOD_VIDEO;
 				else
-				if (strcmp(str,"period master") == 0)
-					this->type = PERIOD_MASTER;
-				else
-				if (strcmp(str,"period merge") == 0)
-					this->type = PERIOD_MERGE;
+				if (strcmp(str,"period") == 0)
+					this->type = PERIOD;
 				else
 				if (strcmp(str,"observe") == 0)
 					this->type = OBSERVE;
@@ -124,7 +107,9 @@ typedef enum
 {
 	IMG_FORCE_EXIT = -1,
 	UPDATE_BUFFER = 0,
-	GROUP_FINISHED = 1,
+	GROUP_ADDED,
+	GROUP_FINISHED,
+	REGISTER_STREAM,
 } ImageBufferType;
 
 class InsituConnectorGroup;

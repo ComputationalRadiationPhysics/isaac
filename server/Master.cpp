@@ -66,10 +66,10 @@ MetaDataClient* Master::addDataClient()
 	ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr mom = insituConnectorGroupList.getFront();
 	while (mom)
 	{
-		if (mom->t->nodes == mom->t->elements.length())
+		if (mom->t->master && mom->t->video)
 		{
 			json_incref( mom->t->initData );
-			client->masterSendMessage(new MessageContainer(TELL_PLUGIN,mom->t->initData,true));
+			client->masterSendMessage(new MessageContainer(REGISTER,mom->t->initData,true));
 		}
 		mom = mom->next;
 	}
@@ -82,6 +82,25 @@ size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 	while (count < group->video_buffer_size)
 		count += recv(group->video->connector->getSockFD(),&(video_buffer[count]),group->video_buffer_size-count,MSG_DONTWAIT);
 	return count;
+}
+
+std::string Master::getStream(std::string connector,std::string name)
+{
+	std::string result ("");
+	ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr group = insituConnectorGroupList.getFront();
+	while (group)
+	{
+		if (group->t->name == name)
+		{
+			pthread_mutex_lock(&group->t->streams_mutex);
+			std::map<std::string,std::string>::iterator it = group->t->streams.find( connector );
+			if (it != group->t->streams.end())
+				result = (*it).second;
+			pthread_mutex_unlock(&group->t->streams_mutex);
+		}
+		group = group->next;
+	}
+	return result;
 }
 
 #define ISAAC_WAIT_VIDEO_AND_SEND_ALL(group,json) \
@@ -143,46 +162,10 @@ errorCode Master::run()
 			while (MessageContainer* message = insitu->t->connector->masterGetMessage())
 			{
 				bool delete_message = true;
-				if (message->type == PERIOD_MASTER)
+				if (message->type == PERIOD)
 					ISAAC_WAIT_VIDEO_AND_SEND_ALL(insitu->t->group,message->json_root)
 				else
-				if (message->type == PERIOD_MERGE && insitu->t->group)
-				{			
-					int metaNr = json_integer_value( json_object_get(message->json_root, "meta nr") );
-					if (metaNr == insitu->t->group->meta_merge_count)
-					{
-						if (insitu->t->group->merge_count == 0)
-						{
-							//Reset merge data
-							json_incref( message->json_root );
-							insitu->t->group->mergeData = message->json_root;							
-							json_t* json_count = json_object_get(message->json_root, "count");
-							if (json_is_integer(json_count))
-								insitu->t->group->merge_count_max = json_integer_value( json_count );
-							else
-								insitu->t->group->merge_count_max = insitu->t->group->nodes;
-						}
-						else
-							insitu->t->group->mergeJSON( insitu->t->group->mergeData, message->json_root, NULL );
-						insitu->t->group->merge_count++;
-						if (insitu->t->group->merge_count >= insitu->t->group->merge_count_max)
-						{
-							ISAAC_WAIT_VIDEO_AND_SEND_ALL(insitu->t->group,insitu->t->group->mergeData)
-							json_decref( insitu->t->group->mergeData );
-							insitu->t->group->merge_count = 0;
-							insitu->t->group->meta_merge_count++;
-						}
-					}
-					else
-					if (metaNr > insitu->t->group->meta_merge_count)
-					//this message is too early!
-					{
-						delete_message = false;
-						insitu->t->connector->clientSendMessage(message);
-					}
-				}
-				else
-				if (message->type == REGISTER_MASTER || message->type == REGISTER_SLAVE || message->type == REGISTER_VIDEO) //Saving the metadata description for later
+				if (message->type == REGISTER || message->type == REGISTER_VIDEO) //Saving the metadata description for later
 				{
 					//Get group
 					std::string name( json_string_value( json_object_get( message->json_root, "name" ) ) );
@@ -206,11 +189,13 @@ errorCode Master::run()
 
 					switch (message->type)
 					{
-						case REGISTER_MASTER:
-							printf("New connection, giving id %i (master)\n",insitu->t->connector->getID());
-							break;
-						case REGISTER_SLAVE:
-							printf("New connection, giving id %i (slave)\n",insitu->t->connector->getID());
+						case REGISTER:
+							group->initData = message->json_root;
+							group->framebuffer_width = json_integer_value( json_object_get(group->initData, "framebuffer width") );
+							group->framebuffer_height = json_integer_value( json_object_get(group->initData, "framebuffer height") );
+							group->video_buffer_size = group->framebuffer_width*group->framebuffer_height*4;
+							delete_message = false;
+							printf("New connection, giving id %i (control)\n",insitu->t->connector->getID());
 							break;
 						case REGISTER_VIDEO:
 							printf("New connection, giving id %i (video)\n",insitu->t->connector->getID());
@@ -221,27 +206,21 @@ errorCode Master::run()
 						group->video = insitu->t;
 					else
 					{
-						group->mergeJSON( group->initData, message->json_root, insitu->t );
-						group->elements.push_back( insitu->t );
+						group->master = insitu->t;
+						group->id = insitu->t->connector->getID();
 					}
-					if (group->nodes == group->elements.length() && group->video)
+					if (group->master && group->video)
 					{
-						//Okay, let's tell every element in the group, that it's ready
-						char buffer[] = "{\"type\": \"ready\"}";
-						ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr it = group->elements.getFront();
-						while (it)
-						{
-							send(it->t->connector->getSockFD(),buffer,strlen(buffer),0);
-							it = it->next;
-						}
 						//And also all yet registered interfaces
 						printf("Group complete, sending to connected interfaces\n");
 						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
 						while (dc)
 						{
-							dc->t->masterSendMessage(new MessageContainer(TELL_PLUGIN,group->initData,true));
+							dc->t->masterSendMessage(new MessageContainer(REGISTER,group->initData,true));
 							dc = dc->next;
 						}
+						for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_ADDED,NULL,group,1));
 					}
 				}
 				else
@@ -265,12 +244,7 @@ errorCode Master::run()
 						for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_FINISHED,NULL,group,1));
 						//Now let's remove the whole group
-						ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr element = group->elements.getFront();
-						while (element)
-						{
-							element->t->group = NULL;
-							element = element->next;
-						}
+						group->master->group = NULL;
 						group->video->group = NULL;
 						printf("Removed group %i\n",group->id);
 						ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
@@ -305,7 +279,7 @@ errorCode Master::run()
 			//Check for new messages for every client
 			while (MessageContainer* message = dc->t->masterGetMessage())
 			{
-				if (message->type == FEEDBACK_MASTER || message->type == FEEDBACK_ALL || message->type == FEEDBACK_MASTER_NEIGHBOUR || message->type == FEEDBACK_ALL_NEIGHBOUR)
+				if (message->type == FEEDBACK || message->type == FEEDBACK_NEIGHBOUR)
 				{
 					json_t* observe_id = json_object_get(message->json_root, "observe id");
 					if (observe_id)
@@ -318,19 +292,9 @@ errorCode Master::run()
 							char* buffer = json_dumps( message->json_root, 0 );
 							if ( group->t->master->connector->getID() == id)
 							{
-								if (message->type == FEEDBACK_MASTER || message->type == FEEDBACK_MASTER_NEIGHBOUR)
-									send(group->t->master->connector->getSockFD(),buffer,strlen(buffer),0);
-								else //FEEDBACK_ALL[_NEIGHBOUR]
-								{
-									ThreadList< InsituConnectorContainer* >::ThreadListContainer_ptr insitu = group->t->elements.getFront();
-									while (insitu)
-									{
-										send(insitu->t->connector->getSockFD(),buffer,strlen(buffer),0);
-										insitu = insitu->next;
-									}					
-								}
+								send(group->t->master->connector->getSockFD(),buffer,strlen(buffer),0);
 								//Forwarding to other neighbours of necessary
-								if (message->type == FEEDBACK_MASTER_NEIGHBOUR || message->type == FEEDBACK_ALL_NEIGHBOUR)
+								if (message->type == FEEDBACK_NEIGHBOUR)
 								{
 									//Let's see, whether rotation, projection or modelview are broadcastet and change them in the initData
 									json_t* js;
@@ -368,8 +332,27 @@ errorCode Master::run()
 			}
 			dc = next;
 		}
+
+		///////////////////////////////////////
+		// Iterate over all image connectors //
+		///////////////////////////////////////
+		for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+		{
+			while (ImageBufferContainer* message = (*it).connector->masterGetMessage())
+			{
+				if (message->type == REGISTER_STREAM)
+				{
+					pthread_mutex_lock(&message->group->streams_mutex);
+					message->group->streams.insert(std::pair<std::string,std::string>(std::string((*it).connector->getName()),std::string((char*)message->buffer)));
+					pthread_mutex_unlock(&message->group->streams_mutex);
+				}
+				message->suicide();
+			}
+		}
 		usleep(1);
 	}
+
+
 	//shutdown(insituMaster.getSockFD(),SHUT_RDWR);
 	insituMaster.setExit();
 	printf("Waiting for insitu Master thread to finish... ");

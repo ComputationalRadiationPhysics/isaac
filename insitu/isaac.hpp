@@ -34,7 +34,7 @@
 #include <alpaka/alpaka.hpp>
 #include <stdio.h>
 
-#define MAX_RECEIVE 262144 //256kb
+#define MAX_RECEIVE 32768 //32kb
 
 typedef enum
 {
@@ -121,11 +121,16 @@ class IsaacVisualization
 			myself = this;
 			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 			MPI_Comm_size(MPI_COMM_WORLD, &numProc);
-			this->communicator = new IsaacCommunicator(server_url,server_port);
 			if (rank == master)
+			{
+				this->communicator = new IsaacCommunicator(server_url,server_port);
 				this->video_communicator = new IsaacCommunicator(server_url,server_port);
+			}
 			else
+			{
+				this->communicator = NULL;
 				this->video_communicator = NULL;
+			}
 			setPerspective( 45.0f, (float)framebuffer_width/(float)framebuffer_height,1.0f, 100.0f);
 			ISAAC_SET_IDENTITY(modelview)
 			modelview[14] = -5.0f; //glTranslate(0,0,-5);
@@ -169,10 +174,9 @@ class IsaacVisualization
 			
 			//JSON
 			recreateJSON();
-			json_object_set_new( json_root, "name", json_string( name.c_str() ) );
-			json_object_set_new( json_root, "rank", json_integer( rank ) );
 			if (rank == master)
 			{
+				json_object_set_new( json_root, "name", json_string( name.c_str() ) );
 				json_object_set_new( json_root, "nodes", json_integer( numProc ) );
 				json_object_set_new( json_root, "framebuffer width", json_integer ( framebuffer_width ) );
 				json_object_set_new( json_root, "framebuffer height", json_integer ( framebuffer_height ) );
@@ -202,7 +206,7 @@ class IsaacVisualization
 					json_object_set_new( json_root, "height", json_integer ( global_size[1] ) );
 				if (TAccDim::value > 2)
 					json_object_set_new( json_root, "depth", json_integer ( global_size[2] ) );
-
+				json_object_set_new( json_root, "type", json_string( "register" ) );
 			}
 		}
 		
@@ -225,55 +229,87 @@ class IsaacVisualization
 		}
 		int init()
 		{
-			if (communicator->serverConnect())
-				return -1;
-			if (video_communicator && video_communicator->serverConnect())
+			int failed = 0;
+			if (communicator && communicator->serverConnect())
+				failed = 1;
+			if (failed == 0 && video_communicator && video_communicator->serverConnect())
+				failed = 1;
+			MPI_Bcast(&failed,sizeof(failed), MPI_INT, master, MPI_COMM_WORLD);
+			if (failed)
 				return -1;
 			if (rank == master)
-				json_object_set_new( json_root, "type", json_string( "register master" ) );
-			else
-				json_object_set_new( json_root, "type", json_string( "register slave" ) );
-			char* buffer = json_dumps( json_root, 0 );
-			communicator->serverSend(buffer);
-			free(buffer);
-			json_decref( json_root );
-			
-			if (video_communicator)
 			{
-				json_root = json_object();
-				json_object_set_new( json_root, "type", json_string( "register video" ) );
-				json_object_set_new( json_root, "name", json_string( name.c_str() ) );
 				char* buffer = json_dumps( json_root, 0 );
-				video_communicator->serverSend(buffer);
+				communicator->serverSend(buffer);
 				free(buffer);
 				json_decref( json_root );
-			}
 			
-			//Let's wait for the group completely registered at the server
-			json_t* ready;
-			while ((ready = communicator->getLastMessage()) == NULL)
-				usleep(5000);
-			json_decref( ready ); //Let's just assume the server sends a correct message
-			recreateJSON();
+				if (video_communicator)
+				{
+					json_root = json_object();
+					json_object_set_new( json_root, "type", json_string( "register video" ) );
+					json_object_set_new( json_root, "name", json_string( name.c_str() ) );
+					char* buffer = json_dumps( json_root, 0 );
+					video_communicator->serverSend(buffer);
+					free(buffer);
+					json_decref( json_root );
+				}			
+				recreateJSON();
+			}
 			return 0;
 		}
-		void doVisualization(
-			IsaacVisualizationMetaEnum metaTargets = META_MASTER,
-			int metaCount = -1 )
+		json_t* doVisualization( IsaacVisualizationMetaEnum metaTargets = META_MASTER )
 		{
 			ISAAC_WAIT_VISUALIZATION
+
+			//Handle messages
+			json_t* message;
+			char message_buffer[MAX_RECEIVE];
+			//Master merges all messages and broadcasts it.
+			if (rank == master)
+			{
+				message = json_object();
+				while (json_t* last = communicator->getLastMessage())
+				{
+					mergeJSON(message,last);
+					json_decref( last );
+				}
+				char* buffer = json_dumps( message, 0 );
+				strcpy( message_buffer, buffer );
+				free(buffer);
+				MPI_Bcast( message_buffer, MAX_RECEIVE, MPI_CHAR, master, MPI_COMM_WORLD);
+			}
+			else //The others just get the message
+			{
+				MPI_Bcast( message_buffer, MAX_RECEIVE, MPI_CHAR, master, MPI_COMM_WORLD);
+				message = json_loads(message_buffer, 0, NULL);
+			}
+			
+			json_t* js;
+			size_t index;
+			json_t *value;
+			//Scene set?
+			if (json_array_size( js = json_object_get(message, "projection") ) == 16)
+				json_array_foreach(js, index, value)
+					projection[index] = json_number_value( value );
+			if (json_array_size( js = json_object_get(message, "modelview") ) == 16)
+				json_array_foreach(js, index, value)
+					modelview[index] = json_number_value( value );
+			if (json_array_size( js = json_object_get(message, "rotation") ) == 16)
+				json_array_foreach(js, index, value)
+					rotation[index] = json_number_value( value );
+					
+			json_t* metadata = json_object_get( message, "metadata" );
+			if (metadata)
+				json_incref(metadata);
+			json_decref(message);
 			thr_metaTargets = metaTargets;
-			thr_metaCount = metaCount;
 			#ifdef ISAAC_THREADING
 				pthread_create(&visualizationThread,NULL,visualizationFunction,NULL);
 			#else
 				visualizationFunction(NULL);
 			#endif
-		}
-		json_t* getMeta()
-		{
-			ISAAC_WAIT_VISUALIZATION
-			return communicator->getLastMeta();
+			return metadata;
 		}
 		~IsaacVisualization()
 		{
@@ -341,26 +377,55 @@ class IsaacVisualization
 			alpaka::mem::view::copy(myself->stream, result_buffer, myself->framebuffer, myself->framebuffer_vec);
 			//alpaka::wait::wait(myself->stream);
 		}
+		void mergeJSON(json_t* result,json_t* candidate)
+		{
+			const char *c_key;
+			const char *r_key;
+			json_t *c_value;
+			json_t *r_value;
+			//metadata merge, old values stay, arrays are merged
+			json_t* m_candidate = json_object_get(candidate, "metadata");
+			json_t* m_result = json_object_get(result, "metadata");
+			void *temp,*temp2;
+			if (m_candidate && m_result)
+			{
+				json_object_foreach_safe( m_candidate, temp, c_key, c_value )
+				{
+					bool found_array = false;
+					json_object_foreach_safe( m_result, temp2, r_key, r_value )
+					{
+						if (strcmp(r_key,c_key) == 0)
+						{
+							if (json_is_array(r_value) && json_is_array(c_value))
+							{
+								json_array_extend(r_value,c_value);
+								found_array = true;
+							}
+							break;
+						}
+					}
+					if (!found_array)
+						json_object_set( m_result, c_key, c_value );
+				}
+			}			
+			//general merge, new values stay
+			json_object_foreach_safe( candidate, temp, c_key, c_value )
+			{
+				bool found_meta = false;
+				json_object_foreach_safe( result, temp2, r_key, r_value )
+				{
+					if (strcmp(r_key,c_key) == 0 && strcmp(r_key,"metadata") == 0)
+					{
+						found_meta = true;
+						break;
+					}
+				}
+				if (!found_meta)
+					json_object_set( result, c_key, c_value );
+			}
+		}
 		static void* visualizationFunction(void* dummy)
 		{
-			//Handle messages
-			while (json_t* message = myself->communicator->getLastMessage())
-			{
-				json_t* js;
-				size_t index;
-				json_t *value;
-				//Scene set?
-				if (json_array_size( js = json_object_get(message, "projection") ) == 16)
-					json_array_foreach(js, index, value)
-						myself->projection[index] = json_number_value( value );
-				if (json_array_size( js = json_object_get(message, "modelview") ) == 16)
-					json_array_foreach(js, index, value)
-						myself->modelview[index] = json_number_value( value );
-				if (json_array_size( js = json_object_get(message, "rotation") ) == 16)
-					json_array_foreach(js, index, value)
-						myself->rotation[index] = json_number_value( value );
-				json_decref( message );
-			}
 			//Drawing
 			IceTFloat background_color[4] = {0.0f,0.0f,0.0f,0.0};
 			IceTDouble real_modelview[16];
@@ -372,18 +437,33 @@ class IsaacVisualization
 						+ myself->modelview[y+2*4] * myself->rotation[2+x*4]
 						+ myself->modelview[y+3*4] * myself->rotation[3+x*4];
 			IceTImage image = icetDrawFrame(myself->projection,real_modelview,background_color);
-			if (myself->rank == myself->master)
+			if (myself->video_communicator)
 				myself->video_communicator->serverSendFrame(icetImageGetColorui(image),icetImageGetNumPixels(image)*4);
-			//Sending messages to isaac server
-			if (myself->thr_metaTargets == META_MERGE || (myself->thr_metaTargets == META_MASTER && myself->rank == myself->master))
+			
+			char message_buffer[MAX_RECEIVE];
+			char* buffer = json_dumps( myself->json_root, 0 );
+			strcpy( message_buffer, buffer );
+			free(buffer);
+			if (myself->thr_metaTargets == META_MERGE)
 			{
-				if (myself->thr_metaTargets == META_MERGE)
-					json_object_set_new( myself->json_root, "type", json_string( "period merge" ) );
+				if (myself->rank == myself->master)
+				{
+					char receive_buffer[myself->numProc][MAX_RECEIVE];
+					MPI_Gather( message_buffer, MAX_RECEIVE, MPI_CHAR, receive_buffer, MAX_RECEIVE, MPI_CHAR, myself->master, MPI_COMM_WORLD);
+					for (int i = 0; i < myself->numProc; i++)
+					{
+						if (i == myself->master)
+							continue;
+						json_t* js = json_loads(receive_buffer[i], 0, NULL);
+						myself->mergeJSON( myself->json_root, js );
+					}
+				}
 				else
-				if (myself->thr_metaTargets == META_MASTER && myself->rank == myself->master)
-					json_object_set_new( myself->json_root, "type", json_string( "period master" ) );
-				if (myself->thr_metaCount > 0)
-					json_object_set_new( myself->json_root, "count", json_integer( myself->thr_metaCount ) );
+					MPI_Gather( message_buffer, MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, myself->master, MPI_COMM_WORLD);
+			}
+			if (myself->rank == myself->master && myself->thr_metaTargets != META_NONE)
+			{
+				json_object_set_new( myself->json_root, "type", json_string( "period" ) );
 				json_object_set_new( myself->json_root, "meta nr", json_integer( myself->metaNr ) );
 				char* buffer = json_dumps( myself->json_root, 0 );
 				myself->communicator->serverSend(buffer);
@@ -437,7 +517,6 @@ class IsaacVisualization
 				IsaacCommunicator(std::string url,int port)
 				{
 					pthread_mutex_init (&deleteMessageMutex, NULL);
-					pthread_mutex_init (&deleteMetaMutex, NULL);
 					this->url = url;
 					this->port = port;
 					this->sockfd = 0;
@@ -451,13 +530,6 @@ class IsaacVisualization
 				{
 					while (json_t * content = json_load_callback(json_load_callback_function,&sockfd,JSON_DISABLE_EOF_CHECK,NULL))
 					{
-						json_t* metaElement = json_object_get(content, "metadata");
-						if (json_is_object(metaElement))
-						{
-							pthread_mutex_lock(&deleteMetaMutex);
-							metaList.push_back(json_incref(metaElement));
-							pthread_mutex_unlock(&deleteMetaMutex);
-						}
 						pthread_mutex_lock(&deleteMessageMutex);
 						messageList.push_back(content);
 						pthread_mutex_unlock(&deleteMessageMutex);
@@ -478,18 +550,6 @@ class IsaacVisualization
 						messageList.pop_front();
 					}
 					pthread_mutex_unlock(&deleteMessageMutex);
-					return result;
-				}
-				json_t* getLastMeta()
-				{
-					json_t* result = NULL;
-					pthread_mutex_lock(&deleteMetaMutex);
-					if (!metaList.empty())
-					{
-						result = metaList.front();
-						metaList.pop_front();
-					}
-					pthread_mutex_unlock(&deleteMetaMutex);
 					return result;
 				}
 				int serverConnect()
@@ -547,8 +607,6 @@ class IsaacVisualization
 				int port;
 				int sockfd;
 				int videofd;
-				std::list<json_t*> metaList;
-				pthread_mutex_t deleteMetaMutex;
 				std::list<json_t*> messageList;
 				pthread_mutex_t deleteMessageMutex;
 				pthread_t readThread;
@@ -581,7 +639,6 @@ class IsaacVisualization
 		std::vector< std::shared_ptr< IsaacSource<TDevAcc,TAccDim> > > sources;
 		IceTContext icetContext;
 		IsaacVisualizationMetaEnum thr_metaTargets;
-		int thr_metaCount;
 		pthread_t visualizationThread;
 };
 

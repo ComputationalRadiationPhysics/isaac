@@ -32,6 +32,9 @@
 
 #include "MetaDataClient.hpp"
 
+#include <sstream>
+#include <iostream>
+
 WebSocketDataConnector::WebSocketDataConnector()
 {
 	context = NULL;
@@ -50,13 +53,20 @@ static int callback_http(
 		void *in,
 		size_t len )
 {
+	Master* master = *((Master**)libwebsocket_context_user(context));
 	switch (reason)
 	{
 		case LWS_CALLBACK_HTTP:
 		{
-			char buf[LWS_SEND_BUFFER_PRE_PADDING + 512 + LWS_SEND_BUFFER_POST_PADDING];
+			std::istringstream request( (char*)in );
+			std::string left,right;
+			std::getline(request, left, '/'); //first /
+			std::getline(request, left, '/');
+			std::getline(request, right, '/');
+			std::string description = master->getStream(left,right);
+			char buf[LWS_SEND_BUFFER_PRE_PADDING + 2048 + LWS_SEND_BUFFER_POST_PADDING];
 			char* use = &(buf[LWS_SEND_BUFFER_PRE_PADDING]);
-			sprintf(use,"HTTP/1.1 200 OK\n\nv=0\nm=video 5000 RTP/AVP 96\nc=IN IP4 127.0.0.1\na=rtpmap:96 H264/90000\n");
+			sprintf(use,"HTTP/1.1 200 OK\n\n%s",description.c_str());
 			libwebsocket_write(wsi, (unsigned char*) use, strlen(use), LWS_WRITE_HTTP);
 			char name[256];
 			char rip[256];

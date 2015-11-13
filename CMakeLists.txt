@@ -59,7 +59,7 @@ set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 #find_package (GStreamer REQUIRED)
 pkg_search_module(GSTREAMER REQUIRED gstreamer-1.0)
-set(LIBS ${LIBS} ${GSTREAMER_LIBRARIES})
+set(LIBS ${LIBS} ${GSTREAMER_LIBRARIES} ${GSTREAMER_APP_LIBRARIES})
 set(INCLUDE ${INCLUDE} ${GSTREAMER_INCLUDE_DIRS})
 
 include_directories(isaac ${INCLUDE})	

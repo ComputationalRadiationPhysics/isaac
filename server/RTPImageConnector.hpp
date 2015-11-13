@@ -18,24 +18,32 @@
 #include "ImageConnector.hpp"
 #include "Runable.hpp"
 #include <gst/gst.h>
+#include <gst/gst.h>
+#include <gst/app/gstappsrc.h>
+#include <vector>
 
 class RTPImageConnector : public ImageConnector
 {
 	public:
 		RTPImageConnector();
 		~RTPImageConnector();
-		errorCode init(int port);
+		errorCode init(int minport, int maxport);
 		errorCode run();
-		errorCode run_gstreamer();
 		std::string getName();
 	private:
-		static void* run_gstreamer_wrapper(void* ptr);
-		GstElement *videotestsrc;
-		GstElement *x264enc;
-		GstElement *rtph264pay;
-		GstElement *udpsink;
-		GstElement *pipeline;
-		GstElement *bin;
-		GMainLoop *loop;
-		pthread_t loop_thread;
+		typedef struct
+		{
+			bool is_used;
+			GstElement *appsrc;
+			GstElement *videoconvert;
+			GstElement *x264enc;
+			GstElement *rtph264pay;
+			GstElement *udpsink;
+			GstElement *pipeline;
+			GstElement *bin;
+			InsituConnectorGroup* group;
+		} tStream;
+		int minport;
+		int maxport;
+		std::vector<tStream> streams;
 };

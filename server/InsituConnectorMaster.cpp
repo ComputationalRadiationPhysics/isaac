@@ -136,7 +136,7 @@ errorCode InsituConnectorMaster::run()
 						{
 							MessageContainer* message = new MessageContainer(NONE,content);
 							MessageType type = message->type;
-							if (type == REGISTER_MASTER)
+							if (type == REGISTER)
 								json_object_set_new( message->json_root, "id", json_integer( con_array[i]->connector->getID() ) );
 							if (type == REGISTER_VIDEO)
 							{

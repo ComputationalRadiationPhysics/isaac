@@ -26,7 +26,7 @@ std::string SDLImageConnector::getName()
 	return "SDLImageConnector";
 }
 
-errorCode SDLImageConnector::init(int port)
+errorCode SDLImageConnector::init(int minport,int maxport)
 {
 	return 0;
 }
@@ -59,6 +59,7 @@ errorCode SDLImageConnector::run()
 				}
 			}
 			else
+			if (message->type == UPDATE_BUFFER)
 			{
 				if (group == NULL)
 				{

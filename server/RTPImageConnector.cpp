@@ -16,6 +16,7 @@
 #include "RTPImageConnector.hpp"
 #include <boost/preprocessor.hpp>
 #include <pthread.h>
+#include <inttypes.h>
 
 RTPImageConnector::RTPImageConnector()
 {
@@ -23,82 +24,146 @@ RTPImageConnector::RTPImageConnector()
 
 std::string RTPImageConnector::getName()
 {
-	return "RTPImageConnector(using gStreamer)";
+	return "RTPImageConnector";
 }
 
-#define GST_LOAD_ELEMENT_OR_DIE(element) \
-	element = gst_element_factory_make(BOOST_PP_STRINGIZE(element), NULL); \
-	if(!element) \
+#define GST_LOAD_ELEMENT_OR_DIE(stream,element) \
+	stream.element = gst_element_factory_make(BOOST_PP_STRINGIZE(element), NULL); \
+	if(!stream.element) \
 	{ \
 		fprintf(stderr,"Could not open "BOOST_PP_STRINGIZE(element)"\n"); \
 		return 1; \
 	}
 
-void* RTPImageConnector::run_gstreamer_wrapper(void* ptr)
+errorCode RTPImageConnector::init(int minport,int maxport)
 {
-	RTPImageConnector* myself =(RTPImageConnector*)ptr;
-	myself->run_gstreamer();
-}
-
-errorCode RTPImageConnector::init(int port)
-{
+	this->minport = minport;
+	this->maxport = maxport;
+	tStream defaultstream;
+	defaultstream.is_used = false;
+	streams.resize(maxport-minport,defaultstream);
 	gst_init(NULL,NULL);
-	//gst-launch-1.0 videotestsrc ! x264enc ! rtph264pay config-interval=10 pt=96 ! udpsink host=127.0.0.1 port=5000
-	GST_LOAD_ELEMENT_OR_DIE(videotestsrc)
-	GST_LOAD_ELEMENT_OR_DIE(x264enc)
-	GST_LOAD_ELEMENT_OR_DIE(rtph264pay)
-	g_object_set(G_OBJECT(rtph264pay), "config-interval", 10, "pt", 96, NULL);
-	GST_LOAD_ELEMENT_OR_DIE(udpsink)
-	g_object_set(G_OBJECT(udpsink), "host", "127.0.0.1", "port", 5000, NULL);
-	
-	pipeline = gst_pipeline_new( NULL );
-	bin = gst_bin_new( NULL );
-	gst_bin_add_many(GST_BIN(bin), videotestsrc, x264enc, rtph264pay, udpsink, NULL);
-	gst_bin_add(GST_BIN(pipeline), bin);
-
-	if(!gst_element_link_many(videotestsrc, x264enc, rtph264pay, udpsink, NULL))
-	{
-		fprintf(stderr,"Could not link elements for rtp stream\n");
-		return 1;
-	}
-	
-	gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING);
-	loop = g_main_loop_new(NULL, FALSE);
-	pthread_create(&loop_thread,NULL,RTPImageConnector::run_gstreamer_wrapper,this);
 	return 0;
 }
 
-errorCode RTPImageConnector::run_gstreamer()
+void suicideNotify(gpointer data)
 {
-	g_main_loop_run(loop);
+	ImageBufferContainer* message = (ImageBufferContainer*)data;
+	message->suicide();
 }
 
 errorCode RTPImageConnector::run()
 {
-	int finish = 0;
+	uint64_t finish = 0;
 	while(finish == 0)
 	{
 		ImageBufferContainer* message;
 		while(message = clientGetMessage())
 		{
-			if(message->type == IMG_FORCE_EXIT)
+			if (message->type == GROUP_ADDED)
+			{
+				int nr;
+				for (nr = 0; nr < streams.size(); nr++)
+					if (!streams[nr].is_used)
+						break;
+				if (nr < streams.size())
+				{
+					printf("RTIPImageConnector: Created Stream %i\n",nr);
+					//gst-launch-1.0 appsrc ! videoconf ! x264enc ! rtph264pay config-interval=10 pt=96 ! udpsink host=127.0.0.1 port=5000
+					GST_LOAD_ELEMENT_OR_DIE(streams[nr],appsrc)
+					g_object_set (G_OBJECT (streams[nr].appsrc), "caps",
+						gst_caps_new_simple ("video/x-raw",
+						"format", G_TYPE_STRING, "RGBA",
+						"width", G_TYPE_INT, message->group->getFramebufferWidth(),
+						"height", G_TYPE_INT, message->group->getFramebufferHeight(),
+						"framerate", GST_TYPE_FRACTION, 0, 1,
+						NULL), NULL);
+					g_object_set (G_OBJECT (streams[nr].appsrc),
+						"do-timestamp", 1,
+						"format", GST_FORMAT_TIME, NULL);
+					GST_LOAD_ELEMENT_OR_DIE(streams[nr],videoconvert)
+					GST_LOAD_ELEMENT_OR_DIE(streams[nr],x264enc)
+					g_object_set (G_OBJECT (streams[nr].x264enc),
+						"tune", 0x00000004,
+						"psy-tune", 2,
+						"speed-preset", 1,
+						"bitrate", 3000,
+						"threads", 2,
+						"byte-stream", 1,  NULL);
+					GST_LOAD_ELEMENT_OR_DIE(streams[nr],rtph264pay)
+					g_object_set(G_OBJECT(streams[nr].rtph264pay),
+						"config-interval", 10,
+						"pt", 96, NULL);
+					GST_LOAD_ELEMENT_OR_DIE(streams[nr],udpsink)
+					g_object_set(G_OBJECT(streams[nr].udpsink),
+						"host", "127.0.0.1",
+						"port", nr+minport, NULL);
+					
+					streams[nr].pipeline = gst_pipeline_new( NULL );
+					streams[nr].bin = gst_bin_new( NULL );
+					gst_bin_add_many(GST_BIN(streams[nr].bin), streams[nr].appsrc, streams[nr].videoconvert, streams[nr].x264enc, streams[nr].rtph264pay, streams[nr].udpsink, NULL);
+					gst_bin_add(GST_BIN(streams[nr].pipeline), streams[nr].bin);
+
+					if(!gst_element_link_many(streams[nr].appsrc, streams[nr].videoconvert, streams[nr].x264enc, streams[nr].rtph264pay, streams[nr].udpsink, NULL))
+						fprintf(stderr,"RTPImageConnector: Could not link elements for rtp stream\n");
+					else
+					{
+						gst_element_set_state(GST_ELEMENT(streams[nr].pipeline), GST_STATE_PLAYING);
+						streams[nr].is_used = true;
+						streams[nr].group = message->group;
+					}
+					char* register_message = (char*)malloc(128);
+					sprintf(register_message,"v=0\nm=video %i RTP/AVP 96\nc=IN IP4 127.0.0.1\na=rtpmap:96 H264/90000\n",nr+minport);
+					clientSendMessage(new ImageBufferContainer(REGISTER_STREAM,(uint8_t*)register_message,message->group,1));
+				}
+				else
+					fprintf(stderr,"RTPImageConnector: No free port!\n");
+			}
+			if (message->type == GROUP_FINISHED)
+			{
+				int nr;
+				for (nr = 0; nr < streams.size(); nr++)
+					if (streams[nr].group == message->group)
+						break;
+				if (nr < streams.size())
+				{
+					gst_app_src_end_of_stream( (GstAppSrc*)streams[nr].appsrc );
+					gst_element_set_state(streams[nr].pipeline, GST_STATE_NULL);
+					gst_object_unref(GST_OBJECT(streams[nr].pipeline));
+					streams[nr].is_used = false;
+				}
+			}
+			if (message->type == IMG_FORCE_EXIT)
 				finish = 1;
-			message->suicide();
+			if (message->type == UPDATE_BUFFER)
+			{
+				int nr;
+				for (nr = 0; nr < streams.size(); nr++)
+					if (streams[nr].group == message->group)
+						break;
+				if (nr < streams.size())
+				{
+					GstBuffer *buffer = gst_buffer_new_wrapped_full (GstMemoryFlags(0), message->buffer, streams[nr].group->getVideoBufferSize(), 0, streams[nr].group->getVideoBufferSize(), (gpointer)message, suicideNotify);
+					gst_app_src_push_buffer( (GstAppSrc*)streams[nr].appsrc, buffer);
+				}
+			}
+			else //only if not update buffer 
+				message->suicide();
 		}
 		usleep(1000);
 	}	
+	int nr;
+	for (nr = 0; nr < streams.size(); nr++)
+		if (streams[nr].is_used)
+		{
+			gst_app_src_end_of_stream( (GstAppSrc*)streams[nr].appsrc );
+			gst_element_set_state(streams[nr].pipeline, GST_STATE_NULL);
+			gst_object_unref(GST_OBJECT(streams[nr].pipeline));
+			streams[nr].is_used = false;
+		}
 }
 
 RTPImageConnector::~RTPImageConnector()
 {
-	g_main_loop_quit(loop);
-	pthread_join(loop_thread,NULL);
-	gst_element_set_state(pipeline, GST_STATE_NULL);
-	gst_object_unref(GST_OBJECT(pipeline));
-	gst_object_unref(GST_OBJECT(bin));
-	gst_object_unref(GST_OBJECT(udpsink));
-	gst_object_unref(GST_OBJECT(rtph264pay));
-	gst_object_unref(GST_OBJECT(x264enc));	
-	gst_object_unref(GST_OBJECT(videotestsrc));
 }
 

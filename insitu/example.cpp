@@ -25,8 +25,9 @@
 
 #define MASTER_RANK 0
 
+//#define SEND_PARTICLES
+
 #ifdef SEND_PARTICLES
-	#define META_DATA_DIVISOR 1
 	#define PARTICLES_PER_NODE 8
 #endif
 
@@ -84,14 +85,15 @@ int main(int argc, char **argv)
 	MPI_Bcast(&id,sizeof(id), MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
 	char name[32];
 	sprintf(name,"Example_%i",id);
+	printf("Using name %s\n",name);
 	
 	//Now we initialize the Isaac Insitu Plugin with the name, the number of the master, the server, it's IP, the count of framebuffer to be created and the size per framebuffer
 	using AccDim = alpaka::dim::DimInt<3>;
 	using SimDim = alpaka::dim::DimInt<3>;
-	using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
-	using Stream  = alpaka::stream::StreamCudaRtSync;
-	//using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
-	//using Stream  = alpaka::stream::StreamCpuSync;
+	//using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
+	//using Stream  = alpaka::stream::StreamCudaRtSync;
+	using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
+	using Stream  = alpaka::stream::StreamCpuSync;
 	using DevAcc = alpaka::dev::Dev<Acc>;
 	using DevHost = alpaka::dev::DevCpu;
 	typedef float float3_t[3];
@@ -149,20 +151,6 @@ int main(int argc, char **argv)
 	while (!force_exit)
 	{
 		a += 0.01f;
-		//New metadata from the server?
-		while (json_t* meta = visualization.getMeta())
-		{
-			char* buffer = json_dumps( meta, 0 );
-			//Let's print it to stdout
-			printf("META (%i): %s\n",rank,buffer);
-			//And let's also check for an exit message
-			if (rank == MASTER_RANK && json_integer_value( json_object_get(meta, "exit") ))
-				force_exit = 1;
-			//Free the buffer from jansson
-			free(buffer);
-			//Deref the jansson json root! Otherwise we would get a memory leak
-			json_decref( meta );
-		}
 		//Every frame we fill the metadata with data instead of descriptions
 		if (rank == MASTER_RANK)
 		{
@@ -171,31 +159,41 @@ int main(int argc, char **argv)
 		}
 		#ifdef SEND_PARTICLES
 			//every thread fills "his" particles
-			if (rank % META_DATA_DIVISOR == 0)
+			json_t *particle_array = json_array();
+			for (int i = 0; i < PARTICLES_PER_NODE; i++)
 			{
-				json_t *particle_array = json_array();
-				for (int i = 0; i < PARTICLES_PER_NODE; i++)
+				json_t *position = json_array();
+				json_array_append_new( particle_array, position );
+				//Recalculate force based on distance to box center and add it
+				for (int j = 0; j < 3; j++)
 				{
-					json_t *position = json_array();
-					json_array_append_new( particle_array, position );
-					//Recalculate force based on distance to box center and add it
-					for (int j = 0; j < 3; j++)
-					{
-						float distance = (box_position[j] + box_size[j] / 2.0f) - particles[i][j];
-						forces[i][j] += distance / 10000.0f;
-						particles[i][j] += forces[i][j];
-						json_array_append_new( position, json_real( particles[i][j] ) );
-					}
+					float distance = (box_position[j] + box_size[j] / 2.0f) - particles[i][j];
+					forces[i][j] += distance / 10000.0f;
+					particles[i][j] += forces[i][j];
+					json_array_append_new( position, json_real( particles[i][j] ) );
 				}
-				json_object_set_new( visualization.getJsonMetaRoot(), "reference particles", particle_array );
 			}
+			json_object_set_new( visualization.getJsonMetaRoot(), "reference particles", particle_array );
 		#endif
 		//Visualize and send data to the server
 		#ifdef SEND_PARTICLES
-			visualization.doVisualization((rank % META_DATA_DIVISOR == 0)?META_MERGE:META_NONE,(numProc+META_DATA_DIVISOR-1)/META_DATA_DIVISOR);
+			json_t* meta = visualization.doVisualization(META_MERGE);
 		#else
-			visualization.doVisualization(META_MASTER);
+			json_t* meta = visualization.doVisualization(META_MASTER);
 		#endif
+		//New metadata from the server?
+		if (meta)
+		{
+			//Let's print it to stdout
+			char* buffer = json_dumps( meta, 0 );
+			printf("META (%i): %s\n",rank,buffer);
+			free(buffer);
+			//And let's also check for an exit message
+			if ( rank == MASTER_RANK && json_integer_value( json_object_get(meta, "exit") ) )
+				force_exit = 1;
+			//Deref the jansson json root! Otherwise we would get a memory leak
+			json_decref( meta );
+		}
 		//printf("%i: Sent dummy meta data\n",rank);
 		//sync
 		MPI_Bcast((void*)&force_exit,sizeof(force_exit), MPI_INT, MASTER_RANK, MPI_COMM_WORLD);

@@ -22,7 +22,7 @@ class SDLImageConnector : public ImageConnector
 {
 	public:
 		SDLImageConnector();
-		errorCode init(int port);
+		errorCode init(int minport,int maxport);
 		errorCode run();
 		std::string getName();
 	private:

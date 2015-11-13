@@ -17,7 +17,7 @@
 <table><tr>
 <td id="video_td" valign="top">
 	<!--canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas-->
-	<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls=false/>
+	<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls="false"/>
 </td>
 <td id="preview_td" valign="top">
 	<canvas id="preview" width="512" height="512" style="border:1px solid #000000;"></canvas>
@@ -219,7 +219,7 @@ function sendMatrix(name,matrix)
 {
 	var obj =
 	{
-		"type" : "feedback all neighbour",
+		"type" : "feedback neighbour",
 		"observe id" : observe_id
 	};
 	obj[name] = matrix;
@@ -351,7 +351,7 @@ document.getElementById("connect").onclick = function()
 						table.deleteRow(1);
 					document.getElementById("list_td").style.display = 'initial';
 				}
-				if (obj["type"] == "tell plugin")
+				if (obj["type"] == "register")
 				{
 					plugins.push(obj);
 					var table = document.getElementById("list_table");					
@@ -399,13 +399,14 @@ document.getElementById("connect").onclick = function()
 						video.width = obj["framebuffer width"];
 						video.height = obj["framebuffer height"];
 						video.playlist.items.clear();
-						video.playlist.add("http://127.0.0.1:2459");
+						video.playlist.add( "http://" + document.getElementById("url").value + ":" + document.getElementById("port").value + "/RTPImageConnector/" + obj["name"]);
+						document.getElementById("debug").textContent =  "http://" + document.getElementById("url").value + ":" + document.getElementById("port").value + "/RTPImageConnector/" + obj["name"];
 						video.playlist.play();
 						observeSimulation(obj["id"]);
 					};
 					observeCell.appendChild(button);
 				}
-				if (obj["type"] == "period merge" || obj["type"] == "period master" || obj["type"] == "feedback master neighbour" || obj["type"] == "feedback all neighbour")
+				if (obj["type"] == "period merge" || obj["type"] == "period master" || obj["type"] == "feedback neighbour")
 				{
 					if (obj.hasOwnProperty("metadata"))
 					{
@@ -470,7 +471,7 @@ document.getElementById("metadata").onclick = function()
 {
 	var obj =
 	{
-		"type" : "feedback all",
+		"type" : "feedback",
 		"observe id" : observe_id,
 		"metadata" :
 		{
@@ -485,7 +486,7 @@ document.getElementById("exit").onclick = function()
 {
 	var obj =
 	{
-		"type" : "feedback master",
+		"type" : "feedback",
 		"observe id" : observe_id,
 		"metadata" :
 		{
