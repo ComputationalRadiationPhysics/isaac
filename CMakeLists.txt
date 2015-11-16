@@ -40,6 +40,8 @@ if (ISAAC_SDL)
 	set(HDRS ${HDRS} ${CMAKE_SOURCE_DIR}/server/SDLImageConnector.hpp)
 endif ()
 
+add_definitions(-std=c++11)
+
 add_executable(isaac ${HDRS} ${SRCS})
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules")
@@ -65,9 +67,11 @@ set(INCLUDE ${INCLUDE} ${GSTREAMER_INCLUDE_DIRS})
 include_directories(isaac ${INCLUDE})	
 target_link_libraries(isaac ${LIBS})
 
-option(BUILD_EXAMPLE "Build the example." ON)
+option(BUILD_EXAMPLE_CUDA "Build the example using cuda." ON)
+option(BUILD_EXAMPLE_ALPAKA "Build the example using alpaka." OFF)
 
-if (BUILD_EXAMPLE)
+
+if (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${JANSSON_LIBRARIES})
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${JANSSON_INCLUDE_DIRS})
@@ -86,20 +90,30 @@ if (BUILD_EXAMPLE)
 	find_package(Boost REQUIRED)
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${Boost_INCLUDE_DIR})
 	add_definitions(-DBOOST_ALL_NO_LIB)
-	
-	set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/requirement-modules/alpaka/" CACHE STRING  "The location of the alpaka library")
-	set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")
-	find_package( alpaka  REQUIRED)
-	
-	set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wno-literal-suffix" )
-	
+
 	option(ISAAC_THREADING "Do the vizualisation in background. May be buggy. Needs MPI_threading intialisation!" OFF)
 	if (ISAAC_THREADING)
 		add_definitions(-DISAAC_THREADING)
 	endif ()
-
-	include_directories(example ${EXAMPLE_INCLUDE} ${alpaka_INCLUDE_DIRS})	
-	add_definitions( ${alpaka_DEFINITIONS} ${ALPAKA_DEV_COMPILE_OPTIONS})
-	ALPAKA_ADD_EXECUTABLE(example ${CMAKE_SOURCE_DIR}/insitu/isaac.hpp ${CMAKE_SOURCE_DIR}/insitu/example.cpp)
-	target_link_libraries(example ${EXAMPLE_LIBS})
+	
+	if (BUILD_EXAMPLE_CUDA)
+		find_package( CUDA REQUIRED)
+		set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" -std=c++11)
+		include_directories(example_cuda ${EXAMPLE_INCLUDE} ${CUDA_INCLUDE_DIRS})
+		CUDA_ADD_EXECUTABLE(example_cuda ${CMAKE_SOURCE_DIR}/insitu/isaac.hpp ${CMAKE_SOURCE_DIR}/insitu/example.cu)
+		target_link_libraries(example_cuda ${EXAMPLE_LIBS} ${CUDA_LIBRARIES})
+	endif()
+	
+	if (BUILD_EXAMPLE_ALPAKA)
+		set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/requirement-modules/alpaka/" CACHE STRING  "The location of the alpaka library")
+		set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")
+		find_package( alpaka  REQUIRED)
+		set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wno-literal-suffix" )
+		include_directories(example_alpaka ${EXAMPLE_INCLUDE} ${alpaka_INCLUDE_DIRS})	
+		add_definitions( ${alpaka_DEFINITIONS} ${ALPAKA_DEV_COMPILE_OPTIONS})
+		add_definitions(-DISAAC_ALPAKA)
+		list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
+		ALPAKA_ADD_EXECUTABLE(example_alpaka ${CMAKE_SOURCE_DIR}/insitu/isaac.hpp ${CMAKE_SOURCE_DIR}/insitu/example.cu)
+		target_link_libraries(example_alpaka ${EXAMPLE_LIBS})
+	endif()
 endif ()

@@ -18,6 +18,7 @@
 #include <pthread.h>
 #include "ThreadList.hpp"
 #include <sys/socket.h>
+#include <string>
 
 volatile sig_atomic_t Master::force_exit = 0;
 
