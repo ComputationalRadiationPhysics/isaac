@@ -75,6 +75,10 @@ class InsituConnectorGroup
 		{
 			return framebuffer_height;
 		}
+		std::string getName()
+		{
+			return name;
+		}
 		~InsituConnectorGroup()
 		{
 		}
@@ -88,7 +92,7 @@ class InsituConnectorGroup
 		int framebuffer_width;
 		int framebuffer_height;
 		size_t video_buffer_size;
-		std::map<std::string,std::string> streams;
+		std::map< std::string, std::map< void* , std::string > > streams;
 		pthread_mutex_t streams_mutex;
 };
 
@@ -102,7 +106,7 @@ class Master
 		MetaDataClient* addDataClient();
 		size_t receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer);
 		errorCode run();
-		std::string getStream(std::string connector,std::string name);
+		std::string getStream(std::string connector,std::string name,std::string ref);
 		static volatile sig_atomic_t force_exit;
 	private:
 		InsituConnectorMaster insituMaster;

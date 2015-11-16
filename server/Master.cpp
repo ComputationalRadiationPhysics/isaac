@@ -84,8 +84,9 @@ size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 	return count;
 }
 
-std::string Master::getStream(std::string connector,std::string name)
+std::string Master::getStream(std::string connector,std::string name,std::string ref)
 {
+	void* reference = (void*)std::stol(ref);
 	std::string result ("");
 	ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr group = insituConnectorGroupList.getFront();
 	while (group)
@@ -93,9 +94,13 @@ std::string Master::getStream(std::string connector,std::string name)
 		if (group->t->name == name)
 		{
 			pthread_mutex_lock(&group->t->streams_mutex);
-			std::map<std::string,std::string>::iterator it = group->t->streams.find( connector );
+			std::map< std::string, std::map< void* , std::string > >::iterator it = group->t->streams.find( connector );
 			if (it != group->t->streams.end())
-				result = (*it).second;
+			{
+				std::map< void* , std::string >::iterator it2 = (*it).second.find( reference );
+				if (it2 != (*it).second.end())
+					result = (*it2).second;
+			}
 			pthread_mutex_unlock(&group->t->streams_mutex);
 		}
 		group = group->next;
@@ -211,7 +216,6 @@ errorCode Master::run()
 					}
 					if (group->master && group->video)
 					{
-						//And also all yet registered interfaces
 						printf("Group complete, sending to connected interfaces\n");
 						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
 						while (dc)
@@ -320,11 +324,60 @@ errorCode Master::run()
 					}
 				}
 				if (message->type == OBSERVE)
-					dc->t->observe( json_integer_value( json_object_get(message->json_root, "observe id") ) );
+				{
+					int id = json_integer_value( json_object_get(message->json_root, "observe id") );
+					const char* url = json_string_value( json_object_get(message->json_root, "url") );
+					void* ref = (void*)dc->t;
+					dc->t->observe( id );
+					InsituConnectorGroup* group = NULL;
+					ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
+					while (it)
+					{
+						if (it->t->getID() == id)
+						{
+							group = it->t;
+							break;
+						}
+						it = it->next;
+					}
+					if (group)
+						for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED,NULL,group,1,url,ref));
+				}
 				if (message->type == STOP)
-					dc->t->stopObserve( json_integer_value( json_object_get(message->json_root, "observe id") ) );
+				{
+					int id = json_integer_value( json_object_get(message->json_root, "observe id") );
+					const char* url = json_string_value( json_object_get(message->json_root, "url") );
+					void* ref = (void*)dc->t;
+					dc->t->stopObserve( id );
+					InsituConnectorGroup* group = NULL;
+					ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
+					while (it)
+					{
+						if (it->t->getID() == id)
+						{
+							group = it->t;
+							break;
+						}
+						it = it->next;
+					}
+					if (group)
+						for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED_STOPPED,NULL,group,1,url,ref));
+				}
 				if (message->type == CLOSED)
 				{
+					void* ref = (void*)dc->t;
+					ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr gr = insituConnectorGroupList.getFront();
+					while (gr)
+					{
+						if (dc->t->doesObserve(gr->t->getID()))
+						{
+							for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+								(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED_STOPPED,NULL,gr->t,1,"",ref));
+						}
+						gr = gr->next;
+					}
 					dataClientList.remove(dc);
 					break;
 				}
@@ -343,8 +396,20 @@ errorCode Master::run()
 				if (message->type == REGISTER_STREAM)
 				{
 					pthread_mutex_lock(&message->group->streams_mutex);
-					message->group->streams.insert(std::pair<std::string,std::string>(std::string((*it).connector->getName()),std::string((char*)message->buffer)));
+					message->group->streams[(*it).connector->getName()].insert( std::pair< void*,std::string >( message->reference, std::string((char*)message->buffer) ));
 					pthread_mutex_unlock(&message->group->streams_mutex);
+					json_t* root = json_object();
+					json_object_set_new( root, "type", json_string ("register video") );
+					json_object_set_new( root, "name", json_string ( message->group->getName().c_str() ) );
+					json_object_set_new( root, "connector", json_string ( (*it).connector->getName().c_str() ) );
+					json_object_set_new( root, "reference", json_integer ( (long)message->reference ) );
+					ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+					while (dc)
+					{
+						dc->t->masterSendMessage(new MessageContainer(REGISTER_VIDEO,root,true));
+						dc = dc->next;
+					}
+					json_decref( root );
 				}
 				message->suicide();
 			}

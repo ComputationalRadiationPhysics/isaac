@@ -110,6 +110,8 @@ typedef enum
 	GROUP_ADDED,
 	GROUP_FINISHED,
 	REGISTER_STREAM,
+	GROUP_OBSERVED,
+	GROUP_OBSERVED_STOPPED
 } ImageBufferType;
 
 class InsituConnectorGroup;
@@ -117,16 +119,24 @@ class InsituConnectorGroup;
 class ImageBufferContainer
 {
 	public:
-		ImageBufferContainer(ImageBufferType type,uint8_t* buffer,InsituConnectorGroup* group,int ref_count)
+		ImageBufferContainer(ImageBufferType type,uint8_t* buffer,InsituConnectorGroup* group,int ref_count,std::string target = "",void* reference = NULL)
 		{
 			this->type = type;
 			this->buffer = buffer;
 			this->group = group;
 			this->ref_count = ref_count;
+			this->target = target;
+			this->reference = reference;
 			pthread_mutex_init (&ref_mutex, NULL);
 		}
 		~ImageBufferContainer()
 		{
+		}
+		void incref()
+		{
+			pthread_mutex_lock (&ref_mutex);
+			ref_count++;
+			pthread_mutex_unlock (&ref_mutex);
 		}
 		void suicide()
 		{
@@ -146,6 +156,8 @@ class ImageBufferContainer
 		ImageBufferType type;
 		uint8_t* buffer;
 		InsituConnectorGroup* group;
+		std::string target;
+		void* reference;
 		int ref_count;
 		pthread_mutex_t ref_mutex;
 };

@@ -59,11 +59,12 @@ static int callback_http(
 		case LWS_CALLBACK_HTTP:
 		{
 			std::istringstream request( (char*)in );
-			std::string left,right;
+			std::string left,middle,right;
 			std::getline(request, left, '/'); //first /
 			std::getline(request, left, '/');
+			std::getline(request, middle, '/');
 			std::getline(request, right, '/');
-			std::string description = master->getStream(left,right);
+			std::string description = master->getStream(left,middle,right);
 			char buf[LWS_SEND_BUFFER_PRE_PADDING + 2048 + LWS_SEND_BUFFER_POST_PADDING];
 			char* use = &(buf[LWS_SEND_BUFFER_PRE_PADDING]);
 			sprintf(use,"HTTP/1.1 200 OK\n\n%s",description.c_str());
@@ -80,6 +81,7 @@ static int callback_http(
 
 struct per_session_data__isaac {
 	MetaDataClient* client;
+	char url[32];
 };
 
 static int
@@ -103,6 +105,8 @@ callback_isaac(
 
 	case LWS_CALLBACK_ESTABLISHED:
 		printf("callback_isaac: LWS_CALLBACK_ESTABLISHED\n");
+		char dummy[32];
+		libwebsockets_get_peer_addresses(context,wsi,libwebsocket_get_socket_fd(wsi),dummy,32,pss->url,32);
 		break;
 
 	case LWS_CALLBACK_SERVER_WRITEABLE:
@@ -131,6 +135,7 @@ callback_isaac(
 			json_t* input = json_loads((const char *)in, 0, NULL);
 			MessageContainer* message = new MessageContainer(NONE,input);
 			int finish = (message->type == CLOSED);
+			json_object_set_new( message->json_root, "url", json_string( pss->url ) );
 			pss->client->clientSendMessage(message);
 			if (finish)
 				return -1;

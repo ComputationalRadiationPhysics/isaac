@@ -322,7 +322,7 @@ document.getElementById("connect").onclick = function()
 {
 	if (socket != null && socket.readyState == 1)
 	{
-		socket.send(JSON.stringify({"type" : "close"}));
+		socket.send(JSON.stringify({"type" : "closed"}));
 		socket.close();
 		socket.onclose();
 	}
@@ -399,12 +399,16 @@ document.getElementById("connect").onclick = function()
 						video.width = obj["framebuffer width"];
 						video.height = obj["framebuffer height"];
 						video.playlist.items.clear();
-						video.playlist.add( "http://" + document.getElementById("url").value + ":" + document.getElementById("port").value + "/RTPImageConnector/" + obj["name"]);
-						document.getElementById("debug").textContent =  "http://" + document.getElementById("url").value + ":" + document.getElementById("port").value + "/RTPImageConnector/" + obj["name"];
-						video.playlist.play();
 						observeSimulation(obj["id"]);
 					};
 					observeCell.appendChild(button);
+				}
+				if (obj["type"] == "register video")
+				{
+					var url = "http://" + document.getElementById("url").value + ":" + document.getElementById("port").value + "/" + obj["connector"] + "/" + obj["name"] + "/" + obj["reference"];
+					video.playlist.add( url );
+					document.getElementById("debug").textContent =  url;
+					video.playlist.play();
 				}
 				if (obj["type"] == "period merge" || obj["type"] == "period master" || obj["type"] == "feedback neighbour")
 				{

@@ -27,7 +27,9 @@ int main(int argc, char **argv)
 	int outer_port = 2459;
 	int inner_port = 2460;
 	const char __name[] = "ISAAC Visualization server";
+	const char __url[] = "127.0.0.1";
 	const char* name = __name;
+	const char* url = __url;
 	if (argc > 1)
 	{
 		if (strcmp(argv[1],"--help") == 0)
@@ -36,10 +38,11 @@ int main(int argc, char **argv)
 			printf("Usage:\n");
 			printf("\tisaac --help\n");
 			printf("\t\tShows this help\n");
-			printf("\tisaac [outer_port] [inner_port] [name]\n");
-			printf("\t\touter_port default: 2459\n");
-			printf("\t\tinner_port default: 2460\n");
-			printf("\t\t      name default: ISAAC Visualization server\n");
+			printf("\tisaac [outer_port] [inner_port] [url] [name]\n");
+			printf("\t\t                    outer_port default: 2459\n");
+			printf("\t\t                    inner_port default: 2460\n");
+			printf("\t\turl to connect to from outside default: 127.0.0.1\n");
+			printf("\t\t                          name default: ISAAC Visualization server\n");
 			printf("\tisaac --version\n");
 			printf("\t\tShows the version\n");
 			return 0;
@@ -52,9 +55,11 @@ int main(int argc, char **argv)
 		outer_port = atoi(argv[1]);
 	}
 	if (argc > 2)
-		outer_port = atoi(argv[2]);
+		inner_port = atoi(argv[2]);
 	if (argc > 3)
-		name = argv[3];
+		url = argv[3];
+	if (argc > 4)
+		name = argv[4];
 	
 	printf("Using outer_port=%i and inner_port=%i\n",outer_port,inner_port);
 	
@@ -72,7 +77,7 @@ int main(int argc, char **argv)
 		else
 			master.addImageConnector(sDLImageConnector);
 	#endif
-	RTPImageConnector* rTPImageConnector = new RTPImageConnector();
+	RTPImageConnector* rTPImageConnector = new RTPImageConnector(url);
 	if (rTPImageConnector->init(5000,5100))
 		delete rTPImageConnector;
 	else

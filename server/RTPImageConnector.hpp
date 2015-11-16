@@ -25,7 +25,7 @@
 class RTPImageConnector : public ImageConnector
 {
 	public:
-		RTPImageConnector();
+		RTPImageConnector(std::string url);
 		~RTPImageConnector();
 		errorCode init(int minport, int maxport);
 		errorCode run();
@@ -42,8 +42,11 @@ class RTPImageConnector : public ImageConnector
 			GstElement *pipeline;
 			GstElement *bin;
 			InsituConnectorGroup* group;
+			std::string url;
+			void* ref;
 		} tStream;
 		int minport;
 		int maxport;
 		std::vector<tStream> streams;
+		std::string url;
 };
