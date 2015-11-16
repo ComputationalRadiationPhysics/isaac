@@ -122,11 +122,12 @@ errorCode RTPImageConnector::run()
 				else
 					fprintf(stderr,"RTPImageConnector: No free port!\n");
 			}
-			if (message->type == GROUP_OBSERVED_STOPPED)
+			if (message->type == GROUP_OBSERVED_STOPPED || message->type == GROUP_FINISHED)
 			{
 				int nr;
 				for (nr = 0; nr < streams.size(); nr++)
-					if (streams[nr].ref == message->reference)
+					if ((message->type == GROUP_OBSERVED_STOPPED && streams[nr].ref == message->reference) ||
+						(message->type == GROUP_FINISHED && streams[nr].group == message->group))
 						break;
 				if (nr < streams.size())
 				{
