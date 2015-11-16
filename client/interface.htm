@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>ISAAC Control Page</title>
 </head>
+<body>
 <h3>Preview and camera setting</h3>
 <p>Usage:
 <ul>
@@ -40,6 +41,7 @@
 	</table>
 	<div contentEditable="true" id="debug">Debug Infos</div>
 </div>
+</body>
 <script>
 var preview = document.getElementById("preview");
 var video = document.getElementById("video");
@@ -71,6 +73,16 @@ var rotation = [
 ];
 var znear = 0;
 
+var edges = [
+	[ -1,  1,  1 ],
+	[  1,  1,  1 ],
+	[  1, -1,  1 ],
+	[ -1, -1,  1 ],
+	[ -1,  1, -1 ],
+	[  1,  1, -1 ],
+	[  1, -1, -1 ],
+	[ -1, -1, -1 ]
+];
 
 function updateZNear()
 {
@@ -146,7 +158,7 @@ function project(p)
 	var m = mulMatrix4(mulMatrix3(p,modelview),projection);
 	var t = new Array(2);
 	t[0] = preview.clientWidth/2  + m[0] / m[3] * preview.clientWidth/2;
-	t[1] = preview.clientHeight/2 - m[1] / m[3] * preview.clientHeight/2;
+	t[1] = preview.clientHeight/2 + m[1] / m[3] * preview.clientHeight/2;
 	t[2] = m[2];
     return t;
 }
@@ -172,16 +184,6 @@ function point(p)
 
 function drawUnitCube()
 {
-	var edges = [
-		[ -1,  1,  1 ],
-		[  1,  1,  1 ],
-		[  1, -1,  1 ],
-		[ -1, -1,  1 ],
-		[ -1,  1, -1 ],
-		[  1,  1, -1 ],
-		[  1, -1, -1 ],
-		[ -1, -1, -1 ]
-	]
 	//front
 	line( edges[0], edges[1] );
 	line( edges[1], edges[2] );
@@ -228,6 +230,7 @@ function sendMatrix(name,matrix)
 
 function mouseWheelHandler(e)
 {
+	document.body.style.overflowY = "hidden";
 	var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
 	modelview = mulMatrix(modelview,translateMatrix(0,0,delta));
 	redraw();
@@ -266,7 +269,7 @@ function mouseMoveHandler(e)
 		if (l > 0)
 		{
 			dx /= l;
-			dy /= l;
+			dy /= -l;
 			rotation = mulMatrix(rotateMatrix(dy,dx,0,l),rotation);
 		}
 		sendMatrix("rotation",rotation);
@@ -288,7 +291,7 @@ preview.addEventListener("DOMMouseScroll", mouseWheelHandler, false);
 preview.addEventListener("mousemove", mouseMoveHandler, false);
 preview.addEventListener("mousedown", mouseDownHandler, false);
 preview.addEventListener("mouseup", mouseUpHandler, false);
-preview.onmouseout = function(){mouseResetHandler()};
+preview.onmouseout = function(){mouseResetHandler(); document.body.style.overflowY = "scroll";};
 
 document.getElementById("video_td").style.display = 'none';
 document.getElementById("preview_td").style.display = 'none';
@@ -388,6 +391,18 @@ document.getElementById("connect").onclick = function()
 					button.value = "Observe";
 					button.onclick = function()
 					{
+						var global_size = [ obj["width"],  obj["height"], obj["depth"] ];
+						var m = Math.max( global_size[0], global_size[1], global_size[2] );
+						edges = [
+							[ -global_size[0] / m,  global_size[1] / m,  global_size[2] / m ],
+							[  global_size[0] / m,  global_size[1] / m,  global_size[2] / m ],
+							[  global_size[0] / m, -global_size[1] / m,  global_size[2] / m ],
+							[ -global_size[0] / m, -global_size[1] / m,  global_size[2] / m ],
+							[ -global_size[0] / m,  global_size[1] / m, -global_size[2] / m ],
+							[  global_size[0] / m,  global_size[1] / m, -global_size[2] / m ],
+							[  global_size[0] / m, -global_size[1] / m, -global_size[2] / m ],
+							[ -global_size[0] / m, -global_size[1] / m, -global_size[2] / m ]
+						];
 						document.getElementById("video_td").style.display = 'table-cell';
 						document.getElementById("preview_td").style.display = 'table-cell';
 						document.getElementById("debug").textContent = "Debug Infos";

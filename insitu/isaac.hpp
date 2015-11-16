@@ -195,7 +195,7 @@ class IsaacVisualization
 			ISAAC_SET_IDENTITY(rotation)
 			
 			//Fill framebuffer with test values:
-			uint32_t value = (255 << 24) | (rank*255/numProc << 16) | (255 - rank*255/numProc << 8) | 0;
+			uint32_t value = (255 << 24);
 			#ifdef ISAAC_ALPAKA
 				alpaka::mem::buf::Buf<THost, uint32_t, TFraDim, size_t> framebuffer_host(alpaka::mem::buf::alloc<uint32_t, size_t>(host, framebuffer_size));
 				for (size_t i = 0; i < framebuffer_size.prod(); ++i)

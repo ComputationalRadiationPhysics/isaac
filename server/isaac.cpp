@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 	{
 		if (strcmp(argv[1],"--help") == 0)
 		{
-			printf("ISAAC - In Situ Animation of Accelerated Computations "ISAAC_VERSION"\n");
+			printf("ISAAC - In Situ Animation of Accelerated Computations " ISAAC_VERSION"\n");
 			printf("Usage:\n");
 			printf("\tisaac --help\n");
 			printf("\t\tShows this help\n");
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 		}
 		if (strcmp(argv[1],"--version") == 0)
 		{
-			printf("Isaac version "ISAAC_VERSION"\n");
+			printf("Isaac version " ISAAC_VERSION "\n");
 			return 0;
 		}
 		outer_port = atoi(argv[1]);
@@ -77,7 +77,7 @@ int main(int argc, char **argv)
 		else
 			master.addImageConnector(sDLImageConnector);
 	#endif
-	RTPImageConnector* rTPImageConnector = new RTPImageConnector(url);
+	RTPImageConnector* rTPImageConnector = new RTPImageConnector(url,false);
 	if (rTPImageConnector->init(5000,5100))
 		delete rTPImageConnector;
 	else

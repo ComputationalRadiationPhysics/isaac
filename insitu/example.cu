@@ -14,7 +14,7 @@
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 //#define SEND_PARTICLES
- 
+
 #include "isaac.hpp"
 #include <IceT.h>
 //Against annoying C++11 warning in mpi.h

@@ -25,7 +25,7 @@
 class RTPImageConnector : public ImageConnector
 {
 	public:
-		RTPImageConnector(std::string url);
+		RTPImageConnector(std::string url,bool zerolatency);
 		~RTPImageConnector();
 		errorCode init(int minport, int maxport);
 		errorCode run();
@@ -49,4 +49,5 @@ class RTPImageConnector : public ImageConnector
 		int maxport;
 		std::vector<tStream> streams;
 		std::string url;
+		bool zerolatency;
 };
