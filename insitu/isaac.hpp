@@ -167,6 +167,9 @@ class IsaacVisualization
 			framebuffer_height(framebuffer_height),
 			metaNr(0),
 			visualizationThread(0),
+			kernel_time(0),
+			merge_time(0),
+			video_send_time(0),
 			framebuffer_size(size_t(framebuffer_width) * size_t(framebuffer_height))
 			#ifdef ISAAC_ALPAKA
 				,framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_size))
@@ -398,6 +401,16 @@ class IsaacVisualization
 			icetDestroyContext(icetContext);
 			delete communicator;
 		}	
+		uint64_t get_ticks_us()
+		{
+			struct timespec ts;
+			if (clock_gettime(CLOCK_MONOTONIC_RAW,&ts) == 0)
+				return ts.tv_sec*1000000 + ts.tv_nsec/1000;
+			return 0;
+		}
+		uint64_t kernel_time;
+		uint64_t merge_time;
+		uint64_t video_send_time;
 	//private:		
 		static IsaacVisualization *myself;
 		static void drawCallBack(
@@ -409,8 +422,9 @@ class IsaacVisualization
 		{
 			uint32_t value = (255 << 24) | (myself->rank*255/myself->numProc << 16) | (255 - myself->rank*255/myself->numProc << 8) | 255;
 			IceTUByte* pixels = icetImageGetColorub(result);
+			uint64_t start_kernel = myself->get_ticks_us();
 			#ifdef ISAAC_ALPAKA
-				IsaacFillRectKernel fillRectKernel;				
+				IsaacFillRectKernel fillRectKernel;
 				const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
 				const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(1), size_t(readback_viewport[3]));
 				const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(1), size_t(1));
@@ -437,6 +451,7 @@ class IsaacVisualization
 					readback_viewport[2]);
 				cudaMemcpy((uint32_t*)(pixels), myself->framebuffer, sizeof(uint32_t)*myself->framebuffer_size, cudaMemcpyDeviceToHost);
 			#endif
+			myself->kernel_time += myself->get_ticks_us() - start_kernel;
 		}
 		void mergeJSON(json_t* result,json_t* candidate)
 		{
@@ -497,9 +512,13 @@ class IsaacVisualization
 						+ myself->modelview[y+1*4] * myself->rotation[1+x*4]
 						+ myself->modelview[y+2*4] * myself->rotation[2+x*4]
 						+ myself->modelview[y+3*4] * myself->rotation[3+x*4];
+			uint64_t start_merge = myself->get_ticks_us();
 			IceTImage image = icetDrawFrame(myself->projection,real_modelview,background_color);
+			myself->merge_time += myself->get_ticks_us() - start_merge;
+			uint64_t start_video_send = myself->get_ticks_us();
 			if (myself->video_communicator)
 				myself->video_communicator->serverSendFrame(icetImageGetColorui(image),icetImageGetNumPixels(image)*4);
+			myself->video_send_time += myself->get_ticks_us() - start_video_send;
 			
 			char message_buffer[MAX_RECEIVE];
 			char* buffer = json_dumps( myself->json_root, 0 );

@@ -187,6 +187,10 @@ int main(int argc, char **argv)
 	
 	float a = 0.0f;
 	volatile int force_exit = 0;
+	int start = visualization.get_ticks_us();
+	int count = 0;
+	int drawing_time = 0;
+	int sync_time = 0;
 	while (!force_exit)
 	{
 		a += 0.01f;
@@ -215,11 +219,13 @@ int main(int argc, char **argv)
 			json_object_set_new( visualization.getJsonMetaRoot(), "reference particles", particle_array );
 		#endif
 		//Visualize and send data to the server
+		int start_drawing = visualization.get_ticks_us();
 		#ifdef SEND_PARTICLES
 			json_t* meta = visualization.doVisualization(META_MERGE);
 		#else
 			json_t* meta = visualization.doVisualization(META_MASTER);
 		#endif
+		drawing_time +=visualization.get_ticks_us() - start_drawing;
 		//New metadata from the server?
 		if (meta)
 		{
@@ -235,8 +241,34 @@ int main(int argc, char **argv)
 		}
 		//printf("%i: Sent dummy meta data\n",rank);
 		//sync
+		int start_sync = visualization.get_ticks_us();
 		MPI_Bcast((void*)&force_exit,sizeof(force_exit), MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
-		usleep(50000);
+		sync_time += visualization.get_ticks_us() - start_sync;
+		usleep(100);
+		count++;
+		if (rank == MASTER_RANK)
+		{
+			int end = visualization.get_ticks_us();
+			int diff = end-start;
+			if (diff >= 1000000)
+			{
+				visualization.merge_time -= visualization.kernel_time;
+				printf("FPS: %.1f (Drawing: %.1f%%, Sync: %.1f%%, Kernel: %.1f%%, Merge: %.1f%%, Video: %.1f%%)\n",
+					(float)count*1000000.0f/(float)diff,
+					(float)drawing_time*100.0f/(float)diff,
+					(float)sync_time*100.0f/(float)diff,
+					(float)visualization.merge_time*100.0f/(float)diff,
+					(float)visualization.kernel_time*100.0f/(float)diff,
+					(float)visualization.video_send_time*100.0f/(float)diff);
+				visualization.merge_time = 0;
+				visualization.kernel_time = 0;
+				visualization.video_send_time = 0;
+				start = end;
+				count = 0;
+				drawing_time = 0;
+				sync_time = 0;
+			}
+		}
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
@@ -291,4 +323,3 @@ void recursive_kgv(size_t* d,int number,int test)
 	else
 		recursive_kgv(d,number,test+1);
 }
-
