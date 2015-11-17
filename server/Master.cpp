@@ -81,7 +81,7 @@ size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 {
 	int count = 0;
 	while (count < group->video_buffer_size)
-		count += recv(group->video->connector->getSockFD(),&(video_buffer[count]),group->video_buffer_size-count,MSG_DONTWAIT);
+		count += recv(group->video->connector->getSockFD(),&(video_buffer[count]),group->video_buffer_size-count,0);
 	return count;
 }
 

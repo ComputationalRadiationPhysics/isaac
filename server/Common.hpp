@@ -140,7 +140,6 @@ class ImageBufferContainer
 		}
 		void suicide()
 		{
-			bool do_it = false;
 			pthread_mutex_lock (&ref_mutex);
 			ref_count--;
 			if (ref_count <= 0)

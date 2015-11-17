@@ -276,7 +276,7 @@ function mouseMoveHandler(e)
 	}
 	if (mousedown[2] || mousedown[1])
 	{
-		modelview = mulMatrix(modelview,translateMatrix(dx/100,-dy/100,0,l));
+		modelview = mulMatrix(modelview,translateMatrix(dx/100,dy/100,0,l));
 		sendMatrix("modelview",modelview);
 	}
 	redraw();

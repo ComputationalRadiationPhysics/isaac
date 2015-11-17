@@ -31,9 +31,11 @@ class RTPImageConnector : public ImageConnector
 		errorCode run();
 		std::string getName();
 	private:
+		uint64_t getTicksMs();
 		typedef struct
 		{
 			bool is_used;
+			uint64_t last;
 			GstElement *appsrc;
 			GstElement *videoconvert;
 			GstElement *x264enc;

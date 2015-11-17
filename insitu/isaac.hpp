@@ -32,6 +32,7 @@
 #include <IceTMPI.h>
 #include <math.h>
 #include <stdio.h>
+#include <assert.h>
 
 #ifdef ISAAC_ALPAKA
 	#include <alpaka/alpaka.hpp>
@@ -45,21 +46,25 @@
 	struct IsaacFillRectKernel
 	{
 		template <typename TAcc__, typename __TBuffer, typename __TValue>
-		ALPAKA_FN_ACC void operator()( TAcc__ const &acc, __TBuffer pixels, __TValue value, size_t framebuffer_width, size_t start, size_t length) const
+		ALPAKA_FN_ACC void operator()( TAcc__ const &acc, __TBuffer pixels, __TValue value, size_t framebuffer_width, size_t framebuffer_height, size_t start) const
 #else
-		__global__ void IsaacFillRectKernel( uint32_t* pixels, uint32_t value, size_t framebuffer_width, size_t start, size_t length)
+		__global__ void IsaacFillRectKernel( uint32_t* pixels, uint32_t value, size_t framebuffer_width, size_t framebuffer_height, size_t start)
 #endif
 		{
 			#ifdef ISAAC_ALPAKA
 				auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-				size_t local_start = start + threadIdx[2] * framebuffer_width;
+				auto x = threadIdx[2];
+				auto y = threadIdx[1];
 			#else
-				size_t local_start = start + threadIdx.x * framebuffer_width;
+				auto tx = threadIdx.x;
+				auto ty = threadIdx.y;
+				auto bx = blockIdx.x;
+				auto by = blockIdx.y;
+				auto x = tx + bx * 16;
+				auto y = ty + by * 16;
 			#endif
-			for(size_t i = local_start; i < local_start+length; i++)
-				pixels[i] = value;
-			pixels[local_start] = (255 << 24) | (255 << 16) | (0 << 8) | 0;
-			pixels[local_start+length-1] = (255 << 24) | (255 << 16) | (255 << 8) | 0;
+			if (x < framebuffer_width && y < framebuffer_height)
+				pixels[start + x + y * framebuffer_width] = value;
 		}
 #ifdef ISAAC_ALPAKA
 	};
@@ -170,6 +175,7 @@ class IsaacVisualization
 			kernel_time(0),
 			merge_time(0),
 			video_send_time(0),
+			copy_time(0),
 			framebuffer_size(size_t(framebuffer_width) * size_t(framebuffer_height))
 			#ifdef ISAAC_ALPAKA
 				,framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_size))
@@ -306,7 +312,7 @@ class IsaacVisualization
 			int failed = 0;
 			if (communicator && communicator->serverConnect())
 				failed = 1;
-			if (failed == 0 && video_communicator && video_communicator->serverConnect())
+			if (failed == 0 && video_communicator && video_communicator->serverConnect(true))
 				failed = 1;
 			MPI_Bcast(&failed,sizeof(failed), MPI_INT, master, MPI_COMM_WORLD);
 			if (failed)
@@ -401,7 +407,7 @@ class IsaacVisualization
 			icetDestroyContext(icetContext);
 			delete communicator;
 		}	
-		uint64_t get_ticks_us()
+		uint64_t getTicksUs()
 		{
 			struct timespec ts;
 			if (clock_gettime(CLOCK_MONOTONIC_RAW,&ts) == 0)
@@ -411,6 +417,7 @@ class IsaacVisualization
 		uint64_t kernel_time;
 		uint64_t merge_time;
 		uint64_t video_send_time;
+		uint64_t copy_time;
 	//private:		
 		static IsaacVisualization *myself;
 		static void drawCallBack(
@@ -422,36 +429,43 @@ class IsaacVisualization
 		{
 			uint32_t value = (255 << 24) | (myself->rank*255/myself->numProc << 16) | (255 - myself->rank*255/myself->numProc << 8) | 255;
 			IceTUByte* pixels = icetImageGetColorub(result);
-			uint64_t start_kernel = myself->get_ticks_us();
+			uint64_t start_kernel = myself->getTicksUs();
+			size_t g_width = (readback_viewport[2]+15)/16;
+			size_t g_height = (readback_viewport[3]+15)/16;
+			size_t b_width = 16;
+			size_t b_height = 16;
 			#ifdef ISAAC_ALPAKA
-				IsaacFillRectKernel fillRectKernel;
 				const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
-				const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(1), size_t(readback_viewport[3]));
-				const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(1), size_t(1));
+				const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(b_width), size_t(b_height));
+				const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(g_width), size_t(g_height));
 				auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
 				auto const test (alpaka::exec::create<TAcc> (workdiv,
-					fillRectKernel,
+					myself->fillRectKernel,
 					alpaka::mem::view::getPtrNative(myself->framebuffer),
 					value,
 					myself->framebuffer_width,
-					readback_viewport[0]+readback_viewport[1]*myself->framebuffer_width,
-					readback_viewport[2]));
+					myself->framebuffer_height,
+					readback_viewport[0]+readback_viewport[1]*myself->framebuffer_width));
 				alpaka::stream::enqueue(myself->stream, test);
+				alpaka::wait::wait(myself->stream);
+				uint64_t start_copy = myself->getTicksUs();
 				alpaka::mem::buf::BufPlainPtrWrapper<THost, uint32_t, TFraDim, size_t> result_buffer((uint32_t*)(pixels), myself->host, myself->framebuffer_size);
 				alpaka::mem::view::copy(myself->stream, result_buffer, myself->framebuffer, myself->framebuffer_size);
-				//alpaka::wait::wait(myself->stream);
 			#else
-				dim3 block (readback_viewport[3]);
-				dim3 grid  (1);
+				dim3 block (b_width,b_height);
+				dim3 grid  (g_width,g_height);
 				IsaacFillRectKernel<<<grid, block>>>(
 					myself->framebuffer,
 					value,
 					myself->framebuffer_width,
-					readback_viewport[0]+readback_viewport[1]*myself->framebuffer_width,
-					readback_viewport[2]);
+					myself->framebuffer_height,
+					readback_viewport[0]+readback_viewport[1]*myself->framebuffer_width);
+				cudaDeviceSynchronize();
+				uint64_t start_copy = myself->getTicksUs();
 				cudaMemcpy((uint32_t*)(pixels), myself->framebuffer, sizeof(uint32_t)*myself->framebuffer_size, cudaMemcpyDeviceToHost);
 			#endif
-			myself->kernel_time += myself->get_ticks_us() - start_kernel;
+			myself->copy_time += myself->getTicksUs() - start_copy;
+			myself->kernel_time += myself->getTicksUs() - start_kernel;
 		}
 		void mergeJSON(json_t* result,json_t* candidate)
 		{
@@ -512,13 +526,13 @@ class IsaacVisualization
 						+ myself->modelview[y+1*4] * myself->rotation[1+x*4]
 						+ myself->modelview[y+2*4] * myself->rotation[2+x*4]
 						+ myself->modelview[y+3*4] * myself->rotation[3+x*4];
-			uint64_t start_merge = myself->get_ticks_us();
+			uint64_t start_merge = myself->getTicksUs();
 			IceTImage image = icetDrawFrame(myself->projection,real_modelview,background_color);
-			myself->merge_time += myself->get_ticks_us() - start_merge;
-			uint64_t start_video_send = myself->get_ticks_us();
+			myself->merge_time += myself->getTicksUs() - start_merge;
+			uint64_t start_video_send = myself->getTicksUs();
 			if (myself->video_communicator)
 				myself->video_communicator->serverSendFrame(icetImageGetColorui(image),icetImageGetNumPixels(image)*4);
-			myself->video_send_time += myself->get_ticks_us() - start_video_send;
+			myself->video_send_time += myself->getTicksUs() - start_video_send;
 			
 			char message_buffer[MAX_RECEIVE];
 			char* buffer = json_dumps( myself->json_root, 0 );
@@ -600,7 +614,6 @@ class IsaacVisualization
 					this->url = url;
 					this->port = port;
 					this->sockfd = 0;
-					this->videofd = 0;
 				}
 				static size_t json_load_callback_function (void *buffer, size_t buflen, void *data)
 				{
@@ -632,7 +645,7 @@ class IsaacVisualization
 					pthread_mutex_unlock(&deleteMessageMutex);
 					return result;
 				}
-				int serverConnect()
+				int serverConnect(bool video = false)
 				{
 					struct hostent *server;
 					server = gethostbyname(url.c_str());
@@ -658,7 +671,8 @@ class IsaacVisualization
 						fprintf(stderr,"Could not connect to %s.\n",url.c_str());
 						return -3;
 					}
-					pthread_create(&readThread,NULL,run_readAndSetMessages,this);
+					if (!video)
+						pthread_create(&readThread,NULL,run_readAndSetMessages,this);
 					return 0;
 				}
 				int serverSend(const char* content)
@@ -686,7 +700,6 @@ class IsaacVisualization
 				std::string url;
 				int port;
 				int sockfd;
-				int videofd;
 				std::list<json_t*> messageList;
 				pthread_mutex_t deleteMessageMutex;
 				pthread_t readThread;
@@ -734,6 +747,9 @@ class IsaacVisualization
 		IceTContext icetContext;
 		IsaacVisualizationMetaEnum thr_metaTargets;
 		pthread_t visualizationThread;
+		#ifdef ISAAC_ALPAKA
+			IsaacFillRectKernel fillRectKernel;
+		#endif
 };
 
 #ifdef ISAAC_ALPAKA

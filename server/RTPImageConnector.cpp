@@ -113,6 +113,7 @@ errorCode RTPImageConnector::run()
 						streams[nr].group = message->group;
 						streams[nr].ref = message->reference;
 						streams[nr].url = message->target;
+						streams[nr].last = 0;
 						char* register_message = (char*)malloc(128);
 						sprintf(register_message,"v=0\nm=video %i RTP/AVP 96\nc=IN IP4 %s\na=rtpmap:96 H264/90000\n",nr+minport,url.c_str());
 						clientSendMessage(new ImageBufferContainer(REGISTER_STREAM,(uint8_t*)register_message,message->group,1,message->target,message->reference));
@@ -141,13 +142,15 @@ errorCode RTPImageConnector::run()
 			}
 			if (message->type == UPDATE_BUFFER)
 			{
+				uint64_t now = getTicksMs();
 				int nr;
 				for (nr = 0; nr < streams.size(); nr++)
-					if (streams[nr].is_used && streams[nr].group == message->group)
+					if (streams[nr].is_used && streams[nr].group == message->group && now - 30 > streams[nr].last)
 					{
 						message->incref();
 						GstBuffer *buffer = gst_buffer_new_wrapped_full (GstMemoryFlags(0), message->buffer, streams[nr].group->getVideoBufferSize(), 0, streams[nr].group->getVideoBufferSize(), (gpointer)message, suicideNotify);
 						gst_app_src_push_buffer( (GstAppSrc*)streams[nr].appsrc, buffer);
+						streams[nr].last = now;
 					}
 			}
 			if (message->type == IMG_FORCE_EXIT)
@@ -166,6 +169,15 @@ errorCode RTPImageConnector::run()
 			streams[nr].is_used = false;
 		}
 }
+
+uint64_t RTPImageConnector::getTicksMs()
+{
+	struct timespec ts;
+	if (clock_gettime(CLOCK_MONOTONIC_RAW,&ts) == 0)
+		return ts.tv_sec*1000 + ts.tv_nsec/1000000;
+	return 0;
+}
+
 
 RTPImageConnector::~RTPImageConnector()
 {
