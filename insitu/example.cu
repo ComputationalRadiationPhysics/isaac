@@ -88,6 +88,8 @@ int main(int argc, char **argv)
 	printf("Using name %s\n",name);
 	
 	typedef float float3_t[3];
+	int width = 800;
+	int height = 600;
 	
 	#ifdef ISAAC_ALPAKA
 		//Now we initialize the Isaac Insitu Plugin with the name, the number of the master, the server, it's IP, the count of framebuffer to be created and the size per framebuffer
@@ -95,8 +97,17 @@ int main(int argc, char **argv)
 		using SimDim = alpaka::dim::DimInt<3>;
 		//using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
 		//using Stream  = alpaka::stream::StreamCudaRtSync;
-		using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
+		using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
 		using Stream  = alpaka::stream::StreamCpuSync;
+		//using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
+		//using Stream  = alpaka::stream::StreamCpuSync;
+		
+		/*if ( boost::mpl::not_<boost::is_same<Acc, alpaka::acc::AccGpuCudaRt<AccDim, size_t> > >::value )
+		{
+			width /= 2;
+			height /= 2;
+		}*/
+		
 		using DevAcc = alpaka::dev::Dev<Acc>;
 		using DevHost = alpaka::dev::DevCpu;
 		
@@ -107,10 +118,9 @@ int main(int argc, char **argv)
 		const alpaka::Vec<SimDim, size_t> global_size(d[0]*64,d[1]*64,d[2]*64);
 		const alpaka::Vec<SimDim, size_t> local_size(size_t(64),size_t(64),size_t(64));
 		const alpaka::Vec<SimDim, size_t> position(p[0]*64,p[1]*64,p[2]*64);
-		IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim> visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,800,600,global_size,local_size,position);
+		IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim> visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,width,height,global_size,local_size,position);
 	#else
 		typedef boost::mpl::int_<3> SimDim;
-	
 		std::vector<size_t> global_size;
 			global_size.push_back(d[0]*64);
 			global_size.push_back(d[1]*64);
@@ -123,7 +133,7 @@ int main(int argc, char **argv)
 			position.push_back(p[0]*64);
 			position.push_back(p[1]*64);
 			position.push_back(p[2]*64);
-		IsaacVisualization<SimDim> visualization(name,MASTER_RANK,server,port,800,600,global_size,local_size,position);
+		IsaacVisualization<SimDim> visualization(name,MASTER_RANK,server,port,width,height,global_size,local_size,position);
 	#endif
 	
 	//Init Device memory:
@@ -190,7 +200,6 @@ int main(int argc, char **argv)
 	int start = visualization.getTicksUs();
 	int count = 0;
 	int drawing_time = 0;
-	int sync_time = 0;
 	while (!force_exit)
 	{
 		a += 0.01f;
@@ -241,9 +250,7 @@ int main(int argc, char **argv)
 		}
 		//printf("%i: Sent dummy meta data\n",rank);
 		//sync
-		int start_sync = visualization.getTicksUs();
 		MPI_Bcast((void*)&force_exit,sizeof(force_exit), MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
-		sync_time += visualization.getTicksUs() - start_sync;
 		usleep(100);
 		count++;
 		if (rank == MASTER_RANK)
@@ -252,15 +259,16 @@ int main(int argc, char **argv)
 			int diff = end-start;
 			if (diff >= 1000000)
 			{
-				visualization.merge_time -= visualization.kernel_time;
-				printf("FPS: %.1f (Drawing: %.1f ms, Sync: %.1f ms, Kernel: %.1f ms, Merge: %.1f ms, Copy: %.1f ms, Video: %.1f ms)\n",
+				visualization.merge_time -= visualization.kernel_time + visualization.copy_time;
+				printf("FPS: %.1f \n\tDrawing: %.1f ms\n\t\tSorting: %.1f ms\n\t\tMerge: %.1f ms\n\t\tKernel: %.1f ms\n\t\tCopy: %.1f ms\n\t\tVideo: %.1f ms\n",
 					(float)count*1000000.0f/(float)diff,
 					(float)drawing_time/1000.0f/(float)count,
-					(float)sync_time/1000.0f/(float)count,
+					(float)visualization.sorting_time/1000.0f/(float)count,
 					(float)visualization.merge_time/1000.0f/(float)count,
 					(float)visualization.kernel_time/1000.0f/(float)count,
 					(float)visualization.copy_time/1000.0f/(float)count,
 					(float)visualization.video_send_time/1000.0f/(float)count);
+				visualization.sorting_time = 0;
 				visualization.merge_time = 0;
 				visualization.kernel_time = 0;
 				visualization.copy_time = 0;
@@ -268,7 +276,6 @@ int main(int argc, char **argv)
 				start = end;
 				count = 0;
 				drawing_time = 0;
-				sync_time = 0;
 			}
 		}
 	}

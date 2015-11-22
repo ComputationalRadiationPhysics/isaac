@@ -33,22 +33,139 @@
 #include <math.h>
 #include <stdio.h>
 #include <assert.h>
+#include <map>
 
 #ifdef ISAAC_ALPAKA
 	#include <alpaka/alpaka.hpp>
+	#include <boost/type_traits.hpp>
+	#include <boost/mpl/not.hpp>
 #else
 	#include <boost/mpl/int.hpp>
 #endif
 
+#ifndef __CUDACC__
+	struct isaac_float4
+	{
+		float x,y,z,w;
+	};
+	struct isaac_float3
+	{
+		float x,y,z;
+	};
+	struct isaac_uint4
+	{
+		uint32_t x,y,z,w;
+	};
+	struct isaac_uint3
+	{
+		uint32_t x,y,z;
+	};
+#else
+	typedef float4 isaac_float4;
+	typedef float3 isaac_float3;
+	typedef uint4 isaac_uint4;
+	typedef uint3 isaac_uint3;
+#endif
+
+struct isaac_size_type
+{
+	isaac_float3 global_size;
+	float max_global_size;
+	isaac_float3 position;
+	isaac_float3 local_size;
+};
+
+#define ISAAC_CUDA_CHECK(call)                                                 \
+{                                                                              \
+    const cudaError_t error = call;                                            \
+    if (error != cudaSuccess)                                                  \
+    {                                                                          \
+        fprintf(stderr, "Error: %s:%d, ", __FILE__, __LINE__);                 \
+        fprintf(stderr, "code: %d, reason: %s\n", error,                       \
+                cudaGetErrorString(error));                                    \
+    }                                                                          \
+}
+
+#define ISAAC_CALL_FOR_XYZ(start,end) \
+	start.x end \
+	start.y end \
+	start.z end
+
+#define ISAAC_CALL_FOR_XYZ_ITERATE(start,first,end) \
+	start.x first end \
+	start.y first+1 end \
+	start.z first+2 end
+
+#define ISAAC_CALL_FOR_XYZ_TWICE(start,middle,end) \
+	start.x middle.x end \
+	start.y middle.y end \
+	start.z middle.z end
+
+#define ISAAC_CALL_FOR_XYZ_TRIPLE(start,middle1,middle2,end) \
+	start.x middle1.x middle2.x end \
+	start.y middle1.y middle2.y end \
+	start.z middle1.z middle2.z end
+
+#define ISAAC_SWITCH_IF_SMALLER(left,right) \
+	if (left < right) \
+	{ \
+		auto temp = left; \
+		left = right; \
+		right = temp; \
+	}
+
+#define ISAAC_SET_COLOR( dest, color ) \
+	{ \
+		isaac_uint4 result; \
+		result.x = min(1.0f,color.x) * 255.0f; \
+		result.y = min(1.0f,color.y) * 255.0f; \
+		result.z = min(1.0f,color.z) * 255.0f; \
+		result.w = min(1.0f,color.w) * 255.0f; \
+		dest = (result.w << 24) | (result.z << 16) | (result.y << 8) | (result.x << 0); \
+	}
+
+
+#define ISAAC_START_TIME_MEASUREMENT( unique_name, time_function ) \
+	uint64_t BOOST_PP_CAT( __tm_start_, unique_name ) = time_function;
+#define ISAAC_STOP_TIME_MEASUREMENT( result, operand, unique_name, time_function ) \
+	result operand time_function - BOOST_PP_CAT( __tm_start_, unique_name );
+			
+			
+#define ISAAC_MIN(x,y) ((x) < (y) ? (x) : (y))
+#define ISAAC_MAX(x,y) ((x) > (y) ? (x) : (y))
+
 #define MAX_RECEIVE 32768 //32kb
+#define Z_NEAR 1.0f
+#define Z_FAR 100.0f
+
+__constant__ float isaac_inverse_d[16];
+__constant__ float isaac_modelview_d[16];
+__constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda and alpaka
+
 
 #ifdef ISAAC_ALPAKA
 	struct IsaacFillRectKernel
 	{
-		template <typename TAcc__, typename __TBuffer, typename __TValue>
-		ALPAKA_FN_ACC void operator()( TAcc__ const &acc, __TBuffer pixels, __TValue value, size_t framebuffer_width, size_t framebuffer_height, size_t start) const
+		template <typename TAcc__>
+		ALPAKA_FN_ACC void operator()(
+			TAcc__ const &acc,
+			float* isaac_inverse_d,
+			float* isaac_modelview_d,
+			isaac_size_type* isaac_size_d,
 #else
-		__global__ void IsaacFillRectKernel( uint32_t* pixels, uint32_t value, size_t framebuffer_width, size_t framebuffer_height, size_t start)
+		__global__ void IsaacFillRectKernel(
+#endif
+			uint32_t* pixels,
+			uint32_t value,
+			size_t framebuffer_width,
+			size_t framebuffer_height,
+			size_t startx,
+			size_t starty,
+			float* source,
+			float step,
+			isaac_float4 background_color)
+#ifdef ISAAC_ALPAKA
+		const
 #endif
 		{
 			#ifdef ISAAC_ALPAKA
@@ -56,15 +173,91 @@
 				auto x = threadIdx[2];
 				auto y = threadIdx[1];
 			#else
-				auto tx = threadIdx.x;
-				auto ty = threadIdx.y;
-				auto bx = blockIdx.x;
-				auto by = blockIdx.y;
-				auto x = tx + bx * 16;
-				auto y = ty + by * 16;
+				auto x = threadIdx.x + blockIdx.x * blockDim.x;
+				auto y = threadIdx.y + blockIdx.y * blockDim.y;
 			#endif
-			if (x < framebuffer_width && y < framebuffer_height)
-				pixels[start + x + y * framebuffer_width] = value;
+			x+= startx;
+			y+= starty;
+			if (x >= framebuffer_width || y >= framebuffer_height)
+				return;
+			float f_x = x/(float)framebuffer_width*2.0f-1.0f;
+			float f_y = y/(float)framebuffer_height*2.0f-1.0f;
+			isaac_float4 start_p = {f_x*Z_NEAR,f_y*Z_NEAR,-1.0f*Z_NEAR,1.0f*Z_NEAR}; //znear
+			isaac_float4 end_p = {f_x*Z_FAR,f_y*Z_FAR,1.0f*Z_FAR,1.0f*Z_FAR}; //zfar
+			isaac_float3 start;
+			isaac_float3 end;
+			start.x =  isaac_inverse_d[ 0] * start_p.x + isaac_inverse_d[ 4] * start_p.y +  isaac_inverse_d[ 8] * start_p.z + isaac_inverse_d[12] * start_p.w;
+			start.y =  isaac_inverse_d[ 1] * start_p.x + isaac_inverse_d[ 5] * start_p.y +  isaac_inverse_d[ 9] * start_p.z + isaac_inverse_d[13] * start_p.w;
+			start.z =  isaac_inverse_d[ 2] * start_p.x + isaac_inverse_d[ 6] * start_p.y +  isaac_inverse_d[10] * start_p.z + isaac_inverse_d[14] * start_p.w;
+			  end.x =  isaac_inverse_d[ 0] *   end_p.x + isaac_inverse_d[ 4] *   end_p.y +  isaac_inverse_d[ 8] *   end_p.z + isaac_inverse_d[12] *   end_p.w;
+			  end.y =  isaac_inverse_d[ 1] *   end_p.x + isaac_inverse_d[ 5] *   end_p.y +  isaac_inverse_d[ 9] *   end_p.z + isaac_inverse_d[13] *   end_p.w;
+			  end.z =  isaac_inverse_d[ 2] *   end_p.x + isaac_inverse_d[ 6] *   end_p.y +  isaac_inverse_d[10] *   end_p.z + isaac_inverse_d[14] *   end_p.w;
+
+			float max_size = isaac_size_d[0].max_global_size / 2.0f;
+
+			//scale to globale grid size
+			ISAAC_CALL_FOR_XYZ( start , *=max_size; )
+			ISAAC_CALL_FOR_XYZ( end , *=max_size; )
+			start.z *= -1.0f;
+			end.z *= -1.0f;
+			
+			//move to local grid
+			ISAAC_CALL_FOR_XYZ_TRIPLE( start, += isaac_size_d[0].global_size, / 2.0f - isaac_size_d[0].position, ; )
+			ISAAC_CALL_FOR_XYZ_TRIPLE(   end, += isaac_size_d[0].global_size, / 2.0f - isaac_size_d[0].position, ; )
+
+			isaac_float3 vec;
+			ISAAC_CALL_FOR_XYZ_TRIPLE( vec, = end, - start, ; )
+			float l = sqrt(vec.x*vec.x + vec.y*vec.y + vec.z*vec.z);
+			
+			isaac_float3 step_vec = vec;
+			ISAAC_CALL_FOR_XYZ( step_vec , /= l; )
+			ISAAC_CALL_FOR_XYZ( step_vec , *= step; )
+
+			isaac_float3 count_start;
+			ISAAC_CALL_FOR_XYZ_TRIPLE( count_start, = -start, / step_vec, ; )
+			isaac_float3 count_end;
+			isaac_float3 moved_start;
+			ISAAC_CALL_FOR_XYZ_TRIPLE( moved_start, = -start, + isaac_size_d[0].local_size, ; )
+			ISAAC_CALL_FOR_XYZ_TRIPLE( count_end, = moved_start, / step_vec, ; )
+
+			//count_start shall have the smaller values
+			ISAAC_SWITCH_IF_SMALLER( count_end.x, count_start.x )
+			ISAAC_SWITCH_IF_SMALLER( count_end.y, count_start.y )
+			ISAAC_SWITCH_IF_SMALLER( count_end.z, count_start.z )
+			
+			//calc intersection of all three super planes and save in [count_start.x ; count_end.x]
+			count_start.x = ISAAC_MAX( ISAAC_MAX( count_start.x, count_start.y ), count_start.z );
+			count_end.x = ISAAC_MIN( ISAAC_MIN( count_end.x, count_end.y ), count_end.z );
+			if ( count_start.x > count_end.x || count_end.x <= 0.0f )
+			{
+				ISAAC_SET_COLOR( pixels[x + y * framebuffer_width], background_color )
+				return;
+			}
+			
+			//Starting the main loop
+			int32_t first = ceil( count_start.x );
+			int32_t last = floor( count_end.x );
+			int32_t count = last - first + 1;
+			float count_reciprocal = 1.0f/(float)count/2.0f;
+			isaac_float4 color = background_color;
+			isaac_float3 pos = start;
+			ISAAC_CALL_FOR_XYZ_TWICE( pos, += step_vec, * float(first); )
+			for (int32_t i = 0; i < count; i++)
+			{
+				isaac_uint3 coord;
+				ISAAC_CALL_FOR_XYZ_TWICE( coord, = (uint32_t)pos, ;)
+				
+				//if ( ISAAC_CALL_FOR_XYZ( coord, >= 64 || ) 0 )
+				//	break;
+				uint32_t source_pos = (coord.x + coord.y * isaac_size_d[0].local_size.x + coord.z * isaac_size_d[0].local_size.x * isaac_size_d[0].local_size.y) * 3;
+				if (source_pos >= isaac_size_d[0].local_size.x * isaac_size_d[0].local_size.y * isaac_size_d[0].local_size.z * 3)
+					break;
+				ISAAC_CALL_FOR_XYZ_ITERATE( color, += source[source_pos + 0, ] * count_reciprocal; )
+				ISAAC_CALL_FOR_XYZ_TWICE( pos, += step_vec, ; )
+			}
+			color.w = 0.5f;
+			ISAAC_SET_COLOR( pixels[x + y * framebuffer_width], color )
+
 		}
 #ifdef ISAAC_ALPAKA
 	};
@@ -94,6 +287,10 @@ class IsaacSource
 			this->name = name;
 			this->ptr = ptr;
 			this->f_dim = f_dim;
+		}
+		float* getPtr()
+		{
+			return ptr;
 		}
 	private:
 		std::string name;
@@ -176,13 +373,17 @@ class IsaacVisualization
 			merge_time(0),
 			video_send_time(0),
 			copy_time(0),
+			sorting_time(0),
 			framebuffer_size(size_t(framebuffer_width) * size_t(framebuffer_height))
 			#ifdef ISAAC_ALPAKA
 				,framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_size))
+				,inverse_d(alpaka::mem::buf::alloc<float, size_t>(acc, size_t(16)))
+				,modelview_d(alpaka::mem::buf::alloc<float, size_t>(acc, size_t(16)))
+				,size_d(alpaka::mem::buf::alloc<isaac_size_type, size_t>(acc, size_t(1)))
 		{
 			#else
 		{
-				cudaMalloc((uint32_t**)&framebuffer, sizeof(uint32_t)*framebuffer_size);
+				ISAAC_CUDA_CHECK(cudaMalloc((uint32_t**)&framebuffer, sizeof(uint32_t)*framebuffer_size));
 			#endif
 			//INIT
 			myself = this;
@@ -198,7 +399,7 @@ class IsaacVisualization
 				this->communicator = NULL;
 				this->video_communicator = NULL;
 			}
-			setPerspective( 45.0f, (float)framebuffer_width/(float)framebuffer_height,1.0f, 100.0f);
+			setPerspective( 45.0f, (float)framebuffer_width/(float)framebuffer_height,Z_NEAR, Z_FAR);
 			ISAAC_SET_IDENTITY(modelview)
 			modelview[14] = -5.0f; //glTranslate(0,0,-5);
 			ISAAC_SET_IDENTITY(rotation)
@@ -214,7 +415,7 @@ class IsaacVisualization
 				uint32_t* framebuffer_host = (uint32_t*)malloc(framebuffer_size*sizeof(uint32_t));
 				for (size_t i = 0; i < framebuffer_size; ++i)
 					framebuffer_host[i] = value;
-				cudaMemcpy(framebuffer, framebuffer_host, sizeof(uint32_t)*framebuffer_size, cudaMemcpyHostToDevice);
+				ISAAC_CUDA_CHECK(cudaMemcpy(framebuffer, framebuffer_host, sizeof(uint32_t)*framebuffer_size, cudaMemcpyHostToDevice));
 				free(framebuffer_host);
 			#endif
 			
@@ -225,14 +426,16 @@ class IsaacVisualization
 			icetDestroyMPICommunicator(icetComm);
 			icetResetTiles();
 			icetAddTile(0, 0, framebuffer_width, framebuffer_height, master);
-			icetStrategy(ICET_STRATEGY_SPLIT);
+			//icetStrategy(ICET_STRATEGY_SPLIT);
+			icetStrategy(ICET_STRATEGY_SEQUENTIAL);
 			icetSetColorFormat(ICET_IMAGE_COLOR_RGBA_UBYTE);
 			icetSetDepthFormat(ICET_IMAGE_DEPTH_NONE);
 			icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
+			icetEnable(ICET_ORDERED_COMPOSITE);
 			
-			size_t max = global_size[0] > global_size[1] ? global_size[0] : global_size[1];
+			size_t max = ISAAC_MAX(global_size[0],global_size[1]);
 			if (TSimDim::value > 2)
-				max = global_size[2] > max ? global_size[2] : max;
+				max = ISAAC_MAX(global_size[2],max);
 			float f_l_width = (float)local_size[0]/(float)max * 2.0f;
 			float f_l_height = (float)local_size[1]/(float)max * 2.0f;
 			float f_l_depth = 0.0f;
@@ -271,7 +474,7 @@ class IsaacVisualization
 				ISAAC_JSON_ADD_MATRIX(matrix,modelview)
 				json_object_set_new( json_root, "rotation", matrix = json_array() );
 				ISAAC_JSON_ADD_MATRIX(matrix,rotation)
-
+				
 				json_sources_array = json_array();
 				json_object_set_new( json_root, "sources", json_sources_array );
 
@@ -368,6 +571,7 @@ class IsaacVisualization
 			json_t* js;
 			size_t index;
 			json_t *value;
+			
 			//Scene set?
 			if (json_array_size( js = json_object_get(message, "projection") ) == 16)
 				json_array_foreach(js, index, value)
@@ -418,6 +622,7 @@ class IsaacVisualization
 		uint64_t merge_time;
 		uint64_t video_send_time;
 		uint64_t copy_time;
+		uint64_t sorting_time;
 	//private:		
 		static IsaacVisualization *myself;
 		static void drawCallBack(
@@ -427,28 +632,87 @@ class IsaacVisualization
 			const IceTInt * readback_viewport,
 			IceTImage result)
 		{
+			#ifdef ISAAC_ALPAKA
+				alpaka::mem::buf::Buf<THost, float, TFraDim, size_t> inverse_h_buf ( alpaka::mem::buf::alloc<float, size_t>(myself->host, size_t(16)));
+				alpaka::mem::buf::Buf<THost, float, TFraDim, size_t> modelview_h_buf ( alpaka::mem::buf::alloc<float, size_t>(myself->host, size_t(16)));
+				alpaka::mem::buf::Buf<THost, isaac_size_type, TFraDim, size_t> size_h_buf ( alpaka::mem::buf::alloc<isaac_size_type, size_t>(myself->host, size_t(1)));
+				float* inverse_h = reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(inverse_h_buf));
+				float* modelview_h = reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(modelview_h_buf));
+				isaac_size_type* size_h = reinterpret_cast<isaac_size_type*>(alpaka::mem::view::getPtrNative(size_h_buf));
+			#else
+				float inverse_h[16];
+				float modelview_h[16];
+				isaac_size_type size_h[1];
+			#endif
+			IceTDouble inverse[16];
+			myself->calcInverse(inverse,projection_matrix,modelview_matrix);
+			for (int i = 0; i < 16; i++)
+			{
+				inverse_h[i] = static_cast<float>(inverse[i]);
+				modelview_h[i] = static_cast<float>(modelview_matrix[i]);
+			}
+			ISAAC_CALL_FOR_XYZ_ITERATE( size_h[0].global_size, = myself->global_size[ 0, ]; )
+			ISAAC_CALL_FOR_XYZ_ITERATE( size_h[0].position, = myself->position[ 0, ]; )
+			ISAAC_CALL_FOR_XYZ_ITERATE( size_h[0].local_size, = myself->local_size[ 0, ]; )
+			size_h[0].max_global_size = static_cast<float>(max(max(myself->global_size[0],myself->global_size[1]),myself->global_size[2]));
+			
+			#ifdef ISAAC_ALPAKA
+				alpaka::mem::view::copy(myself->stream, myself->inverse_d, inverse_h_buf, size_t(16));
+				alpaka::mem::view::copy(myself->stream, myself->modelview_d, modelview_h_buf, size_t(16));
+				alpaka::mem::view::copy(myself->stream, myself->size_d, size_h_buf, size_t(1));
+			#else
+				ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_inverse_d, inverse_h, 16 * sizeof(float)));
+				ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_modelview_d, modelview_h, 16 * sizeof(float)));
+				ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_size_d, size_h, sizeof(isaac_size_type)));
+			#endif
 			uint32_t value = (255 << 24) | (myself->rank*255/myself->numProc << 16) | (255 - myself->rank*255/myself->numProc << 8) | 255;
 			IceTUByte* pixels = icetImageGetColorub(result);
-			uint64_t start_kernel = myself->getTicksUs();
 			size_t g_width = (readback_viewport[2]+15)/16;
 			size_t g_height = (readback_viewport[3]+15)/16;
 			size_t b_width = 16;
 			size_t b_height = 16;
+			ISAAC_START_TIME_MEASUREMENT( kernel, myself->getTicksUs() )
+			float* source = myself->sources[0]->getPtr();
+			float step = 1.0f;
+			isaac_float4 bg_color = { background_color[3], background_color[2], background_color[1], background_color[0] };
 			#ifdef ISAAC_ALPAKA
+				if ( boost::mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+				{
+					g_width = readback_viewport[2];
+					g_height = readback_viewport[3];
+					b_width = 1;
+					b_height = 1;					
+				}
 				const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
-				const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(b_width), size_t(b_height));
-				const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(g_width), size_t(g_height));
+				const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(b_height), size_t(b_width));
+				const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(g_height), size_t(g_width));
 				auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
+				/*const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(readback_viewport[3]), size_t(readback_viewport[2]));
+				auto const workdiv(
+					alpaka::workdiv::getValidWorkDiv<TAcc>(
+					myself->acc,
+					grid,
+					alpaka::Vec<TAccDim, size_t>::ones(),
+					false,
+					alpaka::workdiv::GridBlockExtentSubDivRestrictions::Unrestricted));*/
 				auto const test (alpaka::exec::create<TAcc> (workdiv,
 					myself->fillRectKernel,
+					alpaka::mem::view::getPtrNative(myself->inverse_d),
+					alpaka::mem::view::getPtrNative(myself->modelview_d),
+					alpaka::mem::view::getPtrNative(myself->size_d),
 					alpaka::mem::view::getPtrNative(myself->framebuffer),
 					value,
 					myself->framebuffer_width,
 					myself->framebuffer_height,
-					readback_viewport[0]+readback_viewport[1]*myself->framebuffer_width));
+					readback_viewport[0],
+					readback_viewport[1],
+					source,
+					step,
+					bg_color));
 				alpaka::stream::enqueue(myself->stream, test);
 				alpaka::wait::wait(myself->stream);
-				uint64_t start_copy = myself->getTicksUs();
+				ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
+				ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
 				alpaka::mem::buf::BufPlainPtrWrapper<THost, uint32_t, TFraDim, size_t> result_buffer((uint32_t*)(pixels), myself->host, myself->framebuffer_size);
 				alpaka::mem::view::copy(myself->stream, result_buffer, myself->framebuffer, myself->framebuffer_size);
 			#else
@@ -459,13 +723,17 @@ class IsaacVisualization
 					value,
 					myself->framebuffer_width,
 					myself->framebuffer_height,
-					readback_viewport[0]+readback_viewport[1]*myself->framebuffer_width);
-				cudaDeviceSynchronize();
-				uint64_t start_copy = myself->getTicksUs();
-				cudaMemcpy((uint32_t*)(pixels), myself->framebuffer, sizeof(uint32_t)*myself->framebuffer_size, cudaMemcpyDeviceToHost);
+					readback_viewport[0],
+					readback_viewport[1],
+					source,
+					step,
+					bg_color);
+				ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
+				ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
+				ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
+				ISAAC_CUDA_CHECK(cudaMemcpy((uint32_t*)(pixels), myself->framebuffer, sizeof(uint32_t)*myself->framebuffer_size, cudaMemcpyDeviceToHost));
 			#endif
-			myself->copy_time += myself->getTicksUs() - start_copy;
-			myself->kernel_time += myself->getTicksUs() - start_kernel;
+			ISAAC_STOP_TIME_MEASUREMENT( myself->copy_time, +=, copy, myself->getTicksUs() )
 		}
 		void mergeJSON(json_t* result,json_t* candidate)
 		{
@@ -514,25 +782,71 @@ class IsaacVisualization
 					json_object_set( result, c_key, c_value );
 			}
 		}
-		static void* visualizationFunction(void* dummy)
+		void mulMatrixMatrix(IceTDouble* result,const IceTDouble* matrix1,const IceTDouble* matrix2)
 		{
-			//Drawing
-			IceTFloat background_color[4] = {0.0f,0.0f,0.0f,0.0};
-			IceTDouble real_modelview[16];
 			for (int x = 0; x < 4; x++)
 				for (int y = 0; y < 4; y++)
-					real_modelview[y+x*4]
-						= myself->modelview[y+0*4] * myself->rotation[0+x*4]
-						+ myself->modelview[y+1*4] * myself->rotation[1+x*4]
-						+ myself->modelview[y+2*4] * myself->rotation[2+x*4]
-						+ myself->modelview[y+3*4] * myself->rotation[3+x*4];
-			uint64_t start_merge = myself->getTicksUs();
+					result[y+x*4] = matrix1[y+0*4] * matrix2[0+x*4]
+								  + matrix1[y+1*4] * matrix2[1+x*4]
+								  + matrix1[y+2*4] * matrix2[2+x*4]
+								  + matrix1[y+3*4] * matrix2[3+x*4];
+		}
+		void mulMatrixVector(IceTDouble* result,const IceTDouble* matrix,const IceTDouble* vector)
+		{
+			result[0] =  matrix[ 0] * vector[0] + matrix[ 4] * vector[1] +  matrix[ 8] * vector[2] + matrix[12] * vector[3];
+			result[1] =  matrix[ 1] * vector[0] + matrix[ 5] * vector[1] +  matrix[ 9] * vector[2] + matrix[13] * vector[3];
+			result[2] =  matrix[ 2] * vector[0] + matrix[ 6] * vector[1] +  matrix[10] * vector[2] + matrix[14] * vector[3];
+			result[3] =  matrix[ 3] * vector[0] + matrix[ 7] * vector[1] +  matrix[11] * vector[2] + matrix[15] * vector[3];
+		}
+		static void* visualizationFunction(void* dummy)
+		{
+			//Calculating the whole modelview matrix
+			IceTDouble real_modelview[16];
+			myself->mulMatrixMatrix(real_modelview,myself->modelview,myself->rotation);
+
+			//Calc order
+			ISAAC_START_TIME_MEASUREMENT( sorting, myself->getTicksUs() )
+			//Every rank calculates it's distance to the camera
+			IceTDouble point[4] =
+			{
+				IceTDouble(myself->position[0]) + (IceTDouble(myself->local_size[0]) - IceTDouble(myself->global_size[0])) / 2.0,
+				IceTDouble(myself->position[1]) + (IceTDouble(myself->local_size[1]) - IceTDouble(myself->global_size[1])) / 2.0,
+				IceTDouble(myself->position[2]) + (IceTDouble(myself->local_size[2]) - IceTDouble(myself->global_size[2])) / 2.0,
+				1.0
+			};
+			IceTDouble result[4];
+			myself->mulMatrixVector(result,real_modelview,point);
+			float point_distance = sqrt( result[0]*result[0] + result[1]*result[1] + result[2]*result[2] );
+			//Allgather of the distances
+			float receive_buffer[myself->numProc];
+			MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, MPI_COMM_WORLD);
+			//Putting to a std::multimap of {rank, distance}
+			std::multimap<float, int, std::less< float > > distance_map;
+			for (int i = 0; i < myself->numProc; i++)
+				distance_map.insert( std::pair<float, int>( receive_buffer[i], i ) );
+			//Putting in an array for IceT
+			IceTInt icet_order_array[myself->numProc];
+			{
+				int i = 0;
+				for (auto it = distance_map.begin(); it != distance_map.end(); it++)
+				{
+					icet_order_array[i] = it->second;
+					i++;
+				}
+			}
+			MPI_Barrier( MPI_COMM_WORLD );
+			icetCompositeOrder( icet_order_array );
+			ISAAC_STOP_TIME_MEASUREMENT( myself->sorting_time, +=, sorting, myself->getTicksUs() )
+			
+			//Drawing
+			IceTFloat background_color[4] = {0.0f,0.0f,0.0f,1.0f};
+			ISAAC_START_TIME_MEASUREMENT( merge, myself->getTicksUs() )
 			IceTImage image = icetDrawFrame(myself->projection,real_modelview,background_color);
-			myself->merge_time += myself->getTicksUs() - start_merge;
-			uint64_t start_video_send = myself->getTicksUs();
+			ISAAC_STOP_TIME_MEASUREMENT( myself->merge_time, +=, merge, myself->getTicksUs() )
+			ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
 			if (myself->video_communicator)
 				myself->video_communicator->serverSendFrame(icetImageGetColorui(image),icetImageGetNumPixels(image)*4);
-			myself->video_send_time += myself->getTicksUs() - start_video_send;
+			ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
 			
 			char message_buffer[MAX_RECEIVE];
 			char* buffer = json_dumps( myself->json_root, 0 );
@@ -598,6 +912,133 @@ class IsaacVisualization
 			float ymax = znear * tan( fovyInDegrees * M_PI / 360.0f );
 			float xmax = ymax * aspectRatio;
 			setFrustum( -xmax, xmax, -ymax, ymax, znear, zfar );
+		}
+
+		void calcInverse(IceTDouble* inv,const IceTDouble* projection,const IceTDouble* modelview)
+		{
+			IceTDouble m[16];
+			mulMatrixMatrix(m,projection,modelview);
+			inv[0] = m[5]  * m[10] * m[15] - 
+					 m[5]  * m[11] * m[14] - 
+					 m[9]  * m[6]  * m[15] + 
+					 m[9]  * m[7]  * m[14] +
+					 m[13] * m[6]  * m[11] - 
+					 m[13] * m[7]  * m[10];
+
+			inv[4] = -m[4]  * m[10] * m[15] + 
+					  m[4]  * m[11] * m[14] + 
+					  m[8]  * m[6]  * m[15] - 
+					  m[8]  * m[7]  * m[14] - 
+					  m[12] * m[6]  * m[11] + 
+					  m[12] * m[7]  * m[10];
+
+			inv[8] = m[4]  * m[9] * m[15] - 
+					 m[4]  * m[11] * m[13] - 
+					 m[8]  * m[5] * m[15] + 
+					 m[8]  * m[7] * m[13] + 
+					 m[12] * m[5] * m[11] - 
+					 m[12] * m[7] * m[9];
+
+			inv[12] = -m[4]  * m[9] * m[14] + 
+					   m[4]  * m[10] * m[13] +
+					   m[8]  * m[5] * m[14] - 
+					   m[8]  * m[6] * m[13] - 
+					   m[12] * m[5] * m[10] + 
+					   m[12] * m[6] * m[9];
+
+			inv[1] = -m[1]  * m[10] * m[15] + 
+					  m[1]  * m[11] * m[14] + 
+					  m[9]  * m[2] * m[15] - 
+					  m[9]  * m[3] * m[14] - 
+					  m[13] * m[2] * m[11] + 
+					  m[13] * m[3] * m[10];
+
+			inv[5] = m[0]  * m[10] * m[15] - 
+					 m[0]  * m[11] * m[14] - 
+					 m[8]  * m[2] * m[15] + 
+					 m[8]  * m[3] * m[14] + 
+					 m[12] * m[2] * m[11] - 
+					 m[12] * m[3] * m[10];
+
+			inv[9] = -m[0]  * m[9] * m[15] + 
+					  m[0]  * m[11] * m[13] + 
+					  m[8]  * m[1] * m[15] - 
+					  m[8]  * m[3] * m[13] - 
+					  m[12] * m[1] * m[11] + 
+					  m[12] * m[3] * m[9];
+
+			inv[13] = m[0]  * m[9] * m[14] - 
+					  m[0]  * m[10] * m[13] - 
+					  m[8]  * m[1] * m[14] + 
+					  m[8]  * m[2] * m[13] + 
+					  m[12] * m[1] * m[10] - 
+					  m[12] * m[2] * m[9];
+
+			inv[2] = m[1]  * m[6] * m[15] - 
+					 m[1]  * m[7] * m[14] - 
+					 m[5]  * m[2] * m[15] + 
+					 m[5]  * m[3] * m[14] + 
+					 m[13] * m[2] * m[7] - 
+					 m[13] * m[3] * m[6];
+
+			inv[6] = -m[0]  * m[6] * m[15] + 
+					  m[0]  * m[7] * m[14] + 
+					  m[4]  * m[2] * m[15] - 
+					  m[4]  * m[3] * m[14] - 
+					  m[12] * m[2] * m[7] + 
+					  m[12] * m[3] * m[6];
+
+			inv[10] = m[0]  * m[5] * m[15] - 
+					  m[0]  * m[7] * m[13] - 
+					  m[4]  * m[1] * m[15] + 
+					  m[4]  * m[3] * m[13] + 
+					  m[12] * m[1] * m[7] - 
+					  m[12] * m[3] * m[5];
+
+			inv[14] = -m[0]  * m[5] * m[14] + 
+					   m[0]  * m[6] * m[13] + 
+					   m[4]  * m[1] * m[14] - 
+					   m[4]  * m[2] * m[13] - 
+					   m[12] * m[1] * m[6] + 
+					   m[12] * m[2] * m[5];
+
+			inv[3] = -m[1] * m[6] * m[11] + 
+					  m[1] * m[7] * m[10] + 
+					  m[5] * m[2] * m[11] - 
+					  m[5] * m[3] * m[10] - 
+					  m[9] * m[2] * m[7] + 
+					  m[9] * m[3] * m[6];
+
+			inv[7] = m[0] * m[6] * m[11] - 
+					 m[0] * m[7] * m[10] - 
+					 m[4] * m[2] * m[11] + 
+					 m[4] * m[3] * m[10] + 
+					 m[8] * m[2] * m[7] - 
+					 m[8] * m[3] * m[6];
+
+			inv[11] = -m[0] * m[5] * m[11] + 
+					   m[0] * m[7] * m[9] + 
+					   m[4] * m[1] * m[11] - 
+					   m[4] * m[3] * m[9] - 
+					   m[8] * m[1] * m[7] + 
+					   m[8] * m[3] * m[5];
+
+			inv[15] = m[0] * m[5] * m[10] - 
+					  m[0] * m[6] * m[9] - 
+					  m[4] * m[1] * m[10] + 
+					  m[4] * m[2] * m[9] + 
+					  m[8] * m[1] * m[6] - 
+					  m[8] * m[2] * m[5];
+
+			IceTDouble det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+
+			if (det == 0)
+				return;
+				
+			det = 1.0 / det;
+
+			for (int i = 0; i < 16; i++)
+				inv[i] = inv[i] * det;
 		}
 		void recreateJSON()
 		{
@@ -720,6 +1161,9 @@ class IsaacVisualization
 			alpaka::Vec<TSimDim, size_t> local_size;
 			alpaka::Vec<TSimDim, size_t> position;
 			alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t> framebuffer;
+			alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t> inverse_d;
+			alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t> modelview_d;
+			alpaka::mem::buf::Buf<TDevAcc, isaac_size_type, TFraDim, size_t> size_d;
 		#else
 			size_t framebuffer_size;
 			std::vector<size_t> global_size;
