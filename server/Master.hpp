@@ -81,6 +81,7 @@ class InsituConnectorGroup
 		}
 		~InsituConnectorGroup()
 		{
+			pthread_mutex_destroy(&streams_mutex);
 		}
 	private:
 		InsituConnectorContainer* master;

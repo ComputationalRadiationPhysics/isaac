@@ -1136,6 +1136,7 @@ class IsaacVisualization
 						serverDisconnect();
 					usleep(100000); //100ms
 					pthread_cancel(readThread);
+					pthread_mutex_destroy(&deleteMessageMutex);
 				}
 			private:
 				std::string url;

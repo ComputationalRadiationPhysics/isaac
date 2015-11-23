@@ -82,6 +82,7 @@ template <typename T> class ThreadList
 		{
 			while (front)
 				pop_front();
+			pthread_mutex_destroy(&remove_mutex);
 		}
 		ThreadListContainer_ptr getFront()
 		{

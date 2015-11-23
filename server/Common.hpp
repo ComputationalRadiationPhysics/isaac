@@ -131,6 +131,7 @@ class ImageBufferContainer
 		}
 		~ImageBufferContainer()
 		{
+			pthread_mutex_destroy(&ref_mutex);
 		}
 		void incref()
 		{
