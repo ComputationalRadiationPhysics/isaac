@@ -52,6 +52,7 @@ int main(int argc, char **argv)
 	//Let's calculate the best spatial distribution of the dimensions so that d[0]*d[1]*d[2] = numProc
 	size_t d[3] = {1,1,1};
 	recursive_kgv(d,numProc,2);
+
 	size_t p[3] = { rank % d[0], (rank / d[0]) % d[1],  (rank / d[0] / d[1]) % d[2] };
 	
 	//Let's use this to create some random particles inside my box
@@ -88,6 +89,10 @@ int main(int argc, char **argv)
 	printf("Using name %s\n",name);
 	
 	typedef float float3_t[3];
+	//int width = 1920;
+	//int height = 1080;
+	//int width = 1792;
+	//int height = 1024;
 	int width = 800;
 	int height = 600;
 	
@@ -173,7 +178,6 @@ int main(int argc, char **argv)
 		visualization.registerSource("source1",(float*)deviceBuffer1,3);
 		visualization.registerSource("source1",deviceBuffer2,1);
 	#endif
-	
 	//Setting up the metadata description (only master, but however slaves could then metadata metadata, too, it would be merged)
 	if (rank == MASTER_RANK)
 	{

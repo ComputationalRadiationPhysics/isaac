@@ -81,7 +81,12 @@ size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 {
 	int count = 0;
 	while (count < group->video_buffer_size)
-		count += recv(group->video->connector->getSockFD(),&(video_buffer[count]),group->video_buffer_size-count,0);
+	{
+		int r = recv(group->video->connector->getSockFD(),&(video_buffer[count]),group->video_buffer_size-count,0);
+		if (r <= 0)
+			break;
+		count += r;
+	}
 	return count;
 }
 
@@ -169,7 +174,15 @@ errorCode Master::run()
 			{
 				bool delete_message = true;
 				if (message->type == PERIOD)
-					ISAAC_WAIT_VIDEO_AND_SEND_ALL(insitu->t->group,message->json_root)
+				{
+					if (insitu->t->group->video == NULL) //Later!
+					{
+						delete_message = false;
+						insitu->t->connector->clientSendMessage( message );
+					}
+					else
+						ISAAC_WAIT_VIDEO_AND_SEND_ALL(insitu->t->group,message->json_root)
+				}
 				else
 				if (message->type == REGISTER || message->type == REGISTER_VIDEO) //Saving the metadata description for later
 				{
@@ -266,7 +279,7 @@ errorCode Master::run()
 					delete insituMaster.insituConnectorList.remove(insitu);
 					break;
 				}
-				if (delete_message)	
+				if (delete_message)
 					delete message;
 				if (message == lastMessage)
 					break;

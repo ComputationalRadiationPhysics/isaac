@@ -60,11 +60,21 @@
 	{
 		uint32_t x,y,z;
 	};
+	struct isaac_int4
+	{
+		int32_t x,y,z,w;
+	};
+	struct isaac_int3
+	{
+		int32_t x,y,z;
+	};
 #else
 	typedef float4 isaac_float4;
 	typedef float3 isaac_float3;
 	typedef uint4 isaac_uint4;
 	typedef uint3 isaac_uint3;
+	typedef int4 isaac_int4;
+	typedef int3 isaac_int3;
 #endif
 
 struct isaac_size_type
@@ -130,10 +140,6 @@ struct isaac_size_type
 #define ISAAC_STOP_TIME_MEASUREMENT( result, operand, unique_name, time_function ) \
 	result operand time_function - BOOST_PP_CAT( __tm_start_, unique_name );
 			
-			
-#define ISAAC_MIN(x,y) ((x) < (y) ? (x) : (y))
-#define ISAAC_MAX(x,y) ((x) > (y) ? (x) : (y))
-
 #define MAX_RECEIVE 32768 //32kb
 #define Z_NEAR 1.0f
 #define Z_FAR 100.0f
@@ -180,6 +186,12 @@ __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda a
 			y+= starty;
 			if (x >= framebuffer_width || y >= framebuffer_height)
 				return;
+			
+			//Debug output of the bounding box
+			//isaac_float4 foobar = {0.5,0.5,0.5,0.5};
+			//ISAAC_SET_COLOR( pixels[x + y * framebuffer_width], foobar )
+			//return;
+			
 			float f_x = x/(float)framebuffer_width*2.0f-1.0f;
 			float f_y = y/(float)framebuffer_height*2.0f-1.0f;
 			isaac_float4 start_p = {f_x*Z_NEAR,f_y*Z_NEAR,-1.0f*Z_NEAR,1.0f*Z_NEAR}; //znear
@@ -198,8 +210,6 @@ __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda a
 			//scale to globale grid size
 			ISAAC_CALL_FOR_XYZ( start , *=max_size; )
 			ISAAC_CALL_FOR_XYZ( end , *=max_size; )
-			start.z *= -1.0f;
-			end.z *= -1.0f;
 			
 			//move to local grid
 			ISAAC_CALL_FOR_XYZ_TRIPLE( start, += isaac_size_d[0].global_size, / 2.0f - isaac_size_d[0].position, ; )
@@ -215,9 +225,9 @@ __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda a
 
 			isaac_float3 count_start;
 			ISAAC_CALL_FOR_XYZ_TRIPLE( count_start, = -start, / step_vec, ; )
-			isaac_float3 count_end;
 			isaac_float3 moved_start;
 			ISAAC_CALL_FOR_XYZ_TRIPLE( moved_start, = -start, + isaac_size_d[0].local_size, ; )
+			isaac_float3 count_end;
 			ISAAC_CALL_FOR_XYZ_TRIPLE( count_end, = moved_start, / step_vec, ; )
 
 			//count_start shall have the smaller values
@@ -226,8 +236,8 @@ __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda a
 			ISAAC_SWITCH_IF_SMALLER( count_end.z, count_start.z )
 			
 			//calc intersection of all three super planes and save in [count_start.x ; count_end.x]
-			count_start.x = ISAAC_MAX( ISAAC_MAX( count_start.x, count_start.y ), count_start.z );
-			count_end.x = ISAAC_MIN( ISAAC_MIN( count_end.x, count_end.y ), count_end.z );
+			count_start.x = max( max( count_start.x, count_start.y ), count_start.z );
+			  count_end.x = min( min(   count_end.x,   count_end.y ),   count_end.z );
 			if ( count_start.x > count_end.x || count_end.x <= 0.0f )
 			{
 				ISAAC_SET_COLOR( pixels[x + y * framebuffer_width], background_color )
@@ -241,18 +251,26 @@ __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda a
 			float count_reciprocal = 1.0f/(float)count/2.0f;
 			isaac_float4 color = background_color;
 			isaac_float3 pos = start;
+			isaac_uint3 local_size_uint =
+			{
+				uint32_t( isaac_size_d[0].local_size.x ),
+				uint32_t( isaac_size_d[0].local_size.y ),
+				uint32_t( isaac_size_d[0].local_size.z )
+			};
 			ISAAC_CALL_FOR_XYZ_TWICE( pos, += step_vec, * float(first); )
+			
 			for (int32_t i = 0; i < count; i++)
 			{
 				isaac_uint3 coord;
-				ISAAC_CALL_FOR_XYZ_TWICE( coord, = (uint32_t)pos, ;)
-				
-				//if ( ISAAC_CALL_FOR_XYZ( coord, >= 64 || ) 0 )
-				//	break;
-				uint32_t source_pos = (coord.x + coord.y * isaac_size_d[0].local_size.x + coord.z * isaac_size_d[0].local_size.x * isaac_size_d[0].local_size.y) * 3;
-				if (source_pos >= isaac_size_d[0].local_size.x * isaac_size_d[0].local_size.y * isaac_size_d[0].local_size.z * 3)
+				ISAAC_CALL_FOR_XYZ_TWICE( coord, = (uint32_t)pos, ; )				
+				if ( ISAAC_CALL_FOR_XYZ( coord, >= 64 || ) 0 )
 					break;
-				ISAAC_CALL_FOR_XYZ_ITERATE( color, += source[source_pos + 0, ] * count_reciprocal; )
+
+				int32_t source_pos = (
+					coord.x +
+					coord.y * local_size_uint.x +
+					coord.z * local_size_uint.x * local_size_uint.y ) * 3;
+				ISAAC_CALL_FOR_XYZ_ITERATE( color, += source[source_pos + 0, ] * count_reciprocal; )					
 				ISAAC_CALL_FOR_XYZ_TWICE( pos, += step_vec, ; )
 			}
 			color.w = 0.5f;
@@ -433,19 +451,19 @@ class IsaacVisualization
 			icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
 			icetEnable(ICET_ORDERED_COMPOSITE);
 			
-			size_t max = ISAAC_MAX(global_size[0],global_size[1]);
+			size_t max_size = max(global_size[0],global_size[1]);
 			if (TSimDim::value > 2)
-				max = ISAAC_MAX(global_size[2],max);
-			float f_l_width = (float)local_size[0]/(float)max * 2.0f;
-			float f_l_height = (float)local_size[1]/(float)max * 2.0f;
+				max_size = max(global_size[2],max_size);
+			float f_l_width = (float)local_size[0]/(float)max_size * 2.0f;
+			float f_l_height = (float)local_size[1]/(float)max_size * 2.0f;
 			float f_l_depth = 0.0f;
 			if (TSimDim::value > 2)
-				f_l_depth = (float)local_size[2]/(float)max * 2.0f;
-			float f_x = (float)position[0]/(float)max * 2.0f - (float)global_size[0]/(float)max;
-			float f_y = (float)position[1]/(float)max * 2.0f - (float)global_size[1]/(float)max;
+				f_l_depth = (float)local_size[2]/(float)max_size * 2.0f;
+			float f_x = (float)position[0]/(float)max_size * 2.0f - (float)global_size[0]/(float)max_size;
+			float f_y = (float)position[1]/(float)max_size * 2.0f - (float)global_size[1]/(float)max_size;
 			float f_z = 0.0f;
 			if (TSimDim::value > 2)
-				f_z = (float)position[2]/(float)max * 2.0f - (float)global_size[2]/(float)max;
+				f_z = (float)position[2]/(float)max_size * 2.0f - (float)global_size[2]/(float)max_size;
 			icetBoundingBoxf( f_x, f_x + f_l_width, f_y, f_y + f_l_height, f_z, f_z + f_l_depth);
 			icetPhysicalRenderSize(framebuffer_width, framebuffer_height);
 			icetDrawCallback( drawCallBack );
@@ -543,6 +561,8 @@ class IsaacVisualization
 		}
 		json_t* doVisualization( IsaacVisualizationMetaEnum metaTargets = META_MASTER )
 		{
+			//if (rank == master)
+			//	printf("-----\n");
 			ISAAC_WAIT_VISUALIZATION
 
 			//Handle messages
@@ -800,6 +820,38 @@ class IsaacVisualization
 		}
 		static void* visualizationFunction(void* dummy)
 		{
+			//Message sending
+			char message_buffer[MAX_RECEIVE];
+			char* buffer = json_dumps( myself->json_root, 0 );
+			strcpy( message_buffer, buffer );
+			free(buffer);
+			if (myself->thr_metaTargets == META_MERGE)
+			{
+				if (myself->rank == myself->master)
+				{
+					char receive_buffer[myself->numProc][MAX_RECEIVE];
+					MPI_Gather( message_buffer, MAX_RECEIVE, MPI_CHAR, receive_buffer, MAX_RECEIVE, MPI_CHAR, myself->master, MPI_COMM_WORLD);
+					for (int i = 0; i < myself->numProc; i++)
+					{
+						if (i == myself->master)
+							continue;
+						json_t* js = json_loads(receive_buffer[i], 0, NULL);
+						myself->mergeJSON( myself->json_root, js );
+					}
+				}
+				else
+					MPI_Gather( message_buffer, MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, myself->master, MPI_COMM_WORLD);
+			}
+			if (myself->rank == myself->master && myself->thr_metaTargets != META_NONE)
+			{
+				json_object_set_new( myself->json_root, "type", json_string( "period" ) );
+				json_object_set_new( myself->json_root, "meta nr", json_integer( myself->metaNr ) );
+				char* buffer = json_dumps( myself->json_root, 0 );
+				myself->communicator->serverSend(buffer);
+				free(buffer);
+			}
+			json_decref( myself->json_root );
+			myself->recreateJSON();
 			//Calculating the whole modelview matrix
 			IceTDouble real_modelview[16];
 			myself->mulMatrixMatrix(real_modelview,myself->modelview,myself->rotation);
@@ -834,10 +886,9 @@ class IsaacVisualization
 					i++;
 				}
 			}
-			MPI_Barrier( MPI_COMM_WORLD );
 			icetCompositeOrder( icet_order_array );
 			ISAAC_STOP_TIME_MEASUREMENT( myself->sorting_time, +=, sorting, myself->getTicksUs() )
-			
+
 			//Drawing
 			IceTFloat background_color[4] = {0.0f,0.0f,0.0f,1.0f};
 			ISAAC_START_TIME_MEASUREMENT( merge, myself->getTicksUs() )
@@ -847,38 +898,7 @@ class IsaacVisualization
 			if (myself->video_communicator)
 				myself->video_communicator->serverSendFrame(icetImageGetColorui(image),icetImageGetNumPixels(image)*4);
 			ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
-			
-			char message_buffer[MAX_RECEIVE];
-			char* buffer = json_dumps( myself->json_root, 0 );
-			strcpy( message_buffer, buffer );
-			free(buffer);
-			if (myself->thr_metaTargets == META_MERGE)
-			{
-				if (myself->rank == myself->master)
-				{
-					char receive_buffer[myself->numProc][MAX_RECEIVE];
-					MPI_Gather( message_buffer, MAX_RECEIVE, MPI_CHAR, receive_buffer, MAX_RECEIVE, MPI_CHAR, myself->master, MPI_COMM_WORLD);
-					for (int i = 0; i < myself->numProc; i++)
-					{
-						if (i == myself->master)
-							continue;
-						json_t* js = json_loads(receive_buffer[i], 0, NULL);
-						myself->mergeJSON( myself->json_root, js );
-					}
-				}
-				else
-					MPI_Gather( message_buffer, MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, myself->master, MPI_COMM_WORLD);
-			}
-			if (myself->rank == myself->master && myself->thr_metaTargets != META_NONE)
-			{
-				json_object_set_new( myself->json_root, "type", json_string( "period" ) );
-				json_object_set_new( myself->json_root, "meta nr", json_integer( myself->metaNr ) );
-				char* buffer = json_dumps( myself->json_root, 0 );
-				myself->communicator->serverSend(buffer);
-				free(buffer);
-			}
-			json_decref( myself->json_root );
-			myself->recreateJSON();
+
 			myself->metaNr++;
 			return 0;
 		}
@@ -1118,12 +1138,21 @@ class IsaacVisualization
 				}
 				int serverSend(const char* content)
 				{
-					int n = write(sockfd,content,strlen(content));
+					int n = send(sockfd,content,strlen(content),0);
 					return n;
 				}
 				int serverSendFrame(void* ptr,int count)
 				{
-					int n = write(sockfd,ptr,count);
+					int n = 0;
+					int div = count / 262144; //256kb per message
+					int rest = count % 262144; //rest
+					for (int i = 0; i <=  div; i++)
+					{
+						int r = -1;
+						while (r < 0)
+							r = send(sockfd,&(((char*)ptr)[i*262144]),i == div ? rest : 262144,0);
+						n += r;
+					}
 					return n;
 				}
 				void serverDisconnect()

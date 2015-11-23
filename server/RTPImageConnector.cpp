@@ -84,11 +84,16 @@ errorCode RTPImageConnector::run()
 						"format", GST_FORMAT_TIME, NULL);
 					GST_LOAD_ELEMENT_OR_DIE(streams[nr],videoconvert)
 					GST_LOAD_ELEMENT_OR_DIE(streams[nr],x264enc)
+					int bitrate_heuristic =
+						3000 *
+						message->group->getFramebufferWidth() *
+						message->group->getFramebufferHeight() /
+						800 / 600;
 					g_object_set (G_OBJECT (streams[nr].x264enc),
 						"tune", zerolatency ? 0x00000004 : 0x00000000,
 						"psy-tune", 2,
 						"speed-preset", 1,
-						"bitrate", 3000,
+						"bitrate", bitrate_heuristic,
 						"threads", 2,
 						"byte-stream", 1,  NULL);
 					GST_LOAD_ELEMENT_OR_DIE(streams[nr],rtph264pay)

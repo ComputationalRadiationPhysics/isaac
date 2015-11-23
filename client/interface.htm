@@ -12,17 +12,25 @@
 <li>Right click + Mouse movement: Change position</li>
 <li>Mousewheel: zoom</li>
 </ul>
-<form>Server URL:<input type="text" id="url" value="127.0.0.1"> Port:<input type="text" id="port" value="2459"><input type="button" value="Connect" id="connect"></form>
+<form>Server URL:<input type="text" id="url" value="127.0.0.1"> Port:<input type="text" id="port" value="2459"><input type="button" value="Connect" id="connect"> Show video and control in one window <input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()"></form>
 <div id="status">Status: Not connected</div>
 </p>
 <table><tr>
 <td id="video_td" valign="top">
 	<!--canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas-->
-	<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls="false"/>
-</td>
+	<div id="video_container_div" style="position: relative;">
+		<div id="video_div" style="position: relative; top: 0; left: 0;">
+			<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls="false" windowless="true"/>
+			<form><input type="button" value="Send example metadada" id="metadata"><input type="button" value="Stop observing" id="stop"><input type="button" value="Stop simulation" id="exit"></form>
+		</div>
+		<div id="preview_div" style="position: absolute; top: 0; left: 0; opacity: 0.5;">
+			<canvas id="preview" width="512" height="512" style="border:1px solid #000000;"></canvas>
+		</div>
+	</div>
+<td>
 <td id="preview_td" valign="top">
-	<canvas id="preview" width="512" height="512" style="border:1px solid #000000;"></canvas>
-	<form><input type="button" value="Send example metadada" id="metadata"><input type="button" value="Stop observing" id="stop"><input type="button" value="Stop simulation" id="exit"></form>
+	<div id="preview_container_div" style="position: relative;">
+	</div>
 </td>
 </tr></table>
 <div id="list_td" style="display:none">
@@ -49,8 +57,8 @@ var ctx = preview.getContext("2d");
 var socket = null;
 var observe_id = -1;
 var particles = null;
-
 var plugins = new Array();
+var one_window = true;
 
 var projection = [
 	1, 0, 0, 0,
@@ -204,6 +212,11 @@ function redraw()
 {
 	ctx.clearRect(0, 0, preview.clientWidth, preview.clientHeight);
 	ctx.fillStyle = "#000000";
+	if (one_window)
+		ctx.strokeStyle = '#ffffff';
+	else
+		ctx.strokeStyle = '#000000';
+	ctx.lineWidth = 2;
 	var temp = modelview;
 	ctx.beginPath();
 	modelview = mulMatrix(modelview,rotation)
@@ -516,6 +529,23 @@ document.getElementById("exit").onclick = function()
 	socket.send(JSON.stringify(obj));
 	document.getElementById("stop").onclick();
 }
+
+function one_window_checkbox_click()
+{
+	one_window = !one_window;
+	if (one_window)
+	{
+		var node = document.getElementById("preview_div");
+		document.getElementById("video_container_div").appendChild(node);
+		redraw();
+	}
+	else
+	{
+		var node = document.getElementById("preview_div");
+		document.getElementById("preview_container_div").appendChild(node);
+		redraw();
+	}
+};
 
 
 /*function setFrustum(left, right, bottom, top, znear, zfar )
