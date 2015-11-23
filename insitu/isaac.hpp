@@ -145,7 +145,6 @@ struct isaac_size_type
 #define Z_FAR 100.0f
 
 __constant__ float isaac_inverse_d[16];
-__constant__ float isaac_modelview_d[16];
 __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda and alpaka
 
 
@@ -156,7 +155,6 @@ __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda a
 		ALPAKA_FN_ACC void operator()(
 			TAcc__ const &acc,
 			float* isaac_inverse_d,
-			float* isaac_modelview_d,
 			isaac_size_type* isaac_size_d,
 #else
 		__global__ void IsaacFillRectKernel(
@@ -284,7 +282,6 @@ __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda a
 
 typedef enum
 {
-	META_NONE = -1,
 	META_MERGE = 0,
 	META_MASTER = 1
 } IsaacVisualizationMetaEnum;
@@ -316,17 +313,17 @@ class IsaacSource
 		unsigned int f_dim;
 };
 
-#define ISAAC_SET_IDENTITY(matrix) \
-	for (int x = 0; x < 4; x++) \
-		for (int y = 0; y < 4; y++) \
-			(matrix)[x+y*4] = (x==y)?1.0f:0.0f;
+#define ISAAC_SET_IDENTITY(size,matrix) \
+	for (int x = 0; x < size; x++) \
+		for (int y = 0; y < size; y++) \
+			(matrix)[x+y*size] = (x==y)?1.0f:0.0f;
 
-#define ISAAC_JSON_ADD_MATRIX(array,matrix) \
-	for (int i = 0; i < 16; i++) \
+#define ISAAC_JSON_ADD_MATRIX(array,matrix,count) \
+	for (int i = 0; i < count; i++) \
 		json_array_append_new( array, json_real( (matrix)[i] ) );
 
 
-#ifdef ISAAC_SET_IDENTITY
+#ifdef ISAAC_THREADING
 	#define ISAAC_WAIT_VISUALIZATION \
 		if (visualizationThread) \
 		{ \
@@ -334,7 +331,7 @@ class IsaacSource
 			visualizationThread = 0; \
 		}
 #else
-	#define ISAAC_WAIT_VISUALIZATION BOOST_PP_EMPTY
+	#define ISAAC_WAIT_VISUALIZATION {}
 #endif
 
 #ifdef ISAAC_ALPAKA
@@ -396,7 +393,6 @@ class IsaacVisualization
 			#ifdef ISAAC_ALPAKA
 				,framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_size))
 				,inverse_d(alpaka::mem::buf::alloc<float, size_t>(acc, size_t(16)))
-				,modelview_d(alpaka::mem::buf::alloc<float, size_t>(acc, size_t(16)))
 				,size_d(alpaka::mem::buf::alloc<isaac_size_type, size_t>(acc, size_t(1)))
 		{
 			#else
@@ -418,9 +414,12 @@ class IsaacVisualization
 				this->video_communicator = NULL;
 			}
 			setPerspective( 45.0f, (float)framebuffer_width/(float)framebuffer_height,Z_NEAR, Z_FAR);
-			ISAAC_SET_IDENTITY(modelview)
-			modelview[14] = -5.0f; //glTranslate(0,0,-5);
-			ISAAC_SET_IDENTITY(rotation)
+			look_at[0] = 0.0f;
+			look_at[1] = 0.0f;
+			look_at[2] = 0.0f;
+			ISAAC_SET_IDENTITY(3,rotation)
+			distance = -5.0f;
+			updateModelview();
 			
 			//Fill framebuffer with test values:
 			uint32_t value = (255 << 24);
@@ -444,8 +443,22 @@ class IsaacVisualization
 			icetDestroyMPICommunicator(icetComm);
 			icetResetTiles();
 			icetAddTile(0, 0, framebuffer_width, framebuffer_height, master);
-			//icetStrategy(ICET_STRATEGY_SPLIT);
-			icetStrategy(ICET_STRATEGY_SEQUENTIAL);
+			icetStrategy(ICET_STRATEGY_DIRECT);
+			//icetStrategy(ICET_STRATEGY_SEQUENTIAL);
+			//icetStrategy(ICET_STRATEGY_REDUCE);
+			
+			icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC );
+			//icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_BSWAP );
+			//icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_RADIXK );
+			//icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_TREE );
+			
+			IceTBoolean supports;
+			icetGetBooleanv( ICET_STRATEGY_SUPPORTS_ORDERING, &supports );
+			if (supports)
+				printf("yes\n");
+			else
+				printf("no\n");
+			
 			icetSetColorFormat(ICET_IMAGE_COLOR_RGBA_UBYTE);
 			icetSetDepthFormat(ICET_IMAGE_DEPTH_NONE);
 			icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
@@ -487,11 +500,12 @@ class IsaacVisualization
 
 				json_t *matrix;
 				json_object_set_new( json_root, "projection", matrix = json_array() );
-				ISAAC_JSON_ADD_MATRIX(matrix,projection)
-				json_object_set_new( json_root, "modelview", matrix = json_array() );
-				ISAAC_JSON_ADD_MATRIX(matrix,modelview)
+				ISAAC_JSON_ADD_MATRIX(matrix,projection,16)
+				json_object_set_new( json_root, "position", matrix = json_array() );
+				ISAAC_JSON_ADD_MATRIX(matrix,look_at,3)
 				json_object_set_new( json_root, "rotation", matrix = json_array() );
-				ISAAC_JSON_ADD_MATRIX(matrix,rotation)
+				ISAAC_JSON_ADD_MATRIX(matrix,rotation,9)
+				json_object_set_new( json_root, "distance", json_real( distance ) );
 				
 				json_sources_array = json_array();
 				json_object_set_new( json_root, "sources", json_sources_array );
@@ -564,6 +578,11 @@ class IsaacVisualization
 			//if (rank == master)
 			//	printf("-----\n");
 			ISAAC_WAIT_VISUALIZATION
+			
+			send_distance = false;
+			send_look_at = false;
+			send_projection = false;
+			send_rotation = false;
 
 			//Handle messages
 			json_t* message;
@@ -572,10 +591,122 @@ class IsaacVisualization
 			if (rank == master)
 			{
 				message = json_object();
+				bool add_modelview = false;
 				while (json_t* last = communicator->getLastMessage())
 				{
+					//Search for scene changes
+					json_t* js;
+					size_t index;
+					json_t *value;
+					if (json_array_size( js = json_object_get(last, "rotation absolute") ) == 9)
+					{
+						add_modelview = true;
+						send_rotation = true;
+						json_array_foreach(js, index, value)
+							rotation[index] = json_number_value( value );
+						json_object_del( last, "rotation absolute" );
+					}
+					if (json_array_size( js = json_object_get(last, "rotation relative") ) == 9)
+					{
+						add_modelview = true;
+						send_rotation = true;
+						IceTDouble relative[9];
+						IceTDouble new_rotation[9];
+						json_array_foreach(js, index, value)
+							relative[index] = json_number_value( value );
+						for (int x = 0; x < 3; x++)
+							for (int y = 0; y < 3; y++)
+								new_rotation[y+x*3] = relative[y+0*3] * rotation[0+x*3]
+											        + relative[y+1*3] * rotation[1+x*3]
+											        + relative[y+2*3] * rotation[2+x*3];
+						memcpy(rotation, new_rotation, 9 * sizeof(IceTDouble) );
+						json_object_del( last, "rotation relative" );
+					}
+					if (json_array_size( js = json_object_get(last, "rotation axis") ) == 4)
+					{
+						IceTDouble relative[9];
+						IceTDouble x = json_number_value( json_array_get( js, 0 ) );
+						IceTDouble y = json_number_value( json_array_get( js, 1 ) );
+						IceTDouble z = json_number_value( json_array_get( js, 2 ) );
+						IceTDouble rad = json_number_value( json_array_get( js, 3 ) );
+						IceTDouble s = sin( rad * M_PI / 360.0);
+						IceTDouble c = cos( rad * M_PI / 360.0);
+						IceTDouble l = sqrt( x * x + y * y + z * z);
+						if ( l != 0.0 )
+						{
+							add_modelview = true;
+							send_rotation = true;
+							x /= l;
+							y /= l;
+							z /= l;
+							relative[0] = c + x * x * ( 1 - c );
+							relative[3] = x * y * ( 1 - c ) - z * s;
+							relative[6] = x * z * ( 1 - c ) + y * s;
+							relative[1] = y * x * ( 1 - c ) + z * s;
+							relative[4] = c + y * y * ( 1 - c );
+							relative[7] = y * z * ( 1 - c ) - x * s;
+							relative[2] = z * x * ( 1 - c ) - y * s;
+							relative[5] = z * y * ( 1 - c ) + x * s;
+							relative[8] = c + z * z * ( 1 - c );
+							IceTDouble new_rotation[9];
+							for (int x = 0; x < 3; x++)
+								for (int y = 0; y < 3; y++)
+									new_rotation[y+x*3] = relative[y+0*3] * rotation[0+x*3]
+														+ relative[y+1*3] * rotation[1+x*3]
+														+ relative[y+2*3] * rotation[2+x*3];
+							memcpy(rotation, new_rotation, 9 * sizeof(IceTDouble) );
+						}
+						json_object_del( last, "rotation axis" );
+					}
+					if (json_array_size( js = json_object_get(last, "position absolute") ) == 3)
+					{
+						add_modelview = true;
+						send_look_at = true;
+						json_array_foreach(js, index, value)
+							look_at[index] = json_number_value( value );
+						json_object_del( last, "position absolute" );
+					}
+					if (json_array_size( js = json_object_get(last, "position relative") ) == 3)
+					{
+						add_modelview = true;
+						send_look_at = true;
+						IceTDouble add[3];
+						json_array_foreach(js, index, value)
+							add[index] = json_number_value( value );
+						IceTDouble add_p[3] =
+						{
+							rotation[0] * add[0] + rotation[1] * add[1] + rotation[2] * add[2],
+							rotation[3] * add[0] + rotation[4] * add[1] + rotation[5] * add[2],
+							rotation[6] * add[0] + rotation[7] * add[1] + rotation[8] * add[2]
+						};
+						look_at[0] += add_p[0];
+						look_at[1] += add_p[1];
+						look_at[2] += add_p[2];
+						json_object_del( last, "position relative" );
+					}
+					if ( js = json_object_get(last, "distance absolute") )
+					{
+						add_modelview = true;
+						send_distance = true;
+						distance = json_number_value( js );
+						json_object_del( last, "distance absolute" );
+					}
+					if ( js = json_object_get(last, "distance relative") )
+					{
+						add_modelview = true;
+						send_distance = true;
+						distance += json_number_value( js );
+						json_object_del( last, "distance relative" );
+					}
 					mergeJSON(message,last);
 					json_decref( last );
+				}
+				if (add_modelview)
+				{
+					updateModelview();
+					json_t *matrix;
+					json_object_set_new( message, "modelview", matrix = json_array() );
+					ISAAC_JSON_ADD_MATRIX(matrix,modelview,16)
 				}
 				char* buffer = json_dumps( message, 0 );
 				strcpy( message_buffer, buffer );
@@ -594,14 +725,14 @@ class IsaacVisualization
 			
 			//Scene set?
 			if (json_array_size( js = json_object_get(message, "projection") ) == 16)
+			{
+				send_projection = true;
 				json_array_foreach(js, index, value)
 					projection[index] = json_number_value( value );
-			if (json_array_size( js = json_object_get(message, "modelview") ) == 16)
+			}
+			if (rank!= master && json_array_size( js = json_object_get(message, "modelview") ) == 16)
 				json_array_foreach(js, index, value)
 					modelview[index] = json_number_value( value );
-			if (json_array_size( js = json_object_get(message, "rotation") ) == 16)
-				json_array_foreach(js, index, value)
-					rotation[index] = json_number_value( value );
 					
 			json_t* metadata = json_object_get( message, "metadata" );
 			if (metadata)
@@ -654,23 +785,17 @@ class IsaacVisualization
 		{
 			#ifdef ISAAC_ALPAKA
 				alpaka::mem::buf::Buf<THost, float, TFraDim, size_t> inverse_h_buf ( alpaka::mem::buf::alloc<float, size_t>(myself->host, size_t(16)));
-				alpaka::mem::buf::Buf<THost, float, TFraDim, size_t> modelview_h_buf ( alpaka::mem::buf::alloc<float, size_t>(myself->host, size_t(16)));
 				alpaka::mem::buf::Buf<THost, isaac_size_type, TFraDim, size_t> size_h_buf ( alpaka::mem::buf::alloc<isaac_size_type, size_t>(myself->host, size_t(1)));
 				float* inverse_h = reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(inverse_h_buf));
-				float* modelview_h = reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(modelview_h_buf));
 				isaac_size_type* size_h = reinterpret_cast<isaac_size_type*>(alpaka::mem::view::getPtrNative(size_h_buf));
 			#else
 				float inverse_h[16];
-				float modelview_h[16];
 				isaac_size_type size_h[1];
 			#endif
 			IceTDouble inverse[16];
 			myself->calcInverse(inverse,projection_matrix,modelview_matrix);
 			for (int i = 0; i < 16; i++)
-			{
 				inverse_h[i] = static_cast<float>(inverse[i]);
-				modelview_h[i] = static_cast<float>(modelview_matrix[i]);
-			}
 			ISAAC_CALL_FOR_XYZ_ITERATE( size_h[0].global_size, = myself->global_size[ 0, ]; )
 			ISAAC_CALL_FOR_XYZ_ITERATE( size_h[0].position, = myself->position[ 0, ]; )
 			ISAAC_CALL_FOR_XYZ_ITERATE( size_h[0].local_size, = myself->local_size[ 0, ]; )
@@ -678,11 +803,9 @@ class IsaacVisualization
 			
 			#ifdef ISAAC_ALPAKA
 				alpaka::mem::view::copy(myself->stream, myself->inverse_d, inverse_h_buf, size_t(16));
-				alpaka::mem::view::copy(myself->stream, myself->modelview_d, modelview_h_buf, size_t(16));
 				alpaka::mem::view::copy(myself->stream, myself->size_d, size_h_buf, size_t(1));
 			#else
 				ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_inverse_d, inverse_h, 16 * sizeof(float)));
-				ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_modelview_d, modelview_h, 16 * sizeof(float)));
 				ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_size_d, size_h, sizeof(isaac_size_type)));
 			#endif
 			uint32_t value = (255 << 24) | (myself->rank*255/myself->numProc << 16) | (255 - myself->rank*255/myself->numProc << 8) | 255;
@@ -718,7 +841,6 @@ class IsaacVisualization
 				auto const test (alpaka::exec::create<TAcc> (workdiv,
 					myself->fillRectKernel,
 					alpaka::mem::view::getPtrNative(myself->inverse_d),
-					alpaka::mem::view::getPtrNative(myself->modelview_d),
 					alpaka::mem::view::getPtrNative(myself->size_d),
 					alpaka::mem::view::getPtrNative(myself->framebuffer),
 					value,
@@ -842,19 +964,36 @@ class IsaacVisualization
 				else
 					MPI_Gather( message_buffer, MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, myself->master, MPI_COMM_WORLD);
 			}
-			if (myself->rank == myself->master && myself->thr_metaTargets != META_NONE)
+			if (myself->rank == myself->master)
 			{
 				json_object_set_new( myself->json_root, "type", json_string( "period" ) );
 				json_object_set_new( myself->json_root, "meta nr", json_integer( myself->metaNr ) );
+
+				json_t *matrix;
+				if ( myself->send_projection )
+				{
+					json_object_set_new( myself->json_root, "projection", matrix = json_array() );
+					ISAAC_JSON_ADD_MATRIX(matrix,myself->projection,16)
+				}
+				if ( myself->send_look_at )
+				{
+					json_object_set_new( myself->json_root, "position", matrix = json_array() );
+					ISAAC_JSON_ADD_MATRIX(matrix,myself->look_at,3)
+				}
+				if ( myself->send_rotation )
+				{
+					json_object_set_new( myself->json_root, "rotation", matrix = json_array() );
+					ISAAC_JSON_ADD_MATRIX(matrix, myself->rotation,9)
+				}
+				if ( myself->send_distance )
+					json_object_set_new( myself->json_root, "distance", json_real( myself->distance ) );
+					
 				char* buffer = json_dumps( myself->json_root, 0 );
 				myself->communicator->serverSend(buffer);
 				free(buffer);
 			}
 			json_decref( myself->json_root );
 			myself->recreateJSON();
-			//Calculating the whole modelview matrix
-			IceTDouble real_modelview[16];
-			myself->mulMatrixMatrix(real_modelview,myself->modelview,myself->rotation);
 
 			//Calc order
 			ISAAC_START_TIME_MEASUREMENT( sorting, myself->getTicksUs() )
@@ -867,7 +1006,7 @@ class IsaacVisualization
 				1.0
 			};
 			IceTDouble result[4];
-			myself->mulMatrixVector(result,real_modelview,point);
+			myself->mulMatrixVector(result,myself->modelview,point);
 			float point_distance = sqrt( result[0]*result[0] + result[1]*result[1] + result[2]*result[2] );
 			//Allgather of the distances
 			float receive_buffer[myself->numProc];
@@ -892,7 +1031,7 @@ class IsaacVisualization
 			//Drawing
 			IceTFloat background_color[4] = {0.0f,0.0f,0.0f,1.0f};
 			ISAAC_START_TIME_MEASUREMENT( merge, myself->getTicksUs() )
-			IceTImage image = icetDrawFrame(myself->projection,real_modelview,background_color);
+			IceTImage image = icetDrawFrame(myself->projection,myself->modelview,background_color);
 			ISAAC_STOP_TIME_MEASUREMENT( myself->merge_time, +=, merge, myself->getTicksUs() )
 			ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
 			if (myself->video_communicator)
@@ -1066,6 +1205,36 @@ class IsaacVisualization
 			json_meta_root = json_object();
 			json_object_set_new( json_root, "metadata", json_meta_root );
 		}
+		void updateModelview()
+		{
+			IceTDouble look_at_m[16];
+			ISAAC_SET_IDENTITY(4,look_at_m)
+			look_at_m[12] = look_at[0];
+			look_at_m[13] = look_at[1];
+			look_at_m[14] = look_at[2];
+			
+			IceTDouble rotation_m[16];
+			for (int x = 0; x < 4; x++)
+				for (int y = 0; y < 4; y++)
+				{
+					if (x < 3 && y < 3)
+						rotation_m[x+y*4] = rotation[x+y*3];
+					else
+					if (x!=3 || y!=3)
+						rotation_m[x+y*4] = 0.0;
+					else
+						rotation_m[x+y*4] = 1.0;
+				}
+
+			IceTDouble distance_m[16];
+			ISAAC_SET_IDENTITY(4,distance_m)
+			distance_m[14] = distance;
+			
+			IceTDouble temp[16];
+			
+			mulMatrixMatrix( temp, rotation_m, look_at_m );
+			mulMatrixMatrix( modelview, distance_m, temp );
+		}
 		class IsaacCommunicator
 		{
 			public:
@@ -1192,7 +1361,6 @@ class IsaacVisualization
 			alpaka::Vec<TSimDim, size_t> position;
 			alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t> framebuffer;
 			alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t> inverse_d;
-			alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t> modelview_d;
 			alpaka::mem::buf::Buf<TDevAcc, isaac_size_type, TFraDim, size_t> size_d;
 		#else
 			size_t framebuffer_size;
@@ -1202,8 +1370,14 @@ class IsaacVisualization
 			uint32_t* framebuffer;
 		#endif
 		IceTDouble projection[16];
+		IceTDouble look_at[3];
+		IceTDouble rotation[9];
+		IceTDouble distance;
+		bool send_look_at;
+		bool send_rotation;
+		bool send_distance;
+		bool send_projection;
 		IceTDouble modelview[16];
-		IceTDouble rotation[16];
 		IsaacCommunicator* communicator;
 		IsaacCommunicator* video_communicator;
 		json_t *json_root;

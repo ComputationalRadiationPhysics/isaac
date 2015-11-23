@@ -141,42 +141,48 @@ int main(int argc, char **argv)
 		IsaacVisualization<SimDim> visualization(name,MASTER_RANK,server,port,width,height,global_size,local_size,position);
 	#endif
 	
-	//Init Device memory:
+	//Init Device memory and adding source:
 	#ifdef ISAAC_ALPAKA
 		alpaka::mem::buf::Buf<DevHost, float3_t, SimDim, size_t> hostBuffer1   ( alpaka::mem::buf::alloc<float3_t, size_t>(devHost, local_size));
 		alpaka::mem::buf::Buf<DevAcc, float3_t, SimDim, size_t>  deviceBuffer1 ( alpaka::mem::buf::alloc<float3_t, size_t>(devAcc,  local_size));
 		alpaka::mem::buf::Buf<DevHost, float, SimDim, size_t> hostBuffer2   ( alpaka::mem::buf::alloc<float, size_t>(devHost, local_size));
 		alpaka::mem::buf::Buf<DevAcc, float, SimDim, size_t>  deviceBuffer2 ( alpaka::mem::buf::alloc<float, size_t>(devAcc,  local_size));
-		for (size_t i = 0; i < local_size.prod(); ++i)
-		{
-			alpaka::mem::view::getPtrNative(hostBuffer1)[i][0] = 1.0f;
-			alpaka::mem::view::getPtrNative(hostBuffer1)[i][1] = (float)(rank+1)/(float)numProc;
-			alpaka::mem::view::getPtrNative(hostBuffer1)[i][2] = 1.0f-(float)(rank+1)/(float)numProc;
-			alpaka::mem::view::getPtrNative(hostBuffer2)[i] = (float)(rank+1)/(float)numProc;
-		}
+		for (size_t x = 0; x < local_size[0]; x++)
+			for (size_t y = 0; y < local_size[1]; y++)
+				for (size_t z = 0; z < local_size[2]; z++)
+				{
+					size_t pos = x + y * local_size[0] + z * local_size[0] * local_size[1];
+					alpaka::mem::view::getPtrNative(hostBuffer1)[pos][0] = 1.0f;
+					alpaka::mem::view::getPtrNative(hostBuffer1)[pos][1] = (float)(rank+1)/(float)numProc;
+					alpaka::mem::view::getPtrNative(hostBuffer1)[pos][2] = 1.0f-(float)(rank+1)/(float)numProc;
+					alpaka::mem::view::getPtrNative(hostBuffer2)[pos] = (float)(rank+1)/(float)numProc;
+				}
 		alpaka::mem::view::copy(stream, deviceBuffer1, hostBuffer1, local_size);
 		alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, local_size);
 		
 		visualization.registerSource("source1",reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(deviceBuffer1)),3);
-		visualization.registerSource("source1",reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(deviceBuffer2)),1);
+		visualization.registerSource("source2",reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(deviceBuffer2)),1);
 	#else
 		size_t prod = local_size[0]*local_size[1]*local_size[2];
 		float3_t* hostBuffer1 = (float3_t*)malloc(sizeof(float3_t)*prod);
 		float3_t* deviceBuffer1; cudaMalloc((float3_t**)&deviceBuffer1, sizeof(float3_t)*prod);
 		float* hostBuffer2 = (float*)malloc(sizeof(float)*prod);
 		float* deviceBuffer2; cudaMalloc((float**)&deviceBuffer2, sizeof(float)*prod);
-		for (size_t i = 0; i < prod; ++i)
-		{
-			hostBuffer1[i][0] = 1.0f;
-			hostBuffer1[i][1] = (float)(rank+1)/(float)numProc;
-			hostBuffer1[i][2] = 1.0f-(float)(rank+1)/(float)numProc;
-			hostBuffer2[i] = (float)(rank+1)/(float)numProc;
-		}
+		for (size_t x = 0; x < local_size[0]; x++)
+			for (size_t y = 0; y < local_size[1]; y++)
+				for (size_t z = 0; z < local_size[2]; z++)
+				{
+					size_t pos = x + y * local_size[0] + z * local_size[0] * local_size[1];
+					hostBuffer1[pos][0] = 1.0f;
+					hostBuffer1[pos][1] = (float)(rank+1)/(float)numProc;
+					hostBuffer1[pos][2] = 1.0f-(float)(rank+1)/(float)numProc;
+					hostBuffer2[pos] = (float)(rank+1)/(float)numProc;
+				}
 		cudaMemcpy(deviceBuffer1, hostBuffer1, sizeof(float3_t)*prod, cudaMemcpyHostToDevice);
 		cudaMemcpy(deviceBuffer2, hostBuffer2, sizeof(float)*prod, cudaMemcpyHostToDevice);
 		
 		visualization.registerSource("source1",(float*)deviceBuffer1,3);
-		visualization.registerSource("source1",deviceBuffer2,1);
+		visualization.registerSource("source2",deviceBuffer2,1);
 	#endif
 	//Setting up the metadata description (only master, but however slaves could then metadata metadata, too, it would be merged)
 	if (rank == MASTER_RANK)

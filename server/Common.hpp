@@ -29,7 +29,6 @@ typedef enum
 {
 	FORCE_EXIT = -1,
 	FEEDBACK = 0,
-	FEEDBACK_NEIGHBOUR,
 	MASTER_HELLO,
 	REGISTER,
 	REGISTER_VIDEO,
@@ -39,6 +38,7 @@ typedef enum
 	OBSERVE,
 	STOP,
 	CLOSED,
+	UPDATE,
 	NONE,
 	UNKNOWN,
 } MessageType;
@@ -57,9 +57,6 @@ class MessageContainer
 				const char* str = json_string_value(json_type);
 				if (strcmp(str,"feedback") == 0)
 					this->type = FEEDBACK;
-				else
-				if (strcmp(str,"feedback neighbour") == 0)
-					this->type = FEEDBACK_NEIGHBOUR;
 				else
 				if (strcmp(str,"hello") == 0)
 					this->type = MASTER_HELLO;
@@ -87,6 +84,9 @@ class MessageContainer
 				else
 				if (strcmp(str,"closed") == 0)
 					this->type = CLOSED;
+				else
+				if (strcmp(str,"update") == 0)
+					this->type = UPDATE;
 				else
 					this->type = UNKNOWN;
 			}

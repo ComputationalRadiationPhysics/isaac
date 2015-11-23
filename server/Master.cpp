@@ -114,26 +114,6 @@ std::string Master::getStream(std::string connector,std::string name,std::string
 	return result;
 }
 
-#define ISAAC_WAIT_VIDEO_AND_SEND_ALL(group,json) \
-{ \
-	uint8_t* video_buffer = (uint8_t*)malloc(group->video_buffer_size); \
-	receiveVideo(group,video_buffer); \
-	ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront(); \
-	while (dc) \
-	{ \
-		if (dc->t->doesObserve(group->getID())) \
-			dc->t->masterSendMessage(new MessageContainer(message->type,json,true)); \
-		dc = dc->next; \
-	} \
-	int l = imageConnectorList.size(); \
-	ImageBufferContainer* container = new ImageBufferContainer(UPDATE_BUFFER,video_buffer,group,l); \
-	if (l == 0) \
-		container->suicide(); \
-	else \
-		for (std::list<ImageConnectorContainer>::iterator ic = imageConnectorList.begin(); ic != imageConnectorList.end(); ic++) \
-			(*ic).connector->masterSendMessage(container); \
-}
-
 errorCode Master::run()
 {
 	printf("Running ISAAC Master\n");
@@ -181,7 +161,36 @@ errorCode Master::run()
 						insitu->t->connector->clientSendMessage( message );
 					}
 					else
-						ISAAC_WAIT_VIDEO_AND_SEND_ALL(insitu->t->group,message->json_root)
+					{
+						//Let's see, whether rotation, projection or modelview are broadcastet and change them in the initData
+						json_t* js;
+						if (json_array_size( js = json_object_get(message->json_root, "projection") ) == 16)
+							json_object_set( insitu->t->group->initData, "projection", js );
+						if (json_array_size( js = json_object_get(message->json_root, "rotation") ) == 9)
+							json_object_set( insitu->t->group->initData, "rotation", js );
+						if (json_array_size( js = json_object_get(message->json_root, "position") ) == 3)
+							json_object_set( insitu->t->group->initData, "position", js );
+						if ( js = json_object_get(message->json_root, "distance") )
+							json_object_set( insitu->t->group->initData, "distance", js );
+						//Allocate and send video
+						uint8_t*video_buffer=(uint8_t*)malloc(insitu->t->group->video_buffer_size);
+						receiveVideo(insitu->t->group,video_buffer);
+						//Send json data
+						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc=dataClientList.getFront();
+						while(dc)
+						{
+							if(dc->t->doesObserve(insitu->t->group->getID()))
+								dc->t->masterSendMessage(new MessageContainer(message->type,message->json_root,true));
+							dc=dc->next;
+						}
+						int l=imageConnectorList.size();
+						ImageBufferContainer *container=new ImageBufferContainer(UPDATE_BUFFER,video_buffer,insitu->t->group,l);
+						if(l==0)
+							container->suicide();
+						else
+							for(std::list<ImageConnectorContainer>::iterator ic=imageConnectorList.begin();ic!=imageConnectorList.end();ic++)
+								(*ic).connector->masterSendMessage(container);
+					}
 				}
 				else
 				if (message->type == REGISTER || message->type == REGISTER_VIDEO) //Saving the metadata description for later
@@ -297,13 +306,13 @@ errorCode Master::run()
 			//Check for new messages for every client
 			while (MessageContainer* message = dc->t->masterGetMessage())
 			{
-				if (message->type == FEEDBACK || message->type == FEEDBACK_NEIGHBOUR)
+				if (message->type == FEEDBACK)
 				{
 					json_t* observe_id = json_object_get(message->json_root, "observe id");
 					if (observe_id)
 					{
 						int id = json_integer_value( observe_id );
-						//Send feedback to observing insitu and (if necessary) neighbours
+						//Send feedback to observing insitu
 						ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr group = insituConnectorGroupList.getFront();
 						while (group)
 						{
@@ -311,25 +320,6 @@ errorCode Master::run()
 							if ( group->t->master->connector->getID() == id)
 							{
 								send(group->t->master->connector->getSockFD(),buffer,strlen(buffer),0);
-								//Forwarding to other neighbours of necessary
-								if (message->type == FEEDBACK_NEIGHBOUR)
-								{
-									//Let's see, whether rotation, projection or modelview are broadcastet and change them in the initData
-									json_t* js;
-									if (json_array_size( js = json_object_get(message->json_root, "projection") ) == 16)
-										json_object_set( group->t->initData, "projection", js );
-									if (json_array_size( js = json_object_get(message->json_root, "modelview") ) == 16)
-										json_object_set( group->t->initData, "modelview", js );
-									if (json_array_size( js = json_object_get(message->json_root, "rotation") ) == 16)
-										json_object_set( group->t->initData, "rotation", js );
-									ThreadList<MetaDataClient*>::ThreadListContainer_ptr neighbour = dataClientList.getFront();
-									while (neighbour)
-									{
-										if (neighbour != dc)
-											neighbour->t->masterSendMessage(new MessageContainer(message->type,message->json_root,true));
-										neighbour = neighbour->next;
-									}
-								}
 								break;
 							}
 							free(buffer);
@@ -355,8 +345,21 @@ errorCode Master::run()
 						it = it->next;
 					}
 					if (group)
+					{
+						json_t *js, *root = json_object();
+						if (json_array_size( js = json_object_get( group->initData, "projection") ) == 16)
+							json_object_set( root, "projection", js );
+						if (json_array_size( js = json_object_get( group->initData, "rotation") ) == 9)
+							json_object_set( root, "rotation", js );
+						if (json_array_size( js = json_object_get( group->initData, "position") ) == 3)
+							json_object_set( root, "position", js );
+						if ( js = json_object_get( group->initData, "distance") )
+							json_object_set( root, "distance", js );
+						json_object_set_new( root, "type", json_string( "update" ) );
+						dc->t->masterSendMessage(new MessageContainer(UPDATE,root));
 						for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED,NULL,group,1,url,ref));
+					}
 				}
 				if (message->type == STOP)
 				{
