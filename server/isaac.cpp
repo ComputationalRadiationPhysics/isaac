@@ -22,44 +22,81 @@
 
 #define ISAAC_VERSION "1.0"
 
+#define ISAAC_INCREASE_NR_OR_DIE \
+	nr++; \
+	if (nr >= argc) \
+	{ \
+		printf("Not enough arguments!\n"); \
+		return 1; \
+	}
+
 int main(int argc, char **argv)
 {
 	int outer_port = 2459;
 	int inner_port = 2460;
+	bool jpeg = false;
 	const char __name[] = "ISAAC Visualization server";
 	const char __url[] = "127.0.0.1";
 	const char* name = __name;
 	const char* url = __url;
-	if (argc > 1)
+	int nr = 1;
+	while (nr < argc)
 	{
-		if (strcmp(argv[1],"--help") == 0)
+		if (strcmp(argv[nr],"--help") == 0)
 		{
 			printf("ISAAC - In Situ Animation of Accelerated Computations " ISAAC_VERSION"\n");
 			printf("Usage:\n");
-			printf("\tisaac --help\n");
-			printf("\t\tShows this help\n");
-			printf("\tisaac [outer_port] [inner_port] [url] [name]\n");
-			printf("\t\t                    outer_port default: 2459\n");
-			printf("\t\t                    inner_port default: 2460\n");
-			printf("\t\turl to connect to from outside default: 127.0.0.1\n");
-			printf("\t\t                          name default: ISAAC Visualization server\n");
-			printf("\tisaac --version\n");
-			printf("\t\tShows the version\n");
+			printf("isaac [--help] [--outer_port <X>] [--inner_port <X>] [--url <X>] [--name <X>]\n");
+			printf("      [--jpeg] [--version]\n");
+			printf("       --help: Shows this help\n");
+			printf(" --outer_port: Set port for the clients to connect. Default 2459\n");
+			printf(" --inner_port: Set port for the simulations to connect to. Default 2460\n");
+			printf("        --url: Set the url to connect to from outside. Default 127.0.0.1\n");
+			printf("       --name: Set the name of the server.\n");
+			printf("       --jpeg: Use JPEG stream instead of H264. Needs very big bandwidth!\n");
+			printf("    --version: Shows the version\n");
 			return 0;
 		}
-		if (strcmp(argv[1],"--version") == 0)
+		else
+		if (strcmp(argv[nr],"--version") == 0)
 		{
 			printf("Isaac version " ISAAC_VERSION "\n");
 			return 0;
 		}
-		outer_port = atoi(argv[1]);
+		else
+		if (strcmp(argv[nr],"--jpeg") == 0)
+			jpeg = true;
+		else
+		if (strcmp(argv[nr],"--outer_port") == 0)
+		{
+			ISAAC_INCREASE_NR_OR_DIE
+			outer_port = atoi(argv[nr]);
+		}
+		else
+		if (strcmp(argv[nr],"--inner_port") == 0)
+		{
+			ISAAC_INCREASE_NR_OR_DIE
+			inner_port = atoi(argv[nr]);
+		}
+		else
+		if (strcmp(argv[nr],"--url") == 0)
+		{
+			ISAAC_INCREASE_NR_OR_DIE
+			url = argv[nr];
+		}
+		else
+		if (strcmp(argv[nr],"--name") == 0)
+		{
+			ISAAC_INCREASE_NR_OR_DIE
+			name = argv[nr];
+		}
+		else
+		{
+			printf("Don't know argument %s\n",argv[nr]);
+			return 1;
+		}
+		nr++;
 	}
-	if (argc > 2)
-		inner_port = atoi(argv[2]);
-	if (argc > 3)
-		url = argv[3];
-	if (argc > 4)
-		name = argv[4];
 	
 	printf("Using outer_port=%i and inner_port=%i\n",outer_port,inner_port);
 	
@@ -77,7 +114,7 @@ int main(int argc, char **argv)
 		else
 			master.addImageConnector(sDLImageConnector);
 	#endif
-	RTPImageConnector* rTPImageConnector = new RTPImageConnector(url,false);
+	RTPImageConnector* rTPImageConnector = new RTPImageConnector(url,false,jpeg);
 	if (rTPImageConnector->init(5000,5100))
 		delete rTPImageConnector;
 	else

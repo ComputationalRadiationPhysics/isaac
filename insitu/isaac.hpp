@@ -144,9 +144,10 @@ struct isaac_size_type
 #define Z_NEAR 1.0f
 #define Z_FAR 100.0f
 
-__constant__ float isaac_inverse_d[16];
-__constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda and alpaka
-
+#ifndef ISAAC_ALPAKA
+	__constant__ float isaac_inverse_d[16];
+	__constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda and alpaka
+#endif
 
 #ifdef ISAAC_ALPAKA
 	struct IsaacFillRectKernel
@@ -208,7 +209,7 @@ __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda a
 			//scale to globale grid size
 			ISAAC_CALL_FOR_XYZ( start , *=max_size; )
 			ISAAC_CALL_FOR_XYZ( end , *=max_size; )
-			
+
 			//move to local grid
 			ISAAC_CALL_FOR_XYZ_TRIPLE( start, += isaac_size_d[0].global_size, / 2.0f - isaac_size_d[0].position, ; )
 			ISAAC_CALL_FOR_XYZ_TRIPLE(   end, += isaac_size_d[0].global_size, / 2.0f - isaac_size_d[0].position, ; )
@@ -243,10 +244,10 @@ __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda a
 			}
 			
 			//Starting the main loop
-			int32_t first = ceil( count_start.x );
-			int32_t last = floor( count_end.x );
+			int32_t first = floor( count_start.x );
+			int32_t last = ceil( count_end.x );
+
 			int32_t count = last - first + 1;
-			float count_reciprocal = 1.0f/(float)count/2.0f;
 			isaac_float4 color = background_color;
 			isaac_float3 pos = start;
 			isaac_uint3 local_size_uint =
@@ -257,21 +258,29 @@ __constant__ isaac_size_type isaac_size_d[1]; //[1] to access it same for cuda a
 			};
 			ISAAC_CALL_FOR_XYZ_TWICE( pos, += step_vec, * float(first); )
 			
+			uint32_t visited = 0;
 			for (int32_t i = 0; i < count; i++)
 			{
 				isaac_uint3 coord;
-				ISAAC_CALL_FOR_XYZ_TWICE( coord, = (uint32_t)pos, ; )				
-				if ( ISAAC_CALL_FOR_XYZ( coord, >= 64 || ) 0 )
-					break;
-
-				int32_t source_pos = (
-					coord.x +
-					coord.y * local_size_uint.x +
-					coord.z * local_size_uint.x * local_size_uint.y ) * 3;
-				ISAAC_CALL_FOR_XYZ_ITERATE( color, += source[source_pos + 0, ] * count_reciprocal; )					
+				ISAAC_CALL_FOR_XYZ_TWICE( coord, = (uint32_t)pos, ; )
+				if ( ISAAC_CALL_FOR_XYZ_TWICE( coord, < isaac_size_d[0].local_size, && ) 1 )
+				{
+					int32_t source_pos = (
+						coord.x +
+						coord.y * local_size_uint.x +
+						coord.z * local_size_uint.x * local_size_uint.y ) * 3;
+					ISAAC_CALL_FOR_XYZ_ITERATE( color, += source[source_pos + 0, ] / 2.0f; )
+					visited++;
+				}
 				ISAAC_CALL_FOR_XYZ_TWICE( pos, += step_vec, ; )
 			}
-			color.w = 0.5f;
+			if (visited)
+			{
+				ISAAC_CALL_FOR_XYZ( color, /= float(visited); )
+				color.w = 0.5f;
+			}
+			else
+				color.w = 0.0f;
 			ISAAC_SET_COLOR( pixels[x + y * framebuffer_width], color )
 
 		}
@@ -452,12 +461,12 @@ class IsaacVisualization
 			//icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_RADIXK );
 			//icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_TREE );
 			
-			IceTBoolean supports;
+			/*IceTBoolean supports;
 			icetGetBooleanv( ICET_STRATEGY_SUPPORTS_ORDERING, &supports );
 			if (supports)
 				printf("yes\n");
 			else
-				printf("no\n");
+				printf("no\n");*/
 			
 			icetSetColorFormat(ICET_IMAGE_COLOR_RGBA_UBYTE);
 			icetSetDepthFormat(ICET_IMAGE_DEPTH_NONE);

@@ -12,7 +12,13 @@
 <li>Right click + Mouse movement: Change position</li>
 <li>Mousewheel: zoom</li>
 </ul>
-<form>Server URL:<input type="text" id="url" value="127.0.0.1"> Port:<input type="text" id="port" value="2459"><input type="button" value="Connect" id="connect"> Show video and control in one window <input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()"></form>
+<form>
+	Server URL:<input type="text" id="url" value="127.0.0.1">
+	Port:<input type="text" id="port" value="2459">
+	<input type="button" value="Connect" id="connect">
+	Show video and control in one window<input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()">
+	Show stream url instead of video<input type="checkbox" id="no_stream_checkbox" onchange="no_stream_checkbox_click()">
+</form>
 <div id="status">Status: Not connected</div>
 </p>
 <table><tr>
@@ -21,6 +27,7 @@
 	<div id="video_container_div" style="position: relative;">
 		<div id="video_div" style="position: relative; top: 0; left: 0;">
 			<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls="false" windowless="true"/>
+			<div contentEditable="true" id="url_div" style="display:none;"></div>
 			<form><input type="button" value="Send example metadada" id="metadata"><input type="button" value="Stop observing" id="stop"><input type="button" value="Stop simulation" id="exit"></form>
 		</div>
 		<div id="preview_div" style="position: absolute; top: 0; left: 0; opacity: 0.5;">
@@ -59,6 +66,7 @@ var observe_id = -1;
 var particles = null;
 var plugins = new Array();
 var one_window = true;
+var no_stream = false;
 
 var projection = [
 	1, 0, 0, 0,
@@ -226,7 +234,7 @@ function redraw()
 	
 	ctx.clearRect(0, 0, preview.clientWidth, preview.clientHeight);
 	ctx.fillStyle = "#000000";
-	if (one_window)
+	if (one_window && !no_stream)
 		ctx.strokeStyle = '#ffffff';
 	else
 		ctx.strokeStyle = '#000000';
@@ -241,8 +249,12 @@ function redraw()
 	ctx.stroke();
 }
 
+var last_feedback_send = 0;
+
 function sendFeedback(name,feedback)
 {
+	var d = new Date();
+		last_feedback_send = d.getTime();
 	var obj =
 	{
 		"type" : "feedback",
@@ -255,7 +267,7 @@ function sendFeedback(name,feedback)
 function mouseWheelHandler(e)
 {
 	document.body.style.overflowY = "hidden";
-	var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
+	var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail))) * 0.1;
 	distance += delta;
 	redraw();
 	ctx.fillText("Delta: " + delta,1,10);
@@ -455,7 +467,8 @@ document.getElementById("connect").onclick = function()
 						preview.height = obj["framebuffer height"];
 						video.width = obj["framebuffer width"];
 						video.height = obj["framebuffer height"];
-						video.playlist.items.clear();
+						if (!no_stream)
+							video.playlist.items.clear();
 						observeSimulation(obj["id"]);
 						redraw();
 					};
@@ -464,9 +477,13 @@ document.getElementById("connect").onclick = function()
 				if (obj["type"] == "register video")
 				{
 					var url = "http://" + document.getElementById("url").value + ":" + document.getElementById("port").value + "/" + obj["connector"] + "/" + obj["name"] + "/" + obj["reference"];
-					video.playlist.add( url );
-					//document.getElementById("debug").textContent =  url;
-					video.playlist.play();
+					if (no_stream)
+						document.getElementById("url_div").textContent =  url;
+					else
+					{
+						video.playlist.add( url, "Visualization", ["--network-caching 1", "--live-caching 1", "--disk-caching 1", "--file-caching 1"] );
+						video.playlist.play();
+					}
 				}
 				if (obj["type"] == "period" || obj["type"] == "update")
 				{
@@ -474,16 +491,21 @@ document.getElementById("connect").onclick = function()
 					{
 						if (obj["metadata"].hasOwnProperty("reference particles"))
 							particles = obj["metadata"]["reference particles"];
-						document.getElementById("debug").innerHTML = JSON.stringify(obj["metadata"]).replace(/{/g,"<br/>{").replace(/}/g,"}<br/>");
+						//document.getElementById("debug").innerHTML = JSON.stringify(obj["metadata"]).replace(/{/g,"<br/>{").replace(/}/g,"}<br/>");
 					}
-					if (obj.hasOwnProperty("projection"))
-						projection = obj["projection"];
-					if (obj.hasOwnProperty("position"))
-						position = obj["position"];
-					if (obj.hasOwnProperty("rotation"))
-						rotation = obj["rotation"];
-					if (obj.hasOwnProperty("distance"))
-						distance = obj["distance"];
+					var d = new Date();
+					var	now = d.getTime();
+					if (now - last_feedback_send > 100)
+					{
+						if (obj.hasOwnProperty("projection"))
+							projection = obj["projection"];
+						if (obj.hasOwnProperty("position"))
+							position = obj["position"];
+						if (obj.hasOwnProperty("rotation"))
+							rotation = obj["rotation"];
+						if (obj.hasOwnProperty("distance"))
+							distance = obj["distance"];
+					}
 					redraw();
 				}
 				if (obj["type"] == "exit")
@@ -563,7 +585,7 @@ document.getElementById("exit").onclick = function()
 
 function one_window_checkbox_click()
 {
-	one_window = !one_window;
+	one_window = document.getElementById("one_window_checkbox").checked;
 	if (one_window)
 	{
 		var node = document.getElementById("preview_div");
@@ -575,6 +597,26 @@ function one_window_checkbox_click()
 		var node = document.getElementById("preview_div");
 		document.getElementById("preview_container_div").appendChild(node);
 		redraw();
+	}
+};
+
+function no_stream_checkbox_click()
+{
+	no_stream = document.getElementById("no_stream_checkbox").checked;
+	if (no_stream)
+	{
+		document.getElementById("video").style.display = 'none';
+		document.getElementById("url_div").style.display = 'inline';
+		document.getElementById("preview_div").style.position = 'static';
+	}
+	else
+	{
+		document.getElementById("video").style.display = 'inline';
+		document.getElementById("url_div").style.display = 'none';
+		document.getElementById("preview_div").style.position = 'absolute';
+		document.getElementById("preview_div").style.top = '0';
+		document.getElementById("preview_div").style.left = '0';
+		document.getElementById("preview_div").style.opacity = '0.5';
 	}
 };
 

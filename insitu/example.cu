@@ -91,10 +91,10 @@ int main(int argc, char **argv)
 	typedef float float3_t[3];
 	//int width = 1920;
 	//int height = 1080;
-	//int width = 1792;
-	//int height = 1024;
-	int width = 800;
-	int height = 600;
+	int width = 1024;
+	int height = 768;
+	//int width = 800;
+	//int height = 600;
 	
 	#ifdef ISAAC_ALPAKA
 		//Now we initialize the Isaac Insitu Plugin with the name, the number of the master, the server, it's IP, the count of framebuffer to be created and the size per framebuffer

@@ -25,21 +25,22 @@
 class RTPImageConnector : public ImageConnector
 {
 	public:
-		RTPImageConnector(std::string url,bool zerolatency);
+		RTPImageConnector(std::string url,bool zerolatency = false,bool raw = false);
 		~RTPImageConnector();
 		errorCode init(int minport, int maxport);
 		errorCode run();
 		std::string getName();
 	private:
-		uint64_t getTicksMs();
 		typedef struct
 		{
 			bool is_used;
-			uint64_t last;
 			GstElement *appsrc;
 			GstElement *videoconvert;
 			GstElement *x264enc;
 			GstElement *rtph264pay;
+			GstElement *capsfilter;
+			GstElement *jpegenc;
+			GstElement *rtpjpegpay;
 			GstElement *udpsink;
 			GstElement *pipeline;
 			GstElement *bin;
@@ -52,4 +53,5 @@ class RTPImageConnector : public ImageConnector
 		std::vector<tStream> streams;
 		std::string url;
 		bool zerolatency;
+		bool raw;
 };
