@@ -15,7 +15,7 @@
 
 //#define SEND_PARTICLES
 
-#include "isaac.hpp"
+#include <isaac.hpp>
 #include <IceT.h>
 //Against annoying C++11 warning in mpi.h
 #pragma GCC diagnostic push
@@ -30,6 +30,98 @@
 #ifdef SEND_PARTICLES
 	#define PARTICLES_PER_NODE 8
 #endif
+
+using namespace isaac;
+
+#ifdef ISAAC_ALPAKA
+template < typename TDevAcc >
+#endif
+class TestSource1 : public IsaacBaseSource <
+#ifdef ISAAC_ALPAKA
+    TDevAcc,
+#endif
+    boost::mpl::int_<3>
+>
+{
+	public:
+        TestSource1 (
+            #ifdef ISAAC_ALPAKA
+                TDevAcc acc,
+            #endif
+            std::string name,
+            size_t transfer_func_size,
+            isaac_float3* ptr,
+            size_t width,
+            size_t height
+        ) :
+        IsaacBaseSource(
+        #ifdef ISAAC_ALPAKA
+			acc,
+		#endif
+			name,
+			transfer_func_size
+		),
+		ptr(ptr),
+		width(width),
+		width_mul_height(width * height) {}
+		
+		isaac_float3* ptr;
+		isaac_uint width;
+		isaac_uint width_mul_height;
+		ISAAC_HOST_DEVICE inline isaac_float3& operator[] (const isaac_uint3 nIndex)
+		{
+			return ptr[
+				nIndex.x +
+				nIndex.y * width +
+				nIndex.z * width_mul_height
+			];
+		}
+};
+
+#ifdef ISAAC_ALPAKA
+template < typename TDevAcc >
+#endif
+class TestSource2 : public IsaacBaseSource <
+#ifdef ISAAC_ALPAKA
+    TDevAcc,
+#endif
+    boost::mpl::int_<1>
+>
+{
+	public:
+        TestSource2 (
+            #ifdef ISAAC_ALPAKA
+                TDevAcc acc,
+            #endif
+            std::string name,
+            size_t transfer_func_size,
+            isaac_float* ptr,
+            size_t width,
+            size_t height
+        ) :
+        IsaacBaseSource(
+        #ifdef ISAAC_ALPAKA
+			acc,
+		#endif
+			name,
+			transfer_func_size
+		),
+		ptr(ptr),
+		width(width),
+		width_mul_height(width * height) {}
+		
+		isaac_float* ptr;
+		isaac_uint width;
+		isaac_uint width_mul_height;
+		ISAAC_HOST_DEVICE inline isaac_float& operator[] (const isaac_uint3 nIndex)
+		{
+			return ptr[
+				nIndex.x +
+				nIndex.y * width +
+				nIndex.z * width_mul_height
+			];
+		}
+};
 
 void recursive_kgv(size_t* d,int number,int test);
 
@@ -89,12 +181,11 @@ int main(int argc, char **argv)
 	printf("Using name %s\n",name);
 	
 	typedef float float3_t[3];
-	//int width = 1920;
-	//int height = 1080;
-	int width = 1024;
-	int height = 768;
-	//int width = 800;
-	//int height = 600;
+	isaac_size2 framebuffer_size =
+	{
+		size_t(1024),
+		size_t(768)
+	};
 	
 	#ifdef ISAAC_ALPAKA
 		//Now we initialize the Isaac Insitu Plugin with the name, the number of the master, the server, it's IP, the count of framebuffer to be created and the size per framebuffer
@@ -106,24 +197,17 @@ int main(int argc, char **argv)
 		using Stream  = alpaka::stream::StreamCpuSync;
 		//using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
 		//using Stream  = alpaka::stream::StreamCpuSync;
-		
-		/*if ( boost::mpl::not_<boost::is_same<Acc, alpaka::acc::AccGpuCudaRt<AccDim, size_t> > >::value )
-		{
-			width /= 2;
-			height /= 2;
-		}*/
-		
+				
 		using DevAcc = alpaka::dev::Dev<Acc>;
 		using DevHost = alpaka::dev::DevCpu;
 		
 		DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(0));
 		DevHost devHost (alpaka::dev::cpu::getDev());
 		Stream  stream  (devAcc);
-		
+
 		const alpaka::Vec<SimDim, size_t> global_size(d[0]*64,d[1]*64,d[2]*64);
 		const alpaka::Vec<SimDim, size_t> local_size(size_t(64),size_t(64),size_t(64));
 		const alpaka::Vec<SimDim, size_t> position(p[0]*64,p[1]*64,p[2]*64);
-		IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim> visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,width,height,global_size,local_size,position);
 	#else
 		typedef boost::mpl::int_<3> SimDim;
 		std::vector<size_t> global_size;
@@ -138,10 +222,9 @@ int main(int argc, char **argv)
 			position.push_back(p[0]*64);
 			position.push_back(p[1]*64);
 			position.push_back(p[2]*64);
-		IsaacVisualization<SimDim> visualization(name,MASTER_RANK,server,port,width,height,global_size,local_size,position);
 	#endif
-	
-	//Init Device memory and adding source:
+
+	//Init Device memory
 	#ifdef ISAAC_ALPAKA
 		alpaka::mem::buf::Buf<DevHost, float3_t, SimDim, size_t> hostBuffer1   ( alpaka::mem::buf::alloc<float3_t, size_t>(devHost, local_size));
 		alpaka::mem::buf::Buf<DevAcc, float3_t, SimDim, size_t>  deviceBuffer1 ( alpaka::mem::buf::alloc<float3_t, size_t>(devAcc,  local_size));
@@ -159,9 +242,6 @@ int main(int argc, char **argv)
 				}
 		alpaka::mem::view::copy(stream, deviceBuffer1, hostBuffer1, local_size);
 		alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, local_size);
-		
-		visualization.registerSource("source1",reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(deviceBuffer1)),3);
-		visualization.registerSource("source2",reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(deviceBuffer2)),1);
 	#else
 		size_t prod = local_size[0]*local_size[1]*local_size[2];
 		float3_t* hostBuffer1 = (float3_t*)malloc(sizeof(float3_t)*prod);
@@ -180,10 +260,27 @@ int main(int argc, char **argv)
 				}
 		cudaMemcpy(deviceBuffer1, hostBuffer1, sizeof(float3_t)*prod, cudaMemcpyHostToDevice);
 		cudaMemcpy(deviceBuffer2, hostBuffer2, sizeof(float)*prod, cudaMemcpyHostToDevice);
-		
-		visualization.registerSource("source1",(float*)deviceBuffer1,3);
-		visualization.registerSource("source2",deviceBuffer2,1);
 	#endif
+	
+	#ifdef ISAAC_ALPAKA
+		TestSource1 < DevAcc > testSource1 ( devAcc, "Test Source 1", 1024 );
+		TestSource2 < DevAcc > testSource2 ( devAcc, "Test Source 2", 1024 );
+	#else
+		TestSource1 testSource1 ( std::string( "Test Source 1" ), 1024, reinterpret_cast<isaac_float3*>(deviceBuffer1), local_size[0], local_size[1] );
+		TestSource2 testSource2 ( std::string( "Test Source 2" ), 1024, reinterpret_cast<isaac_float*>(deviceBuffer2), local_size[0], local_size[1] );
+	#endif
+	using SourceList = boost::fusion::list
+	<
+		TestSource1,
+		TestSource2
+	>;
+	SourceList sources( testSource1, testSource2 );
+	#ifdef ISAAC_ALPAKA
+		IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim,SourceList> visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
+	#else
+		IsaacVisualization<SimDim,SourceList> visualization(name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
+	#endif
+	
 	//Setting up the metadata description (only master, but however slaves could then metadata metadata, too, it would be merged)
 	if (rank == MASTER_RANK)
 	{
@@ -300,7 +397,7 @@ int main(int argc, char **argv)
 		cudaFree(deviceBuffer2);
 	#endif
 	
-	MPI_Finalize();
+	MPI_Finalize();	
 	return 0;
 }
 

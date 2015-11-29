@@ -96,11 +96,13 @@ if (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
 		add_definitions(-DISAAC_THREADING)
 	endif ()
 	
+	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${CMAKE_SOURCE_DIR}/insitu)
+	
 	if (BUILD_EXAMPLE_CUDA)
 		find_package( CUDA REQUIRED)
 		set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" -std=c++11)
 		include_directories(example_cuda ${EXAMPLE_INCLUDE} ${CUDA_INCLUDE_DIRS})
-		CUDA_ADD_EXECUTABLE(example_cuda ${CMAKE_SOURCE_DIR}/insitu/isaac.hpp ${CMAKE_SOURCE_DIR}/insitu/example.cu)
+		CUDA_ADD_EXECUTABLE(example_cuda ${CMAKE_SOURCE_DIR}/insitu/example.cu)
 		target_link_libraries(example_cuda ${EXAMPLE_LIBS} ${CUDA_LIBRARIES})
 	endif()
 	
