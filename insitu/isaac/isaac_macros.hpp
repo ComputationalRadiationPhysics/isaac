@@ -43,6 +43,9 @@
     start.x middle.x end \
     start.y middle.y end
 
+#define ISAAC_FOR_EACH_DIM_TWICE_1(start,middle,end) \
+    start.x middle.x end
+
 #define ISAAC_FOR_EACH_DIM_TWICE(dim,start,middle,end) \
     BOOST_PP_CAT( ISAAC_FOR_EACH_DIM_TWICE_, dim) (start,middle,end)
 
@@ -57,10 +60,10 @@
 #define ISAAC_SET_COLOR( dest, color ) \
     { \
         isaac_uint4 result; \
-        result.x = min(1.0f,color.x) * 255.0f; \
-        result.y = min(1.0f,color.y) * 255.0f; \
-        result.z = min(1.0f,color.z) * 255.0f; \
-        result.w = min(1.0f,color.w) * 255.0f; \
+        result.x = isaac_uint( min( isaac_float(1), color.x ) * 255.0f ); \
+        result.y = isaac_uint( min( isaac_float(1), color.y ) * 255.0f ); \
+        result.z = isaac_uint( min( isaac_float(1) ,color.z ) * 255.0f ); \
+        result.w = isaac_uint( min( isaac_float(1) ,color.w ) * 255.0f ); \
         dest = (result.w << 24) | (result.z << 16) | (result.y << 8) | (result.x << 0); \
     }
 

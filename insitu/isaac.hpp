@@ -14,6 +14,9 @@
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 #pragma once
+
+#include <boost/config/select_compiler_config.hpp>
+
 #include <string>
 #include <string.h>
 #include <jansson.h>
@@ -29,7 +32,7 @@
 #include <assert.h>
 #include <map>
 
-#ifdef ISAAC_ALPAKA
+#if ISAAC_ALPAKA == 1
     #include <alpaka/alpaka.hpp>
     #include <boost/type_traits.hpp>
     #include <boost/mpl/not.hpp>
@@ -41,12 +44,11 @@
 #include <isaac/isaac_communicator.hpp>
 #include <isaac/isaac_helper.hpp>
 
-
 namespace isaac
 {
 
 template <
-#ifdef ISAAC_ALPAKA
+#if ISAAC_ALPAKA == 1
     typename THost,
     typename TAcc,
     typename TStream,
@@ -58,30 +60,33 @@ template <
 class IsaacVisualization 
 {
     public:
-        #ifdef ISAAC_ALPAKA
+        #if ISAAC_ALPAKA == 1
             using TDevAcc = alpaka::dev::Dev<TAcc>;
             using TFraDim = alpaka::dim::DimInt<1>;
         #endif
+        using TChainList = boost::fusion::list< IsaacChainLength >;
         
         struct source_2_json_iterator
         {
             template
             <
-                typename Source,
+                typename TSource,
                 typename TJsonRoot,
                 typename TUnused
             >
-            inline void operator()( Source& s, TJsonRoot& jsonRoot, TUnused& unused) const
+            ISAAC_HOST_DEVICE_INLINE  void operator()( TSource& s, TJsonRoot& jsonRoot, TUnused& unused) const
             {
-                json_t *content = json_object();
-                json_array_append_new( jsonRoot, content );
-                json_object_set_new( content, "name", json_string ( s.name.c_str() ) );
-                json_object_set_new( content, "feature dimension", json_integer ( s.feature_dim ) );
+                #ifndef __CUDA_ARCH__
+                    json_t *content = json_object();
+                    json_array_append_new( jsonRoot, content );
+                    json_object_set_new( content, "name", json_string ( s.name.c_str() ) );
+                    json_object_set_new( content, "feature dimension", json_integer ( s.feature_dim ) );
+                #endif
             }
         };
         
         IsaacVisualization(
-            #ifdef ISAAC_ALPAKA
+            #if ISAAC_ALPAKA == 1
                 THost host,
                 TDevAcc acc,
                 TStream stream,
@@ -91,7 +96,7 @@ class IsaacVisualization
             std::string server_url,
             isaac_uint server_port,
             isaac_size2 framebuffer_size,
-            #ifdef ISAAC_ALPAKA
+            #if ISAAC_ALPAKA == 1
                 const alpaka::Vec<TSimDim, size_t> global_size,
                 const alpaka::Vec<TSimDim, size_t> local_size,
                 const alpaka::Vec<TSimDim, size_t> position,
@@ -102,7 +107,7 @@ class IsaacVisualization
             #endif
             TSourceList sources
             ) :
-            #ifdef ISAAC_ALPAKA
+            #if ISAAC_ALPAKA == 1
                 host(host),
                 acc(acc),
                 stream(stream),
@@ -124,7 +129,7 @@ class IsaacVisualization
             sorting_time(0),
             framebuffer_prod(size_t(framebuffer_size.x) * size_t(framebuffer_size.y)),
             sources( sources )
-            #ifdef ISAAC_ALPAKA
+            #if ISAAC_ALPAKA == 1
                 ,framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_prod))
                 ,inverse_d(alpaka::mem::buf::alloc<isaac_float, size_t>(acc, size_t(16)))
                 ,size_d(alpaka::mem::buf::alloc<isaac_size_struct< TSimDim::value >, size_t>(acc, size_t(1)))
@@ -441,158 +446,47 @@ class IsaacVisualization
                 json_incref(metadata);
             json_decref(message);
             thr_metaTargets = metaTargets;
-            #ifdef ISAAC_THREADING
-                pthread_create(&visualizationThread,NULL,visualizationFunction,NULL);
-            #else
-                visualizationFunction(NULL);
-            #endif
-            return metadata;
-        }
-        ~IsaacVisualization()
-        {
-            ISAAC_WAIT_VISUALIZATION
-            json_decref( json_root );
-            if (rank == master)
+
+           //Calc order
+            ISAAC_START_TIME_MEASUREMENT( sorting, myself->getTicksUs() )
+            //Every rank calculates it's distance to the camera
+            IceTDouble point[4] =
             {
-                json_root = json_object();
-                json_object_set_new( json_root, "type", json_string( "exit" ) );
-                char* buffer = json_dumps( json_root, 0 );
-                communicator->serverSend(buffer);
-                free(buffer);
-                json_decref( json_root );
-            }
-            icetDestroyContext(icetContext);
-            delete communicator;
-        }    
-        uint64_t getTicksUs()
-        {
-            struct timespec ts;
-            if (clock_gettime(CLOCK_MONOTONIC_RAW,&ts) == 0)
-                return ts.tv_sec*1000000 + ts.tv_nsec/1000;
-            return 0;
-        }
-        uint64_t kernel_time;
-        uint64_t merge_time;
-        uint64_t video_send_time;
-        uint64_t copy_time;
-        uint64_t sorting_time;
-    private:        
-        static IsaacVisualization *myself;
-        static void drawCallBack(
-            const IceTDouble * projection_matrix,
-            const IceTDouble * modelview_matrix,
-            const IceTFloat * background_color,
-            const IceTInt * readback_viewport,
-            IceTImage result)
-        {
-            #ifdef ISAAC_ALPAKA
-                alpaka::mem::buf::Buf<THost, isaac_float, TFraDim, size_t> inverse_h_buf ( alpaka::mem::buf::alloc<isaac_float, size_t>(myself->host, size_t(16)));
-                alpaka::mem::buf::Buf<THost, isaac_size_struct< TSimDim::value >, TFraDim, size_t> size_h_buf ( alpaka::mem::buf::alloc<isaac_size_struct< TSimDim::value >, size_t>(myself->host, size_t(1)));
-                isaac_float* inverse_h = reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(inverse_h_buf));
-                isaac_size_struct< TSimDim::value >* size_h = reinterpret_cast<isaac_size_struct< TSimDim::value >*>(alpaka::mem::view::getPtrNative(size_h_buf));
-            #else
-                isaac_float inverse_h[16];
-                isaac_size_struct< TSimDim::value > size_h[1];
-            #endif
-            IceTDouble inverse[16];
-            calcInverse(inverse,projection_matrix,modelview_matrix);
-            for (int i = 0; i < 16; i++)
-                inverse_h[i] = static_cast<float>(inverse[i]);
-            size_h[0].global_size.x = myself->global_size[0];
-            size_h[0].global_size.y = myself->global_size[1];
-            if (TSimDim::value > 2)
-                size_h[0].global_size.z = myself->global_size[2];
-            size_h[0].position.x = myself->position[0];
-            size_h[0].position.y = myself->position[1];
-            if (TSimDim::value > 2)
-                size_h[0].position.z = myself->position[2];
-            size_h[0].local_size.x = myself->local_size[0];
-            size_h[0].local_size.y = myself->local_size[1];
-            if (TSimDim::value > 2)
-                size_h[0].local_size.z = myself->local_size[2];
-            size_h[0].max_global_size = static_cast<float>(max(max(myself->global_size[0],myself->global_size[1]),myself->global_size[2]));
-            
-            #ifdef ISAAC_ALPAKA
-                alpaka::mem::view::copy(myself->stream, myself->inverse_d, inverse_h_buf, size_t(16));
-                alpaka::mem::view::copy(myself->stream, myself->size_d, size_h_buf, size_t(1));
-            #else
-                ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_inverse_d, inverse_h, 16 * sizeof(float)));
-                ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_size_d, size_h, sizeof(isaac_size_struct< TSimDim::value >)));
-            #endif
-            IceTUByte* pixels = icetImageGetColorub(result);
-            isaac_size2 grid_size=
-            {
-                size_t((readback_viewport[2]+15)/16),
-                size_t((readback_viewport[3]+15)/16)
+                IceTDouble(myself->position[0]) + (IceTDouble(myself->local_size[0]) - IceTDouble(myself->global_size[0])) / 2.0,
+                IceTDouble(myself->position[1]) + (IceTDouble(myself->local_size[1]) - IceTDouble(myself->global_size[1])) / 2.0,
+                IceTDouble(myself->position[2]) + (IceTDouble(myself->local_size[2]) - IceTDouble(myself->global_size[2])) / 2.0,
+                1.0
             };
-            isaac_size2 block_size=
+            IceTDouble result[4];
+            mulMatrixVector(result,myself->modelview,point);
+            isaac_float point_distance = sqrt( result[0]*result[0] + result[1]*result[1] + result[2]*result[2] );
+            //Allgather of the distances
+            isaac_float receive_buffer[myself->numProc];
+            MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, MPI_COMM_WORLD);
+            //Putting to a std::multimap of {rank, distance}
+            std::multimap<isaac_float, isaac_int, std::less< isaac_float > > distance_map;
+            for (isaac_int i = 0; i < myself->numProc; i++)
+                distance_map.insert( std::pair<isaac_float, isaac_int>( receive_buffer[i], i ) );
+            //Putting in an array for IceT
+            IceTInt icet_order_array[myself->numProc];
             {
-                size_t(16),
-                size_t(16)
-            };
-            ISAAC_START_TIME_MEASUREMENT( kernel, myself->getTicksUs() )
-            isaac_float step = 1.0f;
-            isaac_float4 bg_color =
-            {
-                isaac_float(background_color[3]),
-                isaac_float(background_color[2]),
-                isaac_float(background_color[1]),
-                isaac_float(background_color[0])
-            };
-            isaac_uint2 framebuffer_start =
-            {
-                isaac_uint( readback_viewport[0] ),
-                isaac_uint( readback_viewport[1] )
-            };
-            #ifdef ISAAC_ALPAKA
-                if ( boost::mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+                isaac_int i = 0;
+                for (auto it = distance_map.begin(); it != distance_map.end(); it++)
                 {
-                    grid_size.x = size_t(readback_viewport[2]);
-                    grid_size.y = size_t(readback_viewport[3]);
-                    block_size.x = size_t(1);
-                    block_size.y = size_t(1);                    
+                    icet_order_array[i] = it->second;
+                    i++;
                 }
-                const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
-                const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
-                const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
-                auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
-                auto const test (alpaka::exec::create<TAcc> (workdiv,
-                    myself->fillRectKernel,
-                    alpaka::mem::view::getPtrNative(myself->inverse_d),
-                    alpaka::mem::view::getPtrNative(myself->size_d),
-                    alpaka::mem::view::getPtrNative(myself->framebuffer),
-                    myself->framebuffer_size,
-                    framebuffer_start,
-                    source,
-                    step,
-                    bg_color));
-                alpaka::stream::enqueue(myself->stream, test);
-                alpaka::wait::wait(myself->stream);
-                ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
-                ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
-                alpaka::mem::buf::BufPlainPtrWrapper<THost, uint32_t, TFraDim, size_t> result_buffer((uint32_t*)(pixels), myself->host, myself->framebuffer_prod);
-                alpaka::mem::view::copy(myself->stream, result_buffer, myself->framebuffer, myself->framebuffer_prod);
-            #else
-                dim3 block (block_size.x, block_size.y);
-                dim3 grid  (grid_size.x, grid_size.y);
-                IsaacFillRectKernel<TSimDim,TSourceList> <<<grid, block>>>(
-                    myself->framebuffer,
-                    myself->framebuffer_size,
-                    framebuffer_start,
-                    myself->sources,
-                    step,
-                    bg_color);
-                ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
-                ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
-                ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
-                ISAAC_CUDA_CHECK(cudaMemcpy((uint32_t*)(pixels), myself->framebuffer, sizeof(uint32_t)*myself->framebuffer_prod, cudaMemcpyDeviceToHost));
-            #endif
-            ISAAC_STOP_TIME_MEASUREMENT( myself->copy_time, +=, copy, myself->getTicksUs() )
-        }
-        static void* visualizationFunction(void* dummy)
-        {
+            }
+            icetCompositeOrder( icet_order_array );
+            ISAAC_STOP_TIME_MEASUREMENT( myself->sorting_time, +=, sorting, myself->getTicksUs() )
+
+            //Drawing
+            IceTFloat background_color[4] = {0.0f,0.0f,0.0f,1.0f};
+            ISAAC_START_TIME_MEASUREMENT( merge, myself->getTicksUs() )
+            IceTImage image = icetDrawFrame(myself->projection,myself->modelview,background_color);
+            ISAAC_STOP_TIME_MEASUREMENT( myself->merge_time, +=, merge, myself->getTicksUs() )
+
             //Message sending
-            char message_buffer[ISAAC_MAX_RECEIVE];
             char* buffer = json_dumps( myself->json_root, 0 );
             strcpy( message_buffer, buffer );
             free(buffer);
@@ -644,47 +538,162 @@ class IsaacVisualization
             json_decref( myself->json_root );
             myself->recreateJSON();
 
-            //Calc order
-            ISAAC_START_TIME_MEASUREMENT( sorting, myself->getTicksUs() )
-            //Every rank calculates it's distance to the camera
-            IceTDouble point[4] =
+            #ifdef ISAAC_THREADING
+                pthread_create(&visualizationThread,NULL,visualizationFunction,&image);
+            #else
+                visualizationFunction(&image);
+            #endif
+            return metadata;
+        }
+        ~IsaacVisualization()
+        {
+            ISAAC_WAIT_VISUALIZATION
+            json_decref( json_root );
+            if (rank == master)
             {
-                IceTDouble(myself->position[0]) + (IceTDouble(myself->local_size[0]) - IceTDouble(myself->global_size[0])) / 2.0,
-                IceTDouble(myself->position[1]) + (IceTDouble(myself->local_size[1]) - IceTDouble(myself->global_size[1])) / 2.0,
-                IceTDouble(myself->position[2]) + (IceTDouble(myself->local_size[2]) - IceTDouble(myself->global_size[2])) / 2.0,
-                1.0
-            };
-            IceTDouble result[4];
-            mulMatrixVector(result,myself->modelview,point);
-            isaac_float point_distance = sqrt( result[0]*result[0] + result[1]*result[1] + result[2]*result[2] );
-            //Allgather of the distances
-            isaac_float receive_buffer[myself->numProc];
-            MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, MPI_COMM_WORLD);
-            //Putting to a std::multimap of {rank, distance}
-            std::multimap<isaac_float, isaac_int, std::less< isaac_float > > distance_map;
-            for (isaac_int i = 0; i < myself->numProc; i++)
-                distance_map.insert( std::pair<isaac_float, isaac_int>( receive_buffer[i], i ) );
-            //Putting in an array for IceT
-            IceTInt icet_order_array[myself->numProc];
-            {
-                isaac_int i = 0;
-                for (auto it = distance_map.begin(); it != distance_map.end(); it++)
-                {
-                    icet_order_array[i] = it->second;
-                    i++;
-                }
+                json_root = json_object();
+                json_object_set_new( json_root, "type", json_string( "exit" ) );
+                char* buffer = json_dumps( json_root, 0 );
+                communicator->serverSend(buffer);
+                free(buffer);
+                json_decref( json_root );
             }
-            icetCompositeOrder( icet_order_array );
-            ISAAC_STOP_TIME_MEASUREMENT( myself->sorting_time, +=, sorting, myself->getTicksUs() )
-
-            //Drawing
-            IceTFloat background_color[4] = {0.0f,0.0f,0.0f,1.0f};
-            ISAAC_START_TIME_MEASUREMENT( merge, myself->getTicksUs() )
-            IceTImage image = icetDrawFrame(myself->projection,myself->modelview,background_color);
-            ISAAC_STOP_TIME_MEASUREMENT( myself->merge_time, +=, merge, myself->getTicksUs() )
+            icetDestroyContext(icetContext);
+            delete communicator;
+        }    
+        uint64_t getTicksUs()
+        {
+            struct timespec ts;
+            if (clock_gettime(CLOCK_MONOTONIC_RAW,&ts) == 0)
+                return ts.tv_sec*1000000 + ts.tv_nsec/1000;
+            return 0;
+        }
+        uint64_t kernel_time;
+        uint64_t merge_time;
+        uint64_t video_send_time;
+        uint64_t copy_time;
+        uint64_t sorting_time;
+    private:        
+        static IsaacVisualization *myself;
+        static void drawCallBack(
+            const IceTDouble * projection_matrix,
+            const IceTDouble * modelview_matrix,
+            const IceTFloat * background_color,
+            const IceTInt * readback_viewport,
+            IceTImage result)
+        {
+            #if ISAAC_ALPAKA == 1
+                alpaka::mem::buf::Buf<THost, isaac_float, TFraDim, size_t> inverse_h_buf ( alpaka::mem::buf::alloc<isaac_float, size_t>(myself->host, size_t(16)));
+                alpaka::mem::buf::Buf<THost, isaac_size_struct< TSimDim::value >, TFraDim, size_t> size_h_buf ( alpaka::mem::buf::alloc<isaac_size_struct< TSimDim::value >, size_t>(myself->host, size_t(1)));
+                isaac_float* inverse_h = reinterpret_cast<float*>(alpaka::mem::view::getPtrNative(inverse_h_buf));
+                isaac_size_struct< TSimDim::value >* size_h = reinterpret_cast<isaac_size_struct< TSimDim::value >*>(alpaka::mem::view::getPtrNative(size_h_buf));
+            #else
+                isaac_float inverse_h[16];
+                isaac_size_struct< TSimDim::value > size_h[1];
+            #endif
+            IceTDouble inverse[16];
+            calcInverse(inverse,projection_matrix,modelview_matrix);
+            for (int i = 0; i < 16; i++)
+                inverse_h[i] = static_cast<float>(inverse[i]);
+            size_h[0].global_size.x = myself->global_size[0];
+            size_h[0].global_size.y = myself->global_size[1];
+            if (TSimDim::value > 2)
+                size_h[0].global_size.z = myself->global_size[2];
+            size_h[0].position.x = myself->position[0];
+            size_h[0].position.y = myself->position[1];
+            if (TSimDim::value > 2)
+                size_h[0].position.z = myself->position[2];
+            size_h[0].local_size.x = myself->local_size[0];
+            size_h[0].local_size.y = myself->local_size[1];
+            if (TSimDim::value > 2)
+                size_h[0].local_size.z = myself->local_size[2];
+            size_h[0].max_global_size = static_cast<float>(max(max(myself->global_size[0],myself->global_size[1]),myself->global_size[2]));
+            
+            #if ISAAC_ALPAKA == 1
+                alpaka::mem::view::copy(myself->stream, myself->inverse_d, inverse_h_buf, size_t(16));
+                alpaka::mem::view::copy(myself->stream, myself->size_d, size_h_buf, size_t(1));
+            #else
+                ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_inverse_d, inverse_h, 16 * sizeof(float)));
+                ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_size_d, size_h, sizeof(isaac_size_struct< TSimDim::value >)));
+            #endif
+            IceTUByte* pixels = icetImageGetColorub(result);
+            isaac_size2 grid_size=
+            {
+                size_t((readback_viewport[2]+15)/16),
+                size_t((readback_viewport[3]+15)/16)
+            };
+            isaac_size2 block_size=
+            {
+                size_t(16),
+                size_t(16)
+            };
+            ISAAC_START_TIME_MEASUREMENT( kernel, myself->getTicksUs() )
+            isaac_float step = 1.0f;
+            isaac_float4 bg_color =
+            {
+                isaac_float(background_color[3]),
+                isaac_float(background_color[2]),
+                isaac_float(background_color[1]),
+                isaac_float(background_color[0])
+            };
+            isaac_uint2 framebuffer_start =
+            {
+                isaac_uint( readback_viewport[0] ),
+                isaac_uint( readback_viewport[1] )
+            };
+            #if ISAAC_ALPAKA == 1
+                if ( boost::mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+                {
+                    grid_size.x = size_t(readback_viewport[2]);
+                    grid_size.y = size_t(readback_viewport[3]);
+                    block_size.x = size_t(1);
+                    block_size.y = size_t(1);                    
+                }
+                const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+                const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
+                const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
+                auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
+                auto const test (alpaka::exec::create<TAcc> (workdiv,
+                    myself->fillRectKernel,
+                    alpaka::mem::view::getPtrNative(myself->inverse_d),
+                    alpaka::mem::view::getPtrNative(myself->size_d),
+                    alpaka::mem::view::getPtrNative(myself->framebuffer),
+                    myself->framebuffer_size,
+                    framebuffer_start,
+                    myself->sources,
+                    step,
+                    bg_color));
+                alpaka::stream::enqueue(myself->stream, test);
+                alpaka::wait::wait(myself->stream);
+                ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
+                ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
+                alpaka::mem::buf::BufPlainPtrWrapper<THost, uint32_t, TFraDim, size_t> result_buffer((uint32_t*)(pixels), myself->host, myself->framebuffer_prod);
+                alpaka::mem::view::copy(myself->stream, result_buffer, myself->framebuffer, myself->framebuffer_prod);
+            #else
+                dim3 block (block_size.x, block_size.y);
+                dim3 grid  (grid_size.x, grid_size.y);
+                IsaacFillRectKernel<TSimDim,TSourceList,TChainList> <<<grid, block>>>(
+                    myself->framebuffer,
+                    myself->framebuffer_size,
+                    framebuffer_start,
+                    myself->sources,
+                    step,
+                    bg_color);
+                ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
+                ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
+                ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
+                ISAAC_CUDA_CHECK(cudaMemcpy((uint32_t*)(pixels), myself->framebuffer, sizeof(uint32_t)*myself->framebuffer_prod, cudaMemcpyDeviceToHost));
+            #endif
+            ISAAC_STOP_TIME_MEASUREMENT( myself->copy_time, +=, copy, myself->getTicksUs() )
+        }
+        
+        static void* visualizationFunction(void* dummy)
+        {
+            IceTImage* image = (IceTImage*)dummy;
+            //Sending
             ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
             if (myself->video_communicator)
-                myself->video_communicator->serverSendFrame(icetImageGetColorui(image),icetImageGetNumPixels(image)*4);
+                myself->video_communicator->serverSendFrame(icetImageGetColorui(*image),icetImageGetNumPixels(*image)*4);
             ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
 
             myself->metaNr++;
@@ -756,7 +765,7 @@ class IsaacVisualization
             mulMatrixMatrix( temp, rotation_m, look_at_m );
             mulMatrixMatrix( modelview, distance_m, temp );
         }
-        #ifdef ISAAC_ALPAKA
+        #if ISAAC_ALPAKA == 1
             THost host;
             TDevAcc acc;
             TStream stream;
@@ -765,7 +774,7 @@ class IsaacVisualization
         std::string server_url;
         isaac_uint server_port;
         isaac_size2 framebuffer_size;
-        #ifdef ISAAC_ALPAKA
+        #if ISAAC_ALPAKA == 1
             alpaka::Vec<TFraDim, size_t> framebuffer_prod;
             alpaka::Vec<TSimDim, size_t> global_size;
             alpaka::Vec<TSimDim, size_t> local_size;
@@ -801,12 +810,12 @@ class IsaacVisualization
         IceTContext icetContext;
         IsaacVisualizationMetaEnum thr_metaTargets;
         pthread_t visualizationThread;
-        #ifdef ISAAC_ALPAKA
-            IsaacFillRectKernel<TSimDim::value> fillRectKernel;
+        #if ISAAC_ALPAKA == 1
+            IsaacFillRectKernel<TSimDim,TSourceList,TChainList> fillRectKernel;
         #endif
 };
 
-#ifdef ISAAC_ALPAKA
+#if ISAAC_ALPAKA == 1
     template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList>
     IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList>::myself = NULL;
 #else

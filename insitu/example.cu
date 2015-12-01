@@ -31,22 +31,33 @@
 	#define PARTICLES_PER_NODE 8
 #endif
 
+typedef float float3_t[3];
+
 using namespace isaac;
 
-#ifdef ISAAC_ALPAKA
-template < typename TDevAcc >
+ISAAC_NO_HOST_DEVICE_WARNING
+#if ISAAC_ALPAKA == 1
+template < typename TDevAcc, typename THost, typename TStream >
 #endif
 class TestSource1 : public IsaacBaseSource <
-#ifdef ISAAC_ALPAKA
+#if ISAAC_ALPAKA == 1
     TDevAcc,
+    THost,
+    TStream,
 #endif
     boost::mpl::int_<3>
 >
 {
+	#if ISAAC_ALPAKA == 1
+		using ParentClass = IsaacBaseSource < TDevAcc , THost, TStream, boost::mpl::int_<3> >;
+	#endif
 	public:
+		ISAAC_NO_HOST_DEVICE_WARNING
         TestSource1 (
-            #ifdef ISAAC_ALPAKA
+            #if ISAAC_ALPAKA == 1
                 TDevAcc acc,
+                THost host,
+                TStream stream,
             #endif
             std::string name,
             size_t transfer_func_size,
@@ -54,44 +65,84 @@ class TestSource1 : public IsaacBaseSource <
             size_t width,
             size_t height
         ) :
-        IsaacBaseSource(
-        #ifdef ISAAC_ALPAKA
+        #if ISAAC_ALPAKA == 1
+			ParentClass (
 			acc,
+			host,
+			stream,
+		#else
+			IsaacBaseSource(
 		#endif
 			name,
 			transfer_func_size
 		),
 		ptr(ptr),
 		width(width),
-		width_mul_height(width * height) {}
+		width_mul_height(width * height)
+		{
+			//Make transfer function green
+            #if ISAAC_ALPAKA == 1
+                alpaka::mem::buf::Buf<THost, isaac_float4, alpaka::dim::DimInt<1>, size_t> transfer_func_h_buf ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, transfer_func_size ) );
+                isaac_float4* transfer_func_h = reinterpret_cast<isaac_float4*>(alpaka::mem::view::getPtrNative(transfer_func_h_buf));
+            #else
+                isaac_float4 transfer_func_h[ transfer_func_size ];
+            #endif
+            for (size_t i = 0; i < transfer_func_size; i++)
+            {
+                transfer_func_h[i].x = isaac_float(0);
+                transfer_func_h[i].y = isaac_float(1);
+                transfer_func_h[i].z = isaac_float(0);
+                transfer_func_h[i].w = isaac_float(i) / isaac_float(transfer_func_size-1);
+            }
+            #if ISAAC_ALPAKA == 1
+                alpaka::mem::view::copy(stream, ParentClass::transfer_func_d, transfer_func_h_buf, transfer_func_size );
+            #else
+                ISAAC_CUDA_CHECK(cudaMemcpy(transfer_func_d, transfer_func_h, sizeof(isaac_float4)*transfer_func_size, cudaMemcpyHostToDevice));
+            #endif
+		}
 		
 		isaac_float3* ptr;
 		isaac_uint width;
 		isaac_uint width_mul_height;
-		ISAAC_HOST_DEVICE inline isaac_float3& operator[] (const isaac_uint3 nIndex)
+		ISAAC_NO_HOST_DEVICE_WARNING
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator[] (const isaac_uint3 nIndex)
 		{
-			return ptr[
+			isaac_float3 value = ptr[
 				nIndex.x +
 				nIndex.y * width +
 				nIndex.z * width_mul_height
 			];
+			isaac_float_dim<3> result;
+			result.x = value.x;
+			result.y = value.y;
+			result.z = value.z;
+			return result;
 		}
 };
 
-#ifdef ISAAC_ALPAKA
-template < typename TDevAcc >
+ISAAC_NO_HOST_DEVICE_WARNING
+#if ISAAC_ALPAKA == 1
+template < typename TDevAcc, typename THost, typename TStream >
 #endif
 class TestSource2 : public IsaacBaseSource <
-#ifdef ISAAC_ALPAKA
+#if ISAAC_ALPAKA == 1
     TDevAcc,
+    THost,
+    TStream,
 #endif
     boost::mpl::int_<1>
 >
 {
+	#if ISAAC_ALPAKA == 1
+		using ParentClass = IsaacBaseSource < TDevAcc , THost, TStream, boost::mpl::int_<1> >;
+	#endif
 	public:
+		ISAAC_NO_HOST_DEVICE_WARNING
         TestSource2 (
-            #ifdef ISAAC_ALPAKA
+            #if ISAAC_ALPAKA == 1
                 TDevAcc acc,
+                THost host,
+                TStream stream,
             #endif
             std::string name,
             size_t transfer_func_size,
@@ -99,31 +150,121 @@ class TestSource2 : public IsaacBaseSource <
             size_t width,
             size_t height
         ) :
-        IsaacBaseSource(
-        #ifdef ISAAC_ALPAKA
+        #if ISAAC_ALPAKA == 1
+			ParentClass (
 			acc,
+			host,
+			stream,
+		#else
+			IsaacBaseSource(
 		#endif
 			name,
 			transfer_func_size
 		),
 		ptr(ptr),
 		width(width),
-		width_mul_height(width * height) {}
+		width_mul_height(width * height)
+		{
+			//Make transfer function red
+            #if ISAAC_ALPAKA == 1
+                alpaka::mem::buf::Buf<THost, isaac_float4, alpaka::dim::DimInt<1>, size_t> transfer_func_h_buf ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, transfer_func_size ) );
+                isaac_float4* transfer_func_h = reinterpret_cast<isaac_float4*>(alpaka::mem::view::getPtrNative(transfer_func_h_buf));
+            #else
+                isaac_float4 transfer_func_h[ transfer_func_size ];
+            #endif
+            for (size_t i = 0; i < transfer_func_size; i++)
+            {
+                transfer_func_h[i].x = isaac_float(1);
+                transfer_func_h[i].y = isaac_float(0);
+                transfer_func_h[i].z = isaac_float(0);
+                transfer_func_h[i].w = isaac_float(i) / isaac_float(transfer_func_size-1);
+            }
+            #if ISAAC_ALPAKA == 1
+                alpaka::mem::view::copy(stream, ParentClass::transfer_func_d, transfer_func_h_buf, transfer_func_size );
+            #else
+                ISAAC_CUDA_CHECK(cudaMemcpy(transfer_func_d, transfer_func_h, sizeof(isaac_float4)*transfer_func_size, cudaMemcpyHostToDevice));
+            #endif
+		}
 		
 		isaac_float* ptr;
 		isaac_uint width;
 		isaac_uint width_mul_height;
-		ISAAC_HOST_DEVICE inline isaac_float& operator[] (const isaac_uint3 nIndex)
+		ISAAC_NO_HOST_DEVICE_WARNING		
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator[] (const isaac_uint3 nIndex)
 		{
-			return ptr[
+			isaac_float value = ptr[
 				nIndex.x +
 				nIndex.y * width +
 				nIndex.z * width_mul_height
 			];
+			isaac_float_dim<1> result;
+			result.x = value;
+			return result;
 		}
 };
 
 void recursive_kgv(size_t* d,int number,int test);
+
+template <
+	typename TStream,
+	typename THost1,
+	typename TDev1,
+	typename THost2,
+	typename TDev2,
+	typename TLoc,
+	typename TPos,
+	typename TGlo
+>
+void update_data(
+	TStream stream,
+	THost1 hostBuffer1,
+	TDev1 deviceBuffer1,
+	THost2 hostBuffer2,
+	TDev2 deviceBuffer2,
+	size_t prod,
+	float pos,
+	TLoc& local_size,
+	TPos& position,
+	TGlo& global_size)
+{
+	srand(0);
+	float s = sin(pos);
+	for (size_t x = 0; x < local_size[0]; x++)
+		for (size_t y = 0; y < local_size[1]; y++)
+			for (size_t z = 0; z < local_size[2]; z++)
+			{
+				float l_pos[3] =
+				{
+					float(int(position[0]) + int(x) - int(global_size[0]) / 2) / float( global_size[0] / 2),
+					float(int(position[1]) + int(y) - int(global_size[1]) / 2) / float( global_size[1] / 2),
+					float(int(position[2]) + int(z) - int(global_size[2]) / 2) / float( global_size[2] / 2)
+				};
+				float l = sqrt( l_pos[0] * l_pos[0] + l_pos[1] * l_pos[1] + l_pos[2] * l_pos[2] );
+				float intensity = 1.0f - l - float(rand() & ((2 << 16) - 1))/float( (2 << 17) - 1 );
+				intensity *= s+1.5f;
+				if (intensity < 0.0f)
+					intensity = 0.0f;
+				if (intensity > 1.0f)
+					intensity = 1.0f;
+				size_t pos = x + y * local_size[0] + z * local_size[0] * local_size[1];
+#if ISAAC_ALPAKA == 1
+				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][0] = intensity;
+				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][1] = intensity;
+				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][2] = intensity;
+				alpaka::mem::view::getPtrNative(hostBuffer2)[pos] = s*s/2.0f;
+			}
+	alpaka::mem::view::copy(stream, deviceBuffer1, hostBuffer1, local_size);
+	alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, local_size);
+#else
+				hostBuffer1[pos][0] = intensity;
+				hostBuffer1[pos][1] = intensity;
+				hostBuffer1[pos][2] = intensity;
+				hostBuffer2[pos] = s*s/2.0f;
+			}
+	cudaMemcpy(deviceBuffer1, hostBuffer1, sizeof(float3_t)*prod, cudaMemcpyHostToDevice);
+	cudaMemcpy(deviceBuffer2, hostBuffer2, sizeof(float)*prod, cudaMemcpyHostToDevice);
+#endif
+}
 
 int main(int argc, char **argv)
 {
@@ -180,14 +321,13 @@ int main(int argc, char **argv)
 	sprintf(name,"Example_%i",id);
 	printf("Using name %s\n",name);
 	
-	typedef float float3_t[3];
 	isaac_size2 framebuffer_size =
 	{
 		size_t(1024),
 		size_t(768)
 	};
 	
-	#ifdef ISAAC_ALPAKA
+	#if ISAAC_ALPAKA == 1
 		//Now we initialize the Isaac Insitu Plugin with the name, the number of the master, the server, it's IP, the count of framebuffer to be created and the size per framebuffer
 		using AccDim = alpaka::dim::DimInt<3>;
 		using SimDim = alpaka::dim::DimInt<3>;
@@ -224,58 +364,58 @@ int main(int argc, char **argv)
 			position.push_back(p[2]*64);
 	#endif
 
+	size_t prod = local_size[0]*local_size[1]*local_size[2];
+
 	//Init Device memory
-	#ifdef ISAAC_ALPAKA
+	#if ISAAC_ALPAKA == 1
 		alpaka::mem::buf::Buf<DevHost, float3_t, SimDim, size_t> hostBuffer1   ( alpaka::mem::buf::alloc<float3_t, size_t>(devHost, local_size));
 		alpaka::mem::buf::Buf<DevAcc, float3_t, SimDim, size_t>  deviceBuffer1 ( alpaka::mem::buf::alloc<float3_t, size_t>(devAcc,  local_size));
 		alpaka::mem::buf::Buf<DevHost, float, SimDim, size_t> hostBuffer2   ( alpaka::mem::buf::alloc<float, size_t>(devHost, local_size));
 		alpaka::mem::buf::Buf<DevAcc, float, SimDim, size_t>  deviceBuffer2 ( alpaka::mem::buf::alloc<float, size_t>(devAcc,  local_size));
-		for (size_t x = 0; x < local_size[0]; x++)
-			for (size_t y = 0; y < local_size[1]; y++)
-				for (size_t z = 0; z < local_size[2]; z++)
-				{
-					size_t pos = x + y * local_size[0] + z * local_size[0] * local_size[1];
-					alpaka::mem::view::getPtrNative(hostBuffer1)[pos][0] = 1.0f;
-					alpaka::mem::view::getPtrNative(hostBuffer1)[pos][1] = (float)(rank+1)/(float)numProc;
-					alpaka::mem::view::getPtrNative(hostBuffer1)[pos][2] = 1.0f-(float)(rank+1)/(float)numProc;
-					alpaka::mem::view::getPtrNative(hostBuffer2)[pos] = (float)(rank+1)/(float)numProc;
-				}
-		alpaka::mem::view::copy(stream, deviceBuffer1, hostBuffer1, local_size);
-		alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, local_size);
 	#else
-		size_t prod = local_size[0]*local_size[1]*local_size[2];
 		float3_t* hostBuffer1 = (float3_t*)malloc(sizeof(float3_t)*prod);
 		float3_t* deviceBuffer1; cudaMalloc((float3_t**)&deviceBuffer1, sizeof(float3_t)*prod);
 		float* hostBuffer2 = (float*)malloc(sizeof(float)*prod);
 		float* deviceBuffer2; cudaMalloc((float**)&deviceBuffer2, sizeof(float)*prod);
-		for (size_t x = 0; x < local_size[0]; x++)
-			for (size_t y = 0; y < local_size[1]; y++)
-				for (size_t z = 0; z < local_size[2]; z++)
-				{
-					size_t pos = x + y * local_size[0] + z * local_size[0] * local_size[1];
-					hostBuffer1[pos][0] = 1.0f;
-					hostBuffer1[pos][1] = (float)(rank+1)/(float)numProc;
-					hostBuffer1[pos][2] = 1.0f-(float)(rank+1)/(float)numProc;
-					hostBuffer2[pos] = (float)(rank+1)/(float)numProc;
-				}
-		cudaMemcpy(deviceBuffer1, hostBuffer1, sizeof(float3_t)*prod, cudaMemcpyHostToDevice);
-		cudaMemcpy(deviceBuffer2, hostBuffer2, sizeof(float)*prod, cudaMemcpyHostToDevice);
 	#endif
-	
-	#ifdef ISAAC_ALPAKA
-		TestSource1 < DevAcc > testSource1 ( devAcc, "Test Source 1", 1024 );
-		TestSource2 < DevAcc > testSource2 ( devAcc, "Test Source 2", 1024 );
+
+	#if ISAAC_ALPAKA == 1
+		TestSource1 < DevAcc, DevHost, Stream > testSource1 (
+			devAcc,
+			devHost,
+			stream,
+			std::string( "Test Source 1" ),
+			1024,
+			reinterpret_cast<isaac_float3*>(alpaka::mem::view::getPtrNative(deviceBuffer1)),
+			local_size[0],
+			local_size[1]
+		);
+		TestSource2 < DevAcc, DevHost, Stream > testSource2 (
+			devAcc,
+			devHost,
+			stream,
+			std::string( "Test Source 2" ),
+			1024,
+			reinterpret_cast<isaac_float*>(alpaka::mem::view::getPtrNative(deviceBuffer2)),
+			local_size[0],
+			local_size[1]
+		);
+		using SourceList = boost::fusion::list
+		<
+			TestSource1< DevAcc, DevHost, Stream >,
+			TestSource2< DevAcc, DevHost, Stream >
+		>;
 	#else
 		TestSource1 testSource1 ( std::string( "Test Source 1" ), 1024, reinterpret_cast<isaac_float3*>(deviceBuffer1), local_size[0], local_size[1] );
 		TestSource2 testSource2 ( std::string( "Test Source 2" ), 1024, reinterpret_cast<isaac_float*>(deviceBuffer2), local_size[0], local_size[1] );
+		using SourceList = boost::fusion::list
+		<
+			TestSource1,
+			TestSource2
+		>;
 	#endif
-	using SourceList = boost::fusion::list
-	<
-		TestSource1,
-		TestSource2
-	>;
 	SourceList sources( testSource1, testSource2 );
-	#ifdef ISAAC_ALPAKA
+	#if ISAAC_ALPAKA == 1
 		IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim,SourceList> visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
 	#else
 		IsaacVisualization<SimDim,SourceList> visualization(name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
@@ -307,9 +447,16 @@ int main(int argc, char **argv)
 	int start = visualization.getTicksUs();
 	int count = 0;
 	int drawing_time = 0;
+	int simulation_time = 0;
 	while (!force_exit)
 	{
 		a += 0.01f;
+		int start_simulation = visualization.getTicksUs();
+		#if ISAAC_ALPAKA == 0
+			int stream = 0;
+		#endif
+		update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
+		simulation_time +=visualization.getTicksUs() - start_simulation;
 		//Every frame we fill the metadata with data instead of descriptions
 		if (rank == MASTER_RANK)
 		{
@@ -367,8 +514,9 @@ int main(int argc, char **argv)
 			if (diff >= 1000000)
 			{
 				visualization.merge_time -= visualization.kernel_time + visualization.copy_time;
-				printf("FPS: %.1f \n\tDrawing: %.1f ms\n\t\tSorting: %.1f ms\n\t\tMerge: %.1f ms\n\t\tKernel: %.1f ms\n\t\tCopy: %.1f ms\n\t\tVideo: %.1f ms\n",
+				printf("FPS: %.1f \n\tSimulation: %.1f ms\n\tDrawing: %.1f ms\n\t\tSorting: %.1f ms\n\t\tMerge: %.1f ms\n\t\tKernel: %.1f ms\n\t\tCopy: %.1f ms\n\t\tVideo: %.1f ms\n",
 					(float)count*1000000.0f/(float)diff,
+					(float)simulation_time/1000.0f/(float)count,
 					(float)drawing_time/1000.0f/(float)count,
 					(float)visualization.sorting_time/1000.0f/(float)count,
 					(float)visualization.merge_time/1000.0f/(float)count,
@@ -380,9 +528,10 @@ int main(int argc, char **argv)
 				visualization.kernel_time = 0;
 				visualization.copy_time = 0;
 				visualization.video_send_time = 0;
+				drawing_time = 0;
+				simulation_time = 0;
 				start = end;
 				count = 0;
-				drawing_time = 0;
 			}
 		}
 	}
@@ -390,7 +539,7 @@ int main(int argc, char **argv)
 	MPI_Barrier(MPI_COMM_WORLD);
 	printf("%i finished\n",rank);
 	
-	#ifndef ISAAC_ALPAKA
+	#if ISAAC_ALPAKA == 0
 		free(hostBuffer1);
 		free(hostBuffer2);
 		cudaFree(deviceBuffer1);

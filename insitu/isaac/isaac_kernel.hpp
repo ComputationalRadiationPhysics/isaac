@@ -21,23 +21,102 @@
 namespace isaac
 {
 
-#ifndef ISAAC_ALPAKA
+namespace fus = boost::fusion;
+namespace mpl = boost::mpl;
+
+ISAAC_NO_HOST_DEVICE_WARNING
+template <int N>
+ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> isaacLength( isaac_float_dim<N> );
+
+template <>
+ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> isaacLength<4>( isaac_float_dim<4> v )
+{
+    isaac_float_dim<1> result;
+    result.x = sqrt(v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w);
+    return result;
+}
+
+template <>
+ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> isaacLength<3>( isaac_float_dim<3> v )
+{
+    isaac_float_dim<1> result;
+    result.x = sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    return result;
+}
+
+template <>
+ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> isaacLength<2>( isaac_float_dim<2> v )
+{
+    isaac_float_dim<1> result;
+    result.x = sqrt(v.x * v.x + v.y * v.y);
+    return result;
+}
+
+template <>
+ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> isaacLength<1>( isaac_float_dim<1> v )
+{
+    isaac_float_dim<1> result;
+    result.x = v.x;
+    return result;
+}
+
+struct IsaacChainLength
+{
+    ISAAC_NO_HOST_DEVICE_WARNING
+    template <int N>
+    ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<1> call( isaac_float_dim<N> v )
+    {
+        return isaacLength<N>( v );
+    }
+};
+
+struct merge_source_iterator
+{
+    ISAAC_NO_HOST_DEVICE_WARNING
+    template
+    <
+        typename TSource,
+        typename TColor,
+        typename TCoord
+    >
+    ISAAC_HOST_DEVICE_INLINE  void operator()( TSource& source, TColor& color, TCoord& coord) const
+    {
+        auto data = source[coord];
+        isaac_float_dim<1> result = IsaacChainLength::call< TSource::feature_dim >( data );
+        isaac_uint lookup_value = isaac_uint( round(result.x * isaac_float( source.transfer_func_size ) ) );
+        if (lookup_value >= source.transfer_func_size)
+            lookup_value = source.transfer_func_size - 1;
+        #if ISAAC_ALPAKA == 1
+            isaac_float4 value = alpaka::mem::view::getPtrNative(source.transfer_func_d)[ lookup_value ];
+        #else
+            isaac_float4 value = source.transfer_func_d[ lookup_value ];
+        #endif
+        color.x = color.x + value.x * value.w;
+        color.y = color.y + value.y * value.w;
+        color.z = color.z + value.z * value.w;
+        color.w = color.w + value.w;
+    }
+};
+
+
+#if ISAAC_ALPAKA == 0
     __constant__ isaac_float isaac_inverse_d[16];
-    __constant__ isaac_size_struct<3> isaac_size_d[1]; //[1] to access it same for cuda and alpaka
+    __constant__ isaac_size_struct<3> isaac_size_d[1]; //[1] to access it same for cuda and alpaka the same way
 #endif
 
 template <
     typename TSimDim,
-    typename TSourceList
+    typename TSourceList,
+    typename TChainList
 >
-#ifdef ISAAC_ALPAKA
+#if ISAAC_ALPAKA == 1
     struct IsaacFillRectKernel
     {
         template <typename TAcc__>
         ALPAKA_FN_ACC void operator()(
             TAcc__ const &acc,
             isaac_float* isaac_inverse_d,
-            isaac_size_struct<simdim>* isaac_size_d,
+            isaac_size_struct<TSimDim::value>* isaac_size_d,
 #else
         __global__ void IsaacFillRectKernel(
 #endif
@@ -47,11 +126,11 @@ template <
             TSourceList sources,
             isaac_float step,
             isaac_float4 background_color)
-#ifdef ISAAC_ALPAKA
+#if ISAAC_ALPAKA == 1
         const
 #endif
         {
-            #ifdef ISAAC_ALPAKA
+            #if ISAAC_ALPAKA == 1
                 auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
                 isaac_uint2 pixel =
                 {
@@ -95,7 +174,12 @@ template <
               end =   end * max_size;
 
             //move to local grid
-            isaac_size3 move = isaac_size_d[0].global_size / size_t(2) - isaac_size_d[0].position;
+            isaac_int3 move =
+            {
+                isaac_int(isaac_size_d[0].global_size.x) / isaac_int(2) - isaac_int(isaac_size_d[0].position.x),
+                isaac_int(isaac_size_d[0].global_size.y) / isaac_int(2) - isaac_int(isaac_size_d[0].position.y),
+                isaac_int(isaac_size_d[0].global_size.z) / isaac_int(2) - isaac_int(isaac_size_d[0].position.z)
+            };
             isaac_float3 move_f =
             {
                 isaac_float(move.x),
@@ -137,32 +221,35 @@ template <
             isaac_int last = ceil( count_end.x );
 
             isaac_int count = last - first + 1;
-            isaac_float4 color = background_color;
+            isaac_float4 color = {isaac_float(0),isaac_float(0),isaac_float(0),isaac_float(0)};
             isaac_float3 pos = start + step_vec * isaac_float(first);
-            isaac_uint visited = 0;
+            isaac_float factor = isaac_float(2) / isaac_size_d[0].max_global_size;
             for (isaac_int i = 0; i < count; i++)
             {
                 isaac_uint3 coord;
                 ISAAC_FOR_EACH_DIM_TWICE(3, coord, = (isaac_uint)pos, ; )
                 if ( ISAAC_FOR_EACH_DIM_TWICE(3, coord, < isaac_size_d[0].local_size, && ) 1 )
                 {
-                    isaac_float3 data = boost::fusion::at_c<0>(sources)[coord];
-                    isaac_float4 color_add = { data.x, data.y, data.z, isaac_float(0) };
-                    color = color + color_add / isaac_float(2);
-                    visited++;
+                    isaac_float4 value = {0, 0, 0, 0};
+                    isaac_for_each_2_params( sources, merge_source_iterator() , value, coord );
+                    if ( mpl::size< TSourceList >::type::value > 1)
+                        value = value / isaac_float( mpl::size< TSourceList >::type::value );
+                    isaac_float oma = isaac_float(1) - color.w;
+                    value = value * factor;
+                    isaac_float4 color_add =
+                    {
+                        oma * value.x, // * value.w does merge_source_iterator
+                        oma * value.y, // * value.w does merge_source_iterator
+                        oma * value.z, // * value.w does merge_source_iterator
+                        oma * value.w
+                    };
+                    color = color + color_add;
                 }
                 pos = pos + step_vec;
             }
-            if (visited)
-            {
-                color = color / isaac_float(visited);
-                color.w = 0.5f;
-            }
-            else
-                color.w = 0.0f;
             ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], color )
         }
-#ifdef ISAAC_ALPAKA
+#if ISAAC_ALPAKA == 1
     };
 #endif
 

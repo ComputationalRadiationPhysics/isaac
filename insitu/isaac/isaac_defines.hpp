@@ -15,12 +15,20 @@
 
 #pragma once
 
+#include <boost/preprocessor.hpp>
+
 #define ISAAC_MAX_RECEIVE 32768 //32kb
 #define ISAAC_Z_NEAR 1.0f
 #define ISAAC_Z_FAR 100.0f
 
-#ifdef __CUDACC__
-    #define ISAAC_HOST_DEVICE __host__ __device__
+#if ISAAC_ALPAKA == 1
+    #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC
 #else
-    #define ISAAC_HOST_DEVICE BOOST_PP_EMPTY
+    #define ISAAC_HOST_DEVICE_INLINE __device__ __host__ __forceinline__
+#endif
+
+#ifdef __CUDACC__
+    #define ISAAC_NO_HOST_DEVICE_WARNING _Pragma("hd_warning_disable")
+#else
+	#define ISAAC_NO_HOST_DEVICE_WARNING
 #endif

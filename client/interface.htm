@@ -16,8 +16,9 @@
 	Server URL:<input type="text" id="url" value="127.0.0.1">
 	Port:<input type="text" id="port" value="2459">
 	<input type="button" value="Connect" id="connect">
-	Show video and control in one window<input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()">
-	Show stream url instead of video<input type="checkbox" id="no_stream_checkbox" onchange="no_stream_checkbox_click()">
+	<br/>Show video and control in one window<input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()">
+	<br/>Show wireframe bounding box<input type="checkbox" id="wireframe_checkbox" checked onchange="wireframe_checkbox_checkbox_click()">
+	<br/>Show stream url instead of video<input type="checkbox" id="no_stream_checkbox" onchange="no_stream_checkbox_click()">
 </form>
 <div id="status">Status: Not connected</div>
 </p>
@@ -66,6 +67,7 @@ var observe_id = -1;
 var particles = null;
 var plugins = new Array();
 var one_window = true;
+var wireframe = true;
 var no_stream = false;
 
 var projection = [
@@ -241,7 +243,8 @@ function redraw()
 	ctx.lineWidth = 2;
 	ctx.beginPath();
 	
-	drawUnitCube();
+	if (wireframe)
+		drawUnitCube();
 	for (p in particles)
 	{
 		point( particles[p] );
@@ -598,6 +601,11 @@ function one_window_checkbox_click()
 		document.getElementById("preview_container_div").appendChild(node);
 		redraw();
 	}
+};
+
+function wireframe_checkbox_checkbox_click()
+{
+	wireframe = document.getElementById("wireframe_checkbox").checked;
 };
 
 function no_stream_checkbox_click()
