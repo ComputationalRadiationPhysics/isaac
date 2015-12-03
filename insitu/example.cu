@@ -39,19 +39,12 @@ ISAAC_NO_HOST_DEVICE_WARNING
 #if ISAAC_ALPAKA == 1
 template < typename TDevAcc, typename THost, typename TStream >
 #endif
-class TestSource1 : public IsaacBaseSource <
-#if ISAAC_ALPAKA == 1
-    TDevAcc,
-    THost,
-    TStream,
-#endif
-    boost::mpl::int_<3>
->
+class TestSource1
 {
-	#if ISAAC_ALPAKA == 1
-		using ParentClass = IsaacBaseSource < TDevAcc , THost, TStream, boost::mpl::int_<3> >;
-	#endif
 	public:
+		static const std::string name;
+		static const size_t feature_dim = 3;
+	
 		ISAAC_NO_HOST_DEVICE_WARNING
         TestSource1 (
             #if ISAAC_ALPAKA == 1
@@ -59,47 +52,14 @@ class TestSource1 : public IsaacBaseSource <
                 THost host,
                 TStream stream,
             #endif
-            std::string name,
-            size_t transfer_func_size,
             isaac_float3* ptr,
             size_t width,
             size_t height
         ) :
-        #if ISAAC_ALPAKA == 1
-			ParentClass (
-			acc,
-			host,
-			stream,
-		#else
-			IsaacBaseSource(
-		#endif
-			name,
-			transfer_func_size
-		),
 		ptr(ptr),
 		width(width),
 		width_mul_height(width * height)
-		{
-			//Make transfer function green
-            #if ISAAC_ALPAKA == 1
-                alpaka::mem::buf::Buf<THost, isaac_float4, alpaka::dim::DimInt<1>, size_t> transfer_func_h_buf ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, transfer_func_size ) );
-                isaac_float4* transfer_func_h = reinterpret_cast<isaac_float4*>(alpaka::mem::view::getPtrNative(transfer_func_h_buf));
-            #else
-                isaac_float4 transfer_func_h[ transfer_func_size ];
-            #endif
-            for (size_t i = 0; i < transfer_func_size; i++)
-            {
-                transfer_func_h[i].x = isaac_float(0);
-                transfer_func_h[i].y = isaac_float(1);
-                transfer_func_h[i].z = isaac_float(0);
-                transfer_func_h[i].w = isaac_float(i) / isaac_float(transfer_func_size-1);
-            }
-            #if ISAAC_ALPAKA == 1
-                alpaka::mem::view::copy(stream, ParentClass::transfer_func_d, transfer_func_h_buf, transfer_func_size );
-            #else
-                ISAAC_CUDA_CHECK(cudaMemcpy(transfer_func_d, transfer_func_h, sizeof(isaac_float4)*transfer_func_size, cudaMemcpyHostToDevice));
-            #endif
-		}
+		{}
 		
 		isaac_float3* ptr;
 		isaac_uint width;
@@ -124,19 +84,12 @@ ISAAC_NO_HOST_DEVICE_WARNING
 #if ISAAC_ALPAKA == 1
 template < typename TDevAcc, typename THost, typename TStream >
 #endif
-class TestSource2 : public IsaacBaseSource <
-#if ISAAC_ALPAKA == 1
-    TDevAcc,
-    THost,
-    TStream,
-#endif
-    boost::mpl::int_<1>
->
+class TestSource2
 {
-	#if ISAAC_ALPAKA == 1
-		using ParentClass = IsaacBaseSource < TDevAcc , THost, TStream, boost::mpl::int_<1> >;
-	#endif
 	public:
+		static const std::string name;
+		static const size_t feature_dim = 1;
+
 		ISAAC_NO_HOST_DEVICE_WARNING
         TestSource2 (
             #if ISAAC_ALPAKA == 1
@@ -144,51 +97,19 @@ class TestSource2 : public IsaacBaseSource <
                 THost host,
                 TStream stream,
             #endif
-            std::string name,
-            size_t transfer_func_size,
             isaac_float* ptr,
             size_t width,
             size_t height
         ) :
-        #if ISAAC_ALPAKA == 1
-			ParentClass (
-			acc,
-			host,
-			stream,
-		#else
-			IsaacBaseSource(
-		#endif
-			name,
-			transfer_func_size
-		),
 		ptr(ptr),
 		width(width),
 		width_mul_height(width * height)
-		{
-			//Make transfer function red
-            #if ISAAC_ALPAKA == 1
-                alpaka::mem::buf::Buf<THost, isaac_float4, alpaka::dim::DimInt<1>, size_t> transfer_func_h_buf ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, transfer_func_size ) );
-                isaac_float4* transfer_func_h = reinterpret_cast<isaac_float4*>(alpaka::mem::view::getPtrNative(transfer_func_h_buf));
-            #else
-                isaac_float4 transfer_func_h[ transfer_func_size ];
-            #endif
-            for (size_t i = 0; i < transfer_func_size; i++)
-            {
-                transfer_func_h[i].x = isaac_float(1);
-                transfer_func_h[i].y = isaac_float(0);
-                transfer_func_h[i].z = isaac_float(0);
-                transfer_func_h[i].w = isaac_float(i) / isaac_float(transfer_func_size-1);
-            }
-            #if ISAAC_ALPAKA == 1
-                alpaka::mem::view::copy(stream, ParentClass::transfer_func_d, transfer_func_h_buf, transfer_func_size );
-            #else
-                ISAAC_CUDA_CHECK(cudaMemcpy(transfer_func_d, transfer_func_h, sizeof(isaac_float4)*transfer_func_size, cudaMemcpyHostToDevice));
-            #endif
-		}
+		{ }
 		
 		isaac_float* ptr;
 		isaac_uint width;
 		isaac_uint width_mul_height;
+		
 		ISAAC_NO_HOST_DEVICE_WARNING		
 		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator[] (const isaac_uint3 nIndex)
 		{
@@ -202,6 +123,17 @@ class TestSource2 : public IsaacBaseSource <
 			return result;
 		}
 };
+
+#if ISAAC_ALPAKA == 1
+	template < typename TDevAcc, typename THost, typename TStream >
+	const std::string TestSource1< TDevAcc, THost, TStream >::name = "Test Source 1";
+	template < typename TDevAcc, typename THost, typename TStream >
+	const std::string TestSource2< TDevAcc, THost, TStream >::name = "Test Source 2";
+#else
+	const std::string TestSource1::name = "Test Source 1";
+	const std::string TestSource2::name = "Test Source 2";
+#endif
+
 
 void recursive_kgv(size_t* d,int number,int test);
 
@@ -384,8 +316,6 @@ int main(int argc, char **argv)
 			devAcc,
 			devHost,
 			stream,
-			std::string( "Test Source 1" ),
-			1024,
 			reinterpret_cast<isaac_float3*>(alpaka::mem::view::getPtrNative(deviceBuffer1)),
 			local_size[0],
 			local_size[1]
@@ -394,8 +324,6 @@ int main(int argc, char **argv)
 			devAcc,
 			devHost,
 			stream,
-			std::string( "Test Source 2" ),
-			1024,
 			reinterpret_cast<isaac_float*>(alpaka::mem::view::getPtrNative(deviceBuffer2)),
 			local_size[0],
 			local_size[1]
@@ -406,8 +334,8 @@ int main(int argc, char **argv)
 			TestSource2< DevAcc, DevHost, Stream >
 		>;
 	#else
-		TestSource1 testSource1 ( std::string( "Test Source 1" ), 1024, reinterpret_cast<isaac_float3*>(deviceBuffer1), local_size[0], local_size[1] );
-		TestSource2 testSource2 ( std::string( "Test Source 2" ), 1024, reinterpret_cast<isaac_float*>(deviceBuffer2), local_size[0], local_size[1] );
+		TestSource1 testSource1 ( reinterpret_cast<isaac_float3*>(deviceBuffer1), local_size[0], local_size[1] );
+		TestSource2 testSource2 ( reinterpret_cast<isaac_float*>(deviceBuffer2), local_size[0], local_size[1] );
 		using SourceList = boost::fusion::list
 		<
 			TestSource1,
@@ -416,9 +344,9 @@ int main(int argc, char **argv)
 	#endif
 	SourceList sources( testSource1, testSource2 );
 	#if ISAAC_ALPAKA == 1
-		IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim,SourceList> visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
+		IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim,SourceList,alpaka::Vec<SimDim, size_t>, 1024 > visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
 	#else
-		IsaacVisualization<SimDim,SourceList> visualization(name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
+		IsaacVisualization<SimDim,SourceList,std::vector<size_t>,1024> visualization(name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
 	#endif
 	
 	//Setting up the metadata description (only master, but however slaves could then metadata metadata, too, it would be merged)

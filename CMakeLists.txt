@@ -59,10 +59,13 @@ set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIR})
 find_package (Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
-#find_package (GStreamer REQUIRED)
-pkg_search_module(GSTREAMER REQUIRED gstreamer-1.0)
-set(LIBS ${LIBS} ${GSTREAMER_LIBRARIES} ${GSTREAMER_APP_LIBRARIES})
-set(INCLUDE ${INCLUDE} ${GSTREAMER_INCLUDE_DIRS})
+pkg_search_module(GST REQUIRED gstreamer-1.0)
+set(LIBS ${LIBS} ${GST_LIBRARIES} )
+set(INCLUDE ${INCLUDE} ${GST_INCLUDE_DIRS})
+
+pkg_search_module(GST_APP REQUIRED gstreamer-app-1.0)
+set(LIBS ${LIBS} ${GST_APP_LIBRARIES})
+set(INCLUDE ${INCLUDE} ${GST_APP_INCLUDE_DIRS})
 
 include_directories(isaac ${INCLUDE})	
 target_link_libraries(isaac ${LIBS})
@@ -87,7 +90,7 @@ if (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${MPI_C_INCLUDE_PATH})
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${MPI_CXX_INCLUDE_PATH})
 
-	find_package(Boost REQUIRED)
+	find_package(Boost 1.56.0 REQUIRED)
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${Boost_INCLUDE_DIR})
 	add_definitions(-DBOOST_ALL_NO_LIB)
 

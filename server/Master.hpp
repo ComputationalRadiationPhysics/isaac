@@ -49,14 +49,15 @@ class InsituConnectorGroup
 {
 	friend class Master;
 	public:
-		InsituConnectorGroup(std::string name)
+		InsituConnectorGroup(std::string name) :
+			video( NULL ),
+			master( NULL ),
+			initData( NULL ),
+			id( 0 ),
+			name( name),
+			nodes( MAX_NODES ),
+			video_buffer_size( 0 )
 		{
-			this->name = name;
-			this->nodes = MAX_NODES;
-			this->id = 0;
-			this->video = NULL;
-			this->video_buffer_size = 0;
-			this->initData = NULL;
 			pthread_mutex_init (&streams_mutex, NULL);
 		}
 		int getID()

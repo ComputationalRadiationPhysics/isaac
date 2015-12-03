@@ -188,6 +188,12 @@ struct isaac_size_struct
     isaac_size_dim < simdim > local_size;
 };
 
+template< int N >
+struct transfer_func_struct
+{
+    isaac_float4* pointer[ N ];
+};
+
 typedef enum
 {
     META_MERGE = 0,

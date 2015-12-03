@@ -16,7 +16,7 @@
 #pragma once
 
 #include "isaac_macros.hpp"
-#include "isaac_source.hpp"
+#include "isaac_fusion_extension.hpp"
 
 namespace isaac
 {
@@ -70,6 +70,7 @@ struct IsaacChainLength
     }
 };
 
+template < size_t Ttransfer_func_size >
 struct merge_source_iterator
 {
     ISAAC_NO_HOST_DEVICE_WARNING
@@ -77,20 +78,22 @@ struct merge_source_iterator
     <
         typename TSource,
         typename TColor,
-        typename TCoord
+        typename TCoord,
+        typename TTransferArray
     >
-    ISAAC_HOST_DEVICE_INLINE  void operator()( TSource& source, TColor& color, TCoord& coord) const
+    ISAAC_HOST_DEVICE_INLINE  void operator()(
+        const int I,
+        TSource& source,
+        TColor& color,
+        TCoord& coord,
+        TTransferArray& transferArray) const
     {
         auto data = source[coord];
         isaac_float_dim<1> result = IsaacChainLength::call< TSource::feature_dim >( data );
-        isaac_uint lookup_value = isaac_uint( round(result.x * isaac_float( source.transfer_func_size ) ) );
-        if (lookup_value >= source.transfer_func_size)
-            lookup_value = source.transfer_func_size - 1;
-        #if ISAAC_ALPAKA == 1
-            isaac_float4 value = alpaka::mem::view::getPtrNative(source.transfer_func_d)[ lookup_value ];
-        #else
-            isaac_float4 value = source.transfer_func_d[ lookup_value ];
-        #endif
+        isaac_uint lookup_value = isaac_uint( round(result.x * isaac_float( Ttransfer_func_size ) ) );
+        if (lookup_value >= Ttransfer_func_size )
+            lookup_value = Ttransfer_func_size - 1;
+        isaac_float4 value = transferArray.pointer[ I ][ lookup_value ];
         color.x = color.x + value.x * value.w;
         color.y = color.y + value.y * value.w;
         color.z = color.z + value.z * value.w;
@@ -107,7 +110,9 @@ struct merge_source_iterator
 template <
     typename TSimDim,
     typename TSourceList,
-    typename TChainList
+    typename TChainList,
+    typename TTransferArray,
+    size_t Ttransfer_func_size
 >
 #if ISAAC_ALPAKA == 1
     struct IsaacFillRectKernel
@@ -125,7 +130,8 @@ template <
             isaac_uint2 framebuffer_start,
             TSourceList sources,
             isaac_float step,
-            isaac_float4 background_color)
+            isaac_float4 background_color,
+            TTransferArray transferArray )
 #if ISAAC_ALPAKA == 1
         const
 #endif
@@ -231,7 +237,7 @@ template <
                 if ( ISAAC_FOR_EACH_DIM_TWICE(3, coord, < isaac_size_d[0].local_size, && ) 1 )
                 {
                     isaac_float4 value = {0, 0, 0, 0};
-                    isaac_for_each_2_params( sources, merge_source_iterator() , value, coord );
+                    isaac_for_each_3_params( sources, merge_source_iterator<Ttransfer_func_size>() , value, coord, transferArray);
                     if ( mpl::size< TSourceList >::type::value > 1)
                         value = value / isaac_float( mpl::size< TSourceList >::type::value );
                     isaac_float oma = isaac_float(1) - color.w;

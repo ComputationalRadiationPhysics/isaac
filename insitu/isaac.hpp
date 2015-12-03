@@ -40,9 +40,9 @@
     #include <boost/mpl/int.hpp>
 #endif
 
-#include <isaac/isaac_kernel.hpp>
-#include <isaac/isaac_communicator.hpp>
-#include <isaac/isaac_helper.hpp>
+#include "isaac/isaac_kernel.hpp"
+#include "isaac/isaac_communicator.hpp"
+#include "isaac/isaac_helper.hpp"
 
 namespace isaac
 {
@@ -55,7 +55,9 @@ template <
     typename TAccDim,
 #endif
     typename TSimDim,
-    typename TSourceList
+    typename TSourceList,
+    typename TDomainSize,
+    size_t TTransfer_func_size
 >
 class IsaacVisualization 
 {
@@ -63,6 +65,7 @@ class IsaacVisualization
         #if ISAAC_ALPAKA == 1
             using TDevAcc = alpaka::dev::Dev<TAcc>;
             using TFraDim = alpaka::dim::DimInt<1>;
+            using TTexDim = alpaka::dim::DimInt<1>;
         #endif
         using TChainList = boost::fusion::list< IsaacChainLength >;
         
@@ -72,9 +75,10 @@ class IsaacVisualization
             <
                 typename TSource,
                 typename TJsonRoot,
-                typename TUnused
+                typename TUnused1,
+                typename TUnused2
             >
-            ISAAC_HOST_DEVICE_INLINE  void operator()( TSource& s, TJsonRoot& jsonRoot, TUnused& unused) const
+            ISAAC_HOST_DEVICE_INLINE  void operator()( const int N,TSource& s, TJsonRoot& jsonRoot, TUnused1& unused1, TUnused2& unused2) const
             {
                 #ifndef __CUDA_ARCH__
                     json_t *content = json_object();
@@ -96,15 +100,9 @@ class IsaacVisualization
             std::string server_url,
             isaac_uint server_port,
             isaac_size2 framebuffer_size,
-            #if ISAAC_ALPAKA == 1
-                const alpaka::Vec<TSimDim, size_t> global_size,
-                const alpaka::Vec<TSimDim, size_t> local_size,
-                const alpaka::Vec<TSimDim, size_t> position,
-            #else
-                const std::vector<size_t> global_size,
-                const std::vector<size_t> local_size,
-                const std::vector<size_t> position,
-            #endif
+            const TDomainSize global_size,
+            const TDomainSize local_size,
+            const TDomainSize position,
             TSourceList sources
             ) :
             #if ISAAC_ALPAKA == 1
@@ -159,6 +157,32 @@ class IsaacVisualization
             ISAAC_SET_IDENTITY(3,rotation)
             distance = -5.0f;
             updateModelview();
+            
+            //Transfer func memory:
+            for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+            {
+                #if ISAAC_ALPAKA == 1
+                    transfer_func_vec[i] = alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>(acc, alpaka::Vec<TTexDim, size_t> ( TTransfer_func_size ) ) );
+                    transfer_funcs.pointer[i] = alpaka::mem::view::getPtrNative( transfer_func_vec[i] );
+                    alpaka::mem::buf::Buf<THost, isaac_float4, TTexDim, size_t> transfer_func_h_buf ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, TTransfer_func_size ) );
+                    isaac_float4* transfer_func_h = reinterpret_cast<isaac_float4*>(alpaka::mem::view::getPtrNative(transfer_func_h_buf));
+                #else
+                    ISAAC_CUDA_CHECK(cudaMalloc((isaac_float4**)&(transfer_funcs.pointer[i]), sizeof(isaac_float4)*TTransfer_func_size));
+                    isaac_float4 transfer_func_h[ transfer_func_size ];
+                #endif
+                for (size_t j = 0; j < TTransfer_func_size; j++)
+                {
+                    transfer_func_h[j].x = isaac_float(i%2 == 0 ? 1 : 0);
+                    transfer_func_h[j].y = isaac_float(i%2 == 0 ? 0 : 1);
+                    transfer_func_h[j].z = isaac_float(0);
+                    transfer_func_h[j].w = isaac_float(j) / isaac_float( TTransfer_func_size-1);
+                }
+                #if ISAAC_ALPAKA == 1
+                    alpaka::mem::view::copy(stream, transfer_func_vec[i], transfer_func_h_buf, TTransfer_func_size );
+                #else
+                    ISAAC_CUDA_CHECK(cudaMemcpy(transfer_funcs.pointer[i], transfer_func_h, sizeof(isaac_float4)*TTransfer_func_size, cudaMemcpyHostToDevice));
+                #endif
+            }
 
             //ISAAC:
             IceTCommunicator icetComm;
@@ -188,9 +212,9 @@ class IsaacVisualization
             icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
             icetEnable(ICET_ORDERED_COMPOSITE);
             
-            size_t max_size = max(global_size[0],global_size[1]);
+            size_t max_size = max(uint32_t(global_size[0]),uint32_t(global_size[1]));
             if (TSimDim::value > 2)
-                max_size = max(global_size[2],max_size);
+                max_size = max(uint32_t(global_size[2]),uint32_t(max_size));
             isaac_float f_l_width = (isaac_float)local_size[0]/(isaac_float)max_size * 2.0f;
             isaac_float f_l_height = (isaac_float)local_size[1]/(isaac_float)max_size * 2.0f;
             isaac_float f_l_depth = 0.0f;
@@ -607,7 +631,7 @@ class IsaacVisualization
             size_h[0].local_size.y = myself->local_size[1];
             if (TSimDim::value > 2)
                 size_h[0].local_size.z = myself->local_size[2];
-            size_h[0].max_global_size = static_cast<float>(max(max(myself->global_size[0],myself->global_size[1]),myself->global_size[2]));
+            size_h[0].max_global_size = static_cast<float>(max(max(uint32_t(myself->global_size[0]),uint32_t(myself->global_size[1])),uint32_t(myself->global_size[2])));
             
             #if ISAAC_ALPAKA == 1
                 alpaka::mem::view::copy(myself->stream, myself->inverse_d, inverse_h_buf, size_t(16));
@@ -662,7 +686,8 @@ class IsaacVisualization
                     framebuffer_start,
                     myself->sources,
                     step,
-                    bg_color));
+                    bg_color,
+                    myself->transfer_funcs));
                 alpaka::stream::enqueue(myself->stream, test);
                 alpaka::wait::wait(myself->stream);
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
@@ -672,13 +697,14 @@ class IsaacVisualization
             #else
                 dim3 block (block_size.x, block_size.y);
                 dim3 grid  (grid_size.x, grid_size.y);
-                IsaacFillRectKernel<TSimDim,TSourceList,TChainList> <<<grid, block>>>(
+                IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_func_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_func_size > <<<grid, block>>>(
                     myself->framebuffer,
                     myself->framebuffer_size,
                     framebuffer_start,
                     myself->sources,
                     step,
-                    bg_color);
+                    bg_color,
+                    myself->transfer_funcs);
                 ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
                 ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
@@ -776,17 +802,17 @@ class IsaacVisualization
         isaac_size2 framebuffer_size;
         #if ISAAC_ALPAKA == 1
             alpaka::Vec<TFraDim, size_t> framebuffer_prod;
-            alpaka::Vec<TSimDim, size_t> global_size;
-            alpaka::Vec<TSimDim, size_t> local_size;
-            alpaka::Vec<TSimDim, size_t> position;
+            TDomainSize global_size;
+            TDomainSize local_size;
+            TDomainSize position;
             alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t> framebuffer;
             alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t> inverse_d;
             alpaka::mem::buf::Buf<TDevAcc, isaac_size_struct< TSimDim::value >, TFraDim, size_t> size_d;
         #else
             size_t framebuffer_prod;
-            std::vector<size_t> global_size;
-            std::vector<size_t> local_size;
-            std::vector<size_t> position;        
+            TDomainSize global_size;
+            TDomainSize local_size;
+            TDomainSize position;        
             isaac_uint* framebuffer;
         #endif
         IceTDouble projection[16];
@@ -811,16 +837,19 @@ class IsaacVisualization
         IsaacVisualizationMetaEnum thr_metaTargets;
         pthread_t visualizationThread;
         #if ISAAC_ALPAKA == 1
-            IsaacFillRectKernel<TSimDim,TSourceList,TChainList> fillRectKernel;
+            IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_func_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_func_size > fillRectKernel;
+            std::vector< alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> > transfer_func_vec;
         #endif
+        transfer_func_struct< boost::mpl::size< TSourceList >::type::value > transfer_funcs;
+        const static size_t transfer_func_size = TTransfer_func_size;
 };
 
 #if ISAAC_ALPAKA == 1
-    template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList>
-    IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList>::myself = NULL;
+    template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_func_size>
+    IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_func_size>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_func_size>::myself = NULL;
 #else
-    template <typename TSimDim, typename TSourceList>
-    IsaacVisualization<TSimDim,TSourceList>* IsaacVisualization<TSimDim,TSourceList>::myself = NULL;
+    template <typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_func_size>
+    IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_func_size>* IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_func_size>::myself = NULL;
 #endif
 
 } //namespace isaac;
