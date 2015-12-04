@@ -127,7 +127,11 @@ errorCode InsituConnectorMaster::run()
 				if (fd_array[i].revents == POLLIN)
 				{
 					jlcb.pos = 0;
-					jlcb.count = recv(fd_array[i].fd,jlcb.buffer,MAX_RECEIVE,MSG_DONTWAIT);
+					uint32_t expected = 0;
+					recv(fd_array[i].fd,&expected,4,0);
+					jlcb.count = 0;
+					while (jlcb.count < expected)
+						jlcb.count += recv(fd_array[i].fd,&(jlcb.buffer[jlcb.count]),expected-jlcb.count,0);
 					bool closed = false;
 					bool reused = false;
 					if (jlcb.count > 0)
@@ -188,7 +192,7 @@ InsituConnectorMaster::~InsituConnectorMaster()
 	while (mom = insituConnectorList.pop_front())
 	{
 		shutdown(mom->connector->getSockFD(),SHUT_RDWR);
-		printf("Waiting for InsituConnectorThread %i to finish... ",mom->connector->getID());
+		printf("Waiting for Connections %i to finish... ",mom->connector->getID());
 		fflush(stdout);
 		delete mom;
 		printf("Done\n");

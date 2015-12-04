@@ -189,9 +189,16 @@ struct isaac_size_struct
 };
 
 template< int N >
-struct transfer_func_struct
+struct transfer_d_struct
 {
     isaac_float4* pointer[ N ];
+};
+
+template< int N >
+struct transfer_h_struct
+{
+    isaac_float4* pointer[ N ];
+    std::map< isaac_uint, isaac_float4 > description[ N ];
 };
 
 typedef enum

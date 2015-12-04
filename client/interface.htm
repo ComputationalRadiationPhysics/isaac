@@ -5,6 +5,7 @@
 <title>ISAAC Control Page</title>
 </head>
 <body>
+<script src="jscolor.js"></script>
 <h3>Preview and camera setting</h3>
 <p>Usage:
 <ul>
@@ -28,8 +29,14 @@
 	<div id="video_container_div" style="position: relative;">
 		<div id="video_div" style="position: relative; top: 0; left: 0;">
 			<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls="false" windowless="true"/>
-			<div contentEditable="true" id="url_div" style="display:none;"></div>
-			<form><input type="button" value="Send example metadada" id="metadata"><input type="button" value="Stop observing" id="stop"><input type="button" value="Stop simulation" id="exit"></form>
+			<div contentEditable="true" id="url_div" style="display:none;"></div><br/>
+			<canvas id="transfer" width="412" height="16"></canvas>
+			<table border="1"><tr id="transfer_form"></tr></table>
+			<form>
+				<input type="button" value="Send example metadada" id="metadata">
+				<input type="button" value="Stop observing" id="stop">
+				<input type="button" value="Stop simulation" id="exit">
+			</form>
 		</div>
 		<div id="preview_div" style="position: absolute; top: 0; left: 0; opacity: 0.5;">
 			<canvas id="preview" width="512" height="512" style="border:1px solid #000000;"></canvas>
@@ -59,9 +66,18 @@
 </div>
 </body>
 <script>
-var preview = document.getElementById("preview");
+/**
+ * ISAAC Client - Reference client implementation for ISAAC
+ *
+ * @link    https://github.com/ComputationalRadiationPhysics/isaac
+ * @license GPLv3
+ * @author  Alexander Matthes
+ */
 var video = document.getElementById("video");
-var ctx = preview.getContext("2d");
+var preview = document.getElementById("preview");
+var p_ctx = preview.getContext("2d");
+var transfer = document.getElementById("transfer");
+var t_ctx = transfer.getContext("2d");
 var socket = null;
 var observe_id = -1;
 var particles = null;
@@ -95,6 +111,8 @@ var modelview = [
 ];
 
 var znear = 0;
+var transfer_array = [];
+var transfer_points = [];
 
 var edges = [
 	[ -1,  1,  1 ],
@@ -179,8 +197,8 @@ function line(p1,p2)
 	var t2 = project(p2);
 	if ((Math.abs(t1[2]) > 1) || (Math.abs(t2[2]) > 1))
 		return;
-	ctx.moveTo( t1[0], t1[1] );
-	ctx.lineTo( t2[0], t2[1] );
+	p_ctx.moveTo( t1[0], t1[1] );
+	p_ctx.lineTo( t2[0], t2[1] );
 }
 
 function point(p,nocheck = false)
@@ -188,7 +206,7 @@ function point(p,nocheck = false)
 	var t = project(p);
 	if (!nocheck && Math.abs(t[2]) > 1)
 		return;
-	ctx.fillRect( t[0], t[1], 3, 3 );
+	p_ctx.fillRect( t[0], t[1], 3, 3 );
 }	
 
 
@@ -234,14 +252,14 @@ function redraw()
 	];
 	modelview = mulMatrix( distance_m, mulMatrix( rotation_m, position_m ) );
 	
-	ctx.clearRect(0, 0, preview.clientWidth, preview.clientHeight);
-	ctx.fillStyle = "#000000";
+	p_ctx.clearRect(0, 0, preview.clientWidth, preview.clientHeight);
+	p_ctx.fillStyle = "#000000";
 	if (one_window && !no_stream)
-		ctx.strokeStyle = '#ffffff';
+		p_ctx.strokeStyle = '#ffffff';
 	else
-		ctx.strokeStyle = '#000000';
-	ctx.lineWidth = 2;
-	ctx.beginPath();
+		p_ctx.strokeStyle = '#000000';
+	p_ctx.lineWidth = 2;
+	p_ctx.beginPath();
 	
 	if (wireframe)
 		drawUnitCube();
@@ -249,10 +267,11 @@ function redraw()
 	{
 		point( particles[p] );
 	}
-	ctx.stroke();
+	p_ctx.stroke();
 }
 
 var last_feedback_send = 0;
+var sources = null;
 
 function sendFeedback(name,feedback)
 {
@@ -273,7 +292,7 @@ function mouseWheelHandler(e)
 	var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail))) * 0.1;
 	distance += delta;
 	redraw();
-	ctx.fillText("Delta: " + delta,1,10);
+	p_ctx.fillText("Delta: " + delta,1,10);
 	sendFeedback("distance relative",delta);
 }
 
@@ -339,7 +358,7 @@ function mouseMoveHandler(e)
 	mousey = e.clientY;
 }
 
-ctx.font = "10px Arial";
+p_ctx.font = "10px Arial";
 redraw();
 preview.addEventListener("mousewheel", mouseWheelHandler, false);
 preview.addEventListener("DOMMouseScroll", mouseWheelHandler, false);
@@ -347,6 +366,8 @@ preview.addEventListener("mousemove", mouseMoveHandler, false);
 preview.addEventListener("mousedown", mouseDownHandler, false);
 preview.addEventListener("mouseup", mouseUpHandler, false);
 preview.onmouseout = function(){mouseResetHandler(); document.body.style.overflowY = "scroll";};
+
+transfer.addEventListener("mousedown", transferMouseDownHandler, false);
 
 document.getElementById("video_td").style.display = 'none';
 document.getElementById("preview_td").style.display = 'none';
@@ -362,6 +383,10 @@ function stopObserverSimulation()
 	};
 	socket.send(JSON.stringify(obj));
 	observe_id = -1;
+	var transfer_form = document.getElementById("transfer_form");
+	while (transfer_form.firstChild) {
+		transfer_form.removeChild(transfer_form.firstChild);
+	}
 }
 
 function observeSimulation(id)
@@ -374,6 +399,109 @@ function observeSimulation(id)
 		"observe id" : observe_id
 	};
 	socket.send(JSON.stringify(obj));
+}
+
+function transferRectangle(x,y,w,h,color)
+{
+	t_ctx.beginPath();
+	t_ctx.rect(x,y,w,h);
+	t_ctx.fillStyle=color;
+	t_ctx.fill();
+}
+
+var transfer_high = 64;
+
+function transferMouseDownHandler(e)
+{
+	var rect = transfer.getBoundingClientRect();
+	var X = Math.floor(e.clientX - rect.left);
+	var Y = Math.floor(e.clientY - rect.top);
+	var source = Math.floor(Y / (transfer_high+2));
+	var value = Math.round(X / transfer.width * transfer_array[source].length);
+	var localY = Math.floor(Y - source * (transfer_high+2));
+	var element =
+	{
+		"value" : value,
+		"r" : transfer_array[source][value][0]/255,
+		"g" : transfer_array[source][value][1]/255,
+		"b" : transfer_array[source][value][2]/255,
+		"a" : 1-localY/(transfer_high+2)
+	}
+	transfer_points[source].push( element );
+	sendFeedback( "transfer points", transfer_points );
+	document.getElementById("debug").innerHTML = transfer_array[source][value][3];
+}
+
+function updateTransfer()
+{
+	transfer.width = video.width;
+	transfer.height = transfer_array.length*transfer_high + (transfer_array.length - 1) * 2;
+	for (var f = 0; f < transfer_array.length; f++)
+	{
+		var lastX = 0;
+		for (var i = 0; i < transfer_array[f].length; i++)
+		{
+			var newX = Math.round( i* transfer.width / transfer_array[f].length );
+			if (newX != lastX)
+			{
+				var bg1 = [127,127,127];
+				var bg2 = [255,255,255];
+				if (Math.round((lastX+transfer_high/4) / (transfer_high/2)) % 2 == 0)
+				{
+					var bgt = bg1;
+					bg1 = bg2;
+					bg2 = bgt;
+				}
+				var rgba = transfer_array[f][i];
+				var fg1 = new Array(3);
+				fg1[0] = Math.round((rgba[0] * rgba[3] + bg1[0] * (255 - rgba[3]) )/ 255);
+				fg1[1] = Math.round((rgba[1] * rgba[3] + bg1[1] * (255 - rgba[3]) )/ 255);
+				fg1[2] = Math.round((rgba[2] * rgba[3] + bg1[2] * (255 - rgba[3]) )/ 255);
+				var fg2 = new Array(3);
+				fg2[0] = Math.round((rgba[0] * rgba[3] + bg2[0] * (255 - rgba[3]) )/ 255);
+				fg2[1] = Math.round((rgba[1] * rgba[3] + bg2[1] * (255 - rgba[3]) )/ 255);
+				fg2[2] = Math.round((rgba[2] * rgba[3] + bg2[2] * (255 - rgba[3]) )/ 255);
+				transferRectangle(lastX,f*(transfer_high+2)                ,newX-lastX,transfer_high/2,"rgb("+ fg1[0] +","+ fg1[1] +","+ fg1[2] +")");
+				transferRectangle(lastX,f*(transfer_high+2)+transfer_high/2,newX-lastX,transfer_high/2,"rgb("+ fg2[0] +","+ fg2[1] +","+ fg2[2] +")");
+			}
+			lastX = newX;
+		}
+		t_ctx.beginPath();
+		var first = true;
+		for (p in transfer_points[f])
+		{
+			var point = [
+				transfer_points[f][p].value * transfer.width / transfer_array[f].length,
+				f*(transfer_high+2) + transfer_high - transfer_points[f][p].a * transfer_high
+			];
+			if (first)
+			{
+				t_ctx.moveTo( point[0], point[1] );
+				first = false;
+			}
+			else
+				t_ctx.lineTo( point[0], point[1] );
+		}
+		t_ctx.stroke();
+		transferRectangle(0,f*(transfer_high+2)+transfer_high,transfer.width,2,"black");
+	}
+}
+
+function removePoint( e )
+{
+	var elements = e.target.id.split("_");
+	var s = parseInt(elements[1]);
+	var i = parseInt(elements[2]);
+	transfer_points[s].splice( i, 1 );
+	sendFeedback( "transfer points", transfer_points );
+}
+
+function pad(num, size) {
+    var s = num.toString();
+    var l = size - s.length;
+    for (var i = 0; i < l; i++)
+		s =	"&nbsp;" + s;
+    return s;
 }
 
 document.getElementById("connect").onclick = function()
@@ -465,6 +593,7 @@ document.getElementById("connect").onclick = function()
 						position = obj["position"];
 						distance = obj["distance"];
 						rotation = obj["rotation"];
+						sources = obj["sources"];
 						
 						preview.width = obj["framebuffer width"];
 						preview.height = obj["framebuffer height"];
@@ -508,6 +637,85 @@ document.getElementById("connect").onclick = function()
 							rotation = obj["rotation"];
 						if (obj.hasOwnProperty("distance"))
 							distance = obj["distance"];
+					}
+					if (obj.hasOwnProperty("transfer array"))
+					{
+						transfer_array = obj["transfer array"];
+						if (obj.hasOwnProperty("transfer points"))
+						{
+							transfer_points = obj["transfer points"];
+							var transfer_form = document.getElementById("transfer_form");
+							while (transfer_form.firstChild) {
+								transfer_form.removeChild(transfer_form.firstChild);
+							}
+							for (var s in transfer_points)
+							{
+								var node = document.createElement("TD");
+								node.innerHTML = "<b>" + sources[s].name + "</b>";
+								node.style.vertical_align = "bottom";
+								for (var i in transfer_points[s])
+								{
+									var subnode = document.createElement("DIV");
+									subnode.innerHTML = '<font face="monospace">' + (transfer_points[s][i].value / transfer_array[s].length).toFixed(3) + ": </font>";
+									var input = document.createElement("INPUT");
+									input.type = button;
+									var picker = new jscolor(input);
+									input.jscolor = picker;
+									picker.closable = true;
+									picker.closeText = "Close";
+									picker.fromRGB( transfer_points[s][i].r * 255, transfer_points[s][i].g * 255, transfer_points[s][i].b * 255 );
+									input.id = "p_" + s + "_" + i + "_color";
+									subnode.appendChild(input);
+									var alpha = document.createElement("INPUT");
+									alpha.value = transfer_points[s][i].a;
+									alpha.size = 10;
+									alpha.id = "p_" + s + "_" + i + "_alpha";
+									subnode.appendChild(alpha);
+									if (i != 0 && i != transfer_points[s].length-1)
+									{
+										var remove = document.createElement("INPUT");
+										remove.type = "button";
+										remove.value = "Remove";
+										remove.id = "p_" + s + "_" + i + "_remove";
+										remove.onclick = removePoint;
+										subnode.appendChild(remove);
+									}
+									node.appendChild(subnode);
+								}
+								transfer_form.appendChild(node);
+							}
+							var node = document.createElement("TD");
+							node.innerHTML = "<b> Controls </b><br/>";
+							var redo = document.createElement("INPUT");
+							redo.type = "button";
+							redo.value = "Reset";
+							redo.onclick = function ()
+							{
+								sendFeedback("request", "transfer");
+							};
+							node.appendChild(redo);
+							var submit = document.createElement("INPUT");
+							submit.type = "button";
+							submit.value = "Submit changes";
+							submit.onclick = function()
+							{
+								for (var s in transfer_points)
+									for (var i in transfer_points[s])
+									{
+										var base = "p_" + s + "_" + i;
+										var color = document.getElementById( base + "_color");
+										var alpha = document.getElementById( base + "_alpha");
+										transfer_points[s][i].r = color.jscolor.rgb[0]/255;
+										transfer_points[s][i].g = color.jscolor.rgb[1]/255;
+										transfer_points[s][i].b = color.jscolor.rgb[2]/255;
+										transfer_points[s][i].a = parseFloat(alpha.value);
+									}
+								sendFeedback( "transfer points", transfer_points );
+							};
+							node.appendChild(submit);
+							transfer_form.appendChild(node);
+						}
+						updateTransfer();
 					}
 					redraw();
 				}
@@ -627,39 +835,6 @@ function no_stream_checkbox_click()
 		document.getElementById("preview_div").style.opacity = '0.5';
 	}
 };
-
-
-/*function setFrustum(left, right, bottom, top, znear, zfar )
-{
-	var znear2 = znear * 2;
-	var width = right - left;
-	var height = top - bottom;
-	var zRange = znear - zfar;
-	projection[ 0] = znear2 / width;
-	projection[ 1] = 0;
-	projection[ 2] = 0;
-	projection[ 3] = 0;
-	projection[ 4] = 0;
-	projection[ 5] = znear2 / height;
-	projection[ 6] = 0;
-	projection[ 7] = 0;
-	projection[ 8] = ( right + left ) / width;
-	projection[ 9] = ( top + bottom ) / height;
-	projection[10] = ( zfar + znear) / zRange;
-	projection[11] = -1;
-	projection[12] = 0;
-	projection[13] = 0;
-	projection[14] = ( -znear2 * zfar ) / -zRange;
-	projection[15] = 0;
-}
-
-function setPerspective( fovyInDegrees, aspectRatio, __znear, zfar )
-{
-	znear = __znear;
-	var ymax = znear * Math.tan( fovyInDegrees * Math.PI / 360.0 );
-	var xmax = ymax * aspectRatio;
-	setFrustum( -xmax, xmax, -ymax, ymax, znear, zfar );
-}*/
 
 </script>
 </html>

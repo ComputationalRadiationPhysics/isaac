@@ -57,7 +57,7 @@ template <
     typename TSimDim,
     typename TSourceList,
     typename TDomainSize,
-    size_t TTransfer_func_size
+    size_t TTransfer_size
 >
 class IsaacVisualization 
 {
@@ -78,7 +78,7 @@ class IsaacVisualization
                 typename TUnused1,
                 typename TUnused2
             >
-            ISAAC_HOST_DEVICE_INLINE  void operator()( const int N,TSource& s, TJsonRoot& jsonRoot, TUnused1& unused1, TUnused2& unused2) const
+            ISAAC_HOST_DEVICE_INLINE  void operator()( const int I,TSource& s, TJsonRoot& jsonRoot, TUnused1& unused1, TUnused2& unused2) const
             {
                 #ifndef __CUDA_ARCH__
                     json_t *content = json_object();
@@ -159,30 +159,22 @@ class IsaacVisualization
             updateModelview();
             
             //Transfer func memory:
+            
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
                 #if ISAAC_ALPAKA == 1
-                    transfer_func_vec[i] = alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>(acc, alpaka::Vec<TTexDim, size_t> ( TTransfer_func_size ) ) );
-                    transfer_funcs.pointer[i] = alpaka::mem::view::getPtrNative( transfer_func_vec[i] );
-                    alpaka::mem::buf::Buf<THost, isaac_float4, TTexDim, size_t> transfer_func_h_buf ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, TTransfer_func_size ) );
-                    isaac_float4* transfer_func_h = reinterpret_cast<isaac_float4*>(alpaka::mem::view::getPtrNative(transfer_func_h_buf));
+                    transfer_d_buf[i] = alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>( acc, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) );
+                    transfer_h_buf[i] = alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) );
+                    transfer_d.pointer[i] = alpaka::mem::view::getPtrNative( transfer_d_buf[i] );
+                    transfer_h.pointer[i] = alpaka::mem::view::getPtrNative( transfer_h_buf[i] );
                 #else
-                    ISAAC_CUDA_CHECK(cudaMalloc((isaac_float4**)&(transfer_funcs.pointer[i]), sizeof(isaac_float4)*TTransfer_func_size));
-                    isaac_float4 transfer_func_h[ transfer_func_size ];
+                    ISAAC_CUDA_CHECK(cudaMalloc((isaac_float4**)&(transfer_d.pointer[i]), sizeof(isaac_float4)*TTransfer_size));
+                    transfer_h.pointer[i] = (isaac_float4*)malloc( sizeof(isaac_float4)*TTransfer_size );
                 #endif
-                for (size_t j = 0; j < TTransfer_func_size; j++)
-                {
-                    transfer_func_h[j].x = isaac_float(i%2 == 0 ? 1 : 0);
-                    transfer_func_h[j].y = isaac_float(i%2 == 0 ? 0 : 1);
-                    transfer_func_h[j].z = isaac_float(0);
-                    transfer_func_h[j].w = isaac_float(j) / isaac_float( TTransfer_func_size-1);
-                }
-                #if ISAAC_ALPAKA == 1
-                    alpaka::mem::view::copy(stream, transfer_func_vec[i], transfer_func_h_buf, TTransfer_func_size );
-                #else
-                    ISAAC_CUDA_CHECK(cudaMemcpy(transfer_funcs.pointer[i], transfer_func_h, sizeof(isaac_float4)*TTransfer_func_size, cudaMemcpyHostToDevice));
-                #endif
+                transfer_h.description[i].insert( std::pair< isaac_uint, isaac_float4> (0, {1, 1, 1, 0} ));
+                transfer_h.description[i].insert( std::pair< isaac_uint, isaac_float4> (TTransfer_size, {1, 1, 1, 1} ));
             }
+            updateTransfer();
 
             //ISAAC:
             IceTCommunicator icetComm;
@@ -233,6 +225,7 @@ class IsaacVisualization
             recreateJSON();
             if (rank == master)
             {
+                json_object_set_new( json_root, "type", json_string( "register" ) );
                 json_object_set_new( json_root, "name", json_string( name.c_str() ) );
                 json_object_set_new( json_root, "nodes", json_integer( numProc ) );
                 json_object_set_new( json_root, "framebuffer width", json_integer ( framebuffer_size.x ) );
@@ -266,7 +259,31 @@ class IsaacVisualization
                     json_object_set_new( json_root, "height", json_integer ( global_size[1] ) );
                 if (TSimDim::value > 2)
                     json_object_set_new( json_root, "depth", json_integer ( global_size[2] ) );
-                json_object_set_new( json_root, "type", json_string( "register" ) );
+            }
+        }
+        void updateTransfer()
+        {
+            for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+            {
+                auto next = transfer_h.description[i].begin();
+                auto before = next;
+                for(next++; next != transfer_h.description[i].end(); next++)
+                {
+                    isaac_uint width = next->first - before->first;
+                    for (size_t j = 0; j < width && j + before->first < TTransfer_size; j++)
+                    {
+                        transfer_h.pointer[i][before->first + j] = (
+                            before->second * isaac_float(width-j) +
+                              next->second * isaac_float(j)
+                            ) / isaac_float( width );
+                    }
+                    before = next;
+                }
+                #if ISAAC_ALPAKA == 1
+                    alpaka::mem::view::copy(stream, transfer_d_buf[i], transfer_h_buf[i], TTransfer_size );
+                #else
+                    ISAAC_CUDA_CHECK(cudaMemcpy(transfer_d.pointer[i], transfer_h.pointer[i], sizeof(isaac_float4)*TTransfer_size, cudaMemcpyHostToDevice));
+                #endif
             }
         }
         json_t* getJsonMetaRoot()
@@ -314,6 +331,7 @@ class IsaacVisualization
             send_look_at = false;
             send_projection = false;
             send_rotation = false;
+            send_transfer = false;
 
             //Handle messages
             json_t* message;
@@ -323,12 +341,28 @@ class IsaacVisualization
             {
                 message = json_object();
                 bool add_modelview = false;
+                bool add_transfer = false;
                 while (json_t* last = communicator->getLastMessage())
                 {
-                    //Search for scene changes
                     json_t* js;
                     size_t index;
                     json_t *value;
+                    //search for update requests
+                    if ( js = json_object_get(last, "request") )
+                    {
+                        const char* target = json_string_value( js );
+                        if ( strcmp( target, "rotation" ) == 0 )
+                            send_rotation = true;
+                        if ( strcmp( target, "position" ) == 0 )
+                            send_look_at = true;
+                        if ( strcmp( target, "distance" ) == 0 )
+                            send_distance = true;
+                        if ( strcmp( target, "projection" ) == 0 )
+                            send_projection = true;
+                        if ( strcmp( target, "transfer" ) == 0 )
+                            send_transfer = true;
+                    }
+                    //Search for scene changes
                     if (json_array_size( js = json_object_get(last, "rotation absolute") ) == 9)
                     {
                         add_modelview = true;
@@ -429,6 +463,28 @@ class IsaacVisualization
                         distance += json_number_value( js );
                         json_object_del( last, "distance relative" );
                     }
+                    if (json_array_size( js = json_object_get(last, "transfer points") ) )
+                    {
+                        add_transfer = true;
+                        send_transfer = true;
+                        json_array_foreach(js, index, value)
+                        {
+                            transfer_h.description[index].clear();
+                            size_t index_2;
+                            json_t *element;
+                            json_array_foreach(value, index_2, element)
+                            {
+                                transfer_h.description[index].insert( std::pair< isaac_uint, isaac_float4> (
+                                    isaac_uint( json_number_value( json_object_get( element, "value" ) ) ), {
+                                        isaac_float( json_number_value( json_object_get( element, "r" ) ) ),
+                                        isaac_float( json_number_value( json_object_get( element, "g" ) ) ),
+                                        isaac_float( json_number_value( json_object_get( element, "b" ) ) ),
+                                        isaac_float( json_number_value( json_object_get( element, "a" ) ) ) } ) );
+                            }
+                        }
+                        json_object_del( last, "transfer points" );
+                    }
+
                     mergeJSON(message,last);
                     json_decref( last );
                 }
@@ -438,6 +494,11 @@ class IsaacVisualization
                     json_t *matrix;
                     json_object_set_new( message, "modelview", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix,modelview,16)
+                }
+                if (add_transfer)
+                {
+                    updateTransfer();
+                    //ToDO: Add transfer function
                 }
                 char* buffer = json_dumps( message, 0 );
                 strcpy( message_buffer, buffer );
@@ -472,27 +533,27 @@ class IsaacVisualization
             thr_metaTargets = metaTargets;
 
            //Calc order
-            ISAAC_START_TIME_MEASUREMENT( sorting, myself->getTicksUs() )
+            ISAAC_START_TIME_MEASUREMENT( sorting, getTicksUs() )
             //Every rank calculates it's distance to the camera
             IceTDouble point[4] =
             {
-                IceTDouble(myself->position[0]) + (IceTDouble(myself->local_size[0]) - IceTDouble(myself->global_size[0])) / 2.0,
-                IceTDouble(myself->position[1]) + (IceTDouble(myself->local_size[1]) - IceTDouble(myself->global_size[1])) / 2.0,
-                IceTDouble(myself->position[2]) + (IceTDouble(myself->local_size[2]) - IceTDouble(myself->global_size[2])) / 2.0,
+                IceTDouble(position[0]) + (IceTDouble(local_size[0]) - IceTDouble(global_size[0])) / 2.0,
+                IceTDouble(position[1]) + (IceTDouble(local_size[1]) - IceTDouble(global_size[1])) / 2.0,
+                IceTDouble(position[2]) + (IceTDouble(local_size[2]) - IceTDouble(global_size[2])) / 2.0,
                 1.0
             };
             IceTDouble result[4];
-            mulMatrixVector(result,myself->modelview,point);
+            mulMatrixVector(result,modelview,point);
             isaac_float point_distance = sqrt( result[0]*result[0] + result[1]*result[1] + result[2]*result[2] );
             //Allgather of the distances
-            isaac_float receive_buffer[myself->numProc];
+            isaac_float receive_buffer[numProc];
             MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, MPI_COMM_WORLD);
             //Putting to a std::multimap of {rank, distance}
             std::multimap<isaac_float, isaac_int, std::less< isaac_float > > distance_map;
-            for (isaac_int i = 0; i < myself->numProc; i++)
+            for (isaac_int i = 0; i < numProc; i++)
                 distance_map.insert( std::pair<isaac_float, isaac_int>( receive_buffer[i], i ) );
             //Putting in an array for IceT
-            IceTInt icet_order_array[myself->numProc];
+            IceTInt icet_order_array[numProc];
             {
                 isaac_int i = 0;
                 for (auto it = distance_map.begin(); it != distance_map.end(); it++)
@@ -502,65 +563,98 @@ class IsaacVisualization
                 }
             }
             icetCompositeOrder( icet_order_array );
-            ISAAC_STOP_TIME_MEASUREMENT( myself->sorting_time, +=, sorting, myself->getTicksUs() )
+            ISAAC_STOP_TIME_MEASUREMENT( sorting_time, +=, sorting, getTicksUs() )
 
             //Drawing
             IceTFloat background_color[4] = {0.0f,0.0f,0.0f,1.0f};
-            ISAAC_START_TIME_MEASUREMENT( merge, myself->getTicksUs() )
-            IceTImage image = icetDrawFrame(myself->projection,myself->modelview,background_color);
-            ISAAC_STOP_TIME_MEASUREMENT( myself->merge_time, +=, merge, myself->getTicksUs() )
+            ISAAC_START_TIME_MEASUREMENT( merge, getTicksUs() )
+            IceTImage image = icetDrawFrame(projection,modelview,background_color);
+            ISAAC_STOP_TIME_MEASUREMENT( merge_time, +=, merge, getTicksUs() )
 
             //Message sending
-            char* buffer = json_dumps( myself->json_root, 0 );
+            char* buffer = json_dumps( json_root, 0 );
             strcpy( message_buffer, buffer );
             free(buffer);
-            if (myself->thr_metaTargets == META_MERGE)
+            if (thr_metaTargets == META_MERGE)
             {
-                if (myself->rank == myself->master)
+                if (rank == master)
                 {
-                    char receive_buffer[myself->numProc][ISAAC_MAX_RECEIVE];
-                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, receive_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, myself->master, MPI_COMM_WORLD);
-                    for (isaac_int i = 0; i < myself->numProc; i++)
+                    char receive_buffer[numProc][ISAAC_MAX_RECEIVE];
+                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, receive_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, MPI_COMM_WORLD);
+                    for (isaac_int i = 0; i < numProc; i++)
                     {
-                        if (i == myself->master)
+                        if (i == master)
                             continue;
                         json_t* js = json_loads(receive_buffer[i], 0, NULL);
-                        mergeJSON( myself->json_root, js );
+                        mergeJSON( json_root, js );
                     }
                 }
                 else
-                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, myself->master, MPI_COMM_WORLD);
+                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, master, MPI_COMM_WORLD);
             }
-            if (myself->rank == myself->master)
+            if (rank == master)
             {
-                json_object_set_new( myself->json_root, "type", json_string( "period" ) );
-                json_object_set_new( myself->json_root, "meta nr", json_integer( myself->metaNr ) );
+                json_object_set_new( json_root, "type", json_string( "period" ) );
+                json_object_set_new( json_root, "meta nr", json_integer( metaNr ) );
 
                 json_t *matrix;
-                if ( myself->send_projection )
+                if ( send_projection )
                 {
-                    json_object_set_new( myself->json_root, "projection", matrix = json_array() );
-                    ISAAC_JSON_ADD_MATRIX(matrix,myself->projection,16)
+                    json_object_set_new( json_root, "projection", matrix = json_array() );
+                    ISAAC_JSON_ADD_MATRIX(matrix,projection,16)
                 }
-                if ( myself->send_look_at )
+                if ( send_look_at )
                 {
-                    json_object_set_new( myself->json_root, "position", matrix = json_array() );
-                    ISAAC_JSON_ADD_MATRIX(matrix,myself->look_at,3)
+                    json_object_set_new( json_root, "position", matrix = json_array() );
+                    ISAAC_JSON_ADD_MATRIX(matrix,look_at,3)
                 }
-                if ( myself->send_rotation )
+                if ( send_rotation )
                 {
-                    json_object_set_new( myself->json_root, "rotation", matrix = json_array() );
-                    ISAAC_JSON_ADD_MATRIX(matrix, myself->rotation,9)
+                    json_object_set_new( json_root, "rotation", matrix = json_array() );
+                    ISAAC_JSON_ADD_MATRIX(matrix, rotation,9)
                 }
-                if ( myself->send_distance )
-                    json_object_set_new( myself->json_root, "distance", json_real( myself->distance ) );
-                    
-                char* buffer = json_dumps( myself->json_root, 0 );
-                myself->communicator->serverSend(buffer);
+                if ( send_distance )
+                    json_object_set_new( json_root, "distance", json_real( distance ) );
+                if ( send_transfer )
+                {
+                    json_object_set_new( json_root, "transfer array", matrix = json_array() );
+                    for (size_t i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+                    {
+                        json_t* transfer = json_array();
+                        json_array_append_new( matrix, transfer );
+                        for (size_t j = 0; j < TTransfer_size; j++)
+                        {
+                            json_t* color = json_array();
+                            json_array_append_new( transfer, color );
+                            json_array_append_new( color, json_integer( isaac_uint( transfer_h.pointer[i][j].x * isaac_float(255) ) ) );
+                            json_array_append_new( color, json_integer( isaac_uint( transfer_h.pointer[i][j].y * isaac_float(255) ) ) );
+                            json_array_append_new( color, json_integer( isaac_uint( transfer_h.pointer[i][j].z * isaac_float(255) ) ) );
+                            json_array_append_new( color, json_integer( isaac_uint( transfer_h.pointer[i][j].w * isaac_float(255) ) ) );
+                        }
+                    }
+                    json_object_set_new( json_root, "transfer points", matrix = json_array() );
+                    for (size_t i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+                    {
+                        json_t* points = json_array();
+                        json_array_append_new( matrix, points );
+                        for(auto it = transfer_h.description[i].begin(); it != transfer_h.description[i].end(); it++)
+                        {
+                            json_t* p = json_object();
+                            json_array_append_new( points, p);
+                            json_object_set_new(p, "value", json_integer( it->first ) );
+                            json_object_set_new(p, "r", json_real( it->second.x ) );
+                            json_object_set_new(p, "g", json_real( it->second.y ) );
+                            json_object_set_new(p, "b", json_real( it->second.z ) );
+                            json_object_set_new(p, "a", json_real( it->second.w ) );
+                        }
+                    }
+                }
+                char* buffer = json_dumps( json_root, 0 );
+                communicator->serverSend(buffer);
                 free(buffer);
             }
-            json_decref( myself->json_root );
-            myself->recreateJSON();
+            json_decref( json_root );
+            recreateJSON();
 
             #ifdef ISAAC_THREADING
                 pthread_create(&visualizationThread,NULL,visualizationFunction,&image);
@@ -687,7 +781,7 @@ class IsaacVisualization
                     myself->sources,
                     step,
                     bg_color,
-                    myself->transfer_funcs));
+                    myself->transfer_d));
                 alpaka::stream::enqueue(myself->stream, test);
                 alpaka::wait::wait(myself->stream);
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
@@ -697,14 +791,14 @@ class IsaacVisualization
             #else
                 dim3 block (block_size.x, block_size.y);
                 dim3 grid  (grid_size.x, grid_size.y);
-                IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_func_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_func_size > <<<grid, block>>>(
+                IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size > <<<grid, block>>>(
                     myself->framebuffer,
                     myself->framebuffer_size,
                     framebuffer_start,
                     myself->sources,
                     step,
                     bg_color,
-                    myself->transfer_funcs);
+                    myself->transfer_d);
                 ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
                 ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
@@ -823,6 +917,7 @@ class IsaacVisualization
         bool send_rotation;
         bool send_distance;
         bool send_projection;
+        bool send_transfer;
         IceTDouble modelview[16];
         IsaacCommunicator* communicator;
         IsaacCommunicator* video_communicator;
@@ -837,19 +932,21 @@ class IsaacVisualization
         IsaacVisualizationMetaEnum thr_metaTargets;
         pthread_t visualizationThread;
         #if ISAAC_ALPAKA == 1
-            IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_func_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_func_size > fillRectKernel;
-            std::vector< alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> > transfer_func_vec;
+            IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size > fillRectKernel;
+            std::vector< alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> > transfer_d_buf;
+            std::vector< alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> > transfer_h_buf;
         #endif
-        transfer_func_struct< boost::mpl::size< TSourceList >::type::value > transfer_funcs;
-        const static size_t transfer_func_size = TTransfer_func_size;
+        transfer_d_struct< boost::mpl::size< TSourceList >::type::value > transfer_d;
+        transfer_h_struct< boost::mpl::size< TSourceList >::type::value > transfer_h;
+        const static size_t transfer_size = TTransfer_size;
 };
 
 #if ISAAC_ALPAKA == 1
-    template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_func_size>
-    IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_func_size>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_func_size>::myself = NULL;
+    template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size>
+    IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size>::myself = NULL;
 #else
-    template <typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_func_size>
-    IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_func_size>* IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_func_size>::myself = NULL;
+    template <typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size>
+    IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size>* IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size>::myself = NULL;
 #endif
 
 } //namespace isaac;

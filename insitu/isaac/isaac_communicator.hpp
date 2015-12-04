@@ -98,19 +98,26 @@ class IsaacCommunicator
 		}
 		isaac_int serverSend(const char* content)
 		{
-			isaac_int n = send(sockfd,content,strlen(content),0);
+			uint32_t l = strlen(content);
+			send(sockfd,&l,4,0);
+			isaac_int n = send(sockfd,content,l,0);
 			return n;
 		}
 		isaac_int serverSendFrame(void* ptr,isaac_int count)
 		{
+			//let's first for message, whether the master is reading
+			char go;
+			recv(sockfd,&go,1,0);
+			if (go != 42)
+				return 0;
 			isaac_int n = 0;
-			isaac_int div = count / 262144; //256kb per message
-			isaac_int rest = count % 262144; //rest
+			isaac_int div = count / ISAAC_MAX_RECEIVE; //256kb per message
+			isaac_int rest = count % ISAAC_MAX_RECEIVE; //rest
 			for (isaac_int i = 0; i <=  div; i++)
 			{
 				isaac_int r = -1;
 				while (r < 0)
-					r = send(sockfd,&(((char*)ptr)[i*262144]),i == div ? rest : 262144,0);
+					r = send(sockfd,&(((char*)ptr)[i*ISAAC_MAX_RECEIVE]),i == div ? rest : ISAAC_MAX_RECEIVE,0);
 				n += r;
 			}
 			return n;

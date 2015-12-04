@@ -70,7 +70,7 @@ struct IsaacChainLength
     }
 };
 
-template < size_t Ttransfer_func_size >
+template < size_t Ttransfer_size >
 struct merge_source_iterator
 {
     ISAAC_NO_HOST_DEVICE_WARNING
@@ -90,9 +90,9 @@ struct merge_source_iterator
     {
         auto data = source[coord];
         isaac_float_dim<1> result = IsaacChainLength::call< TSource::feature_dim >( data );
-        isaac_uint lookup_value = isaac_uint( round(result.x * isaac_float( Ttransfer_func_size ) ) );
-        if (lookup_value >= Ttransfer_func_size )
-            lookup_value = Ttransfer_func_size - 1;
+        isaac_uint lookup_value = isaac_uint( round(result.x * isaac_float( Ttransfer_size ) ) );
+        if (lookup_value >= Ttransfer_size )
+            lookup_value = Ttransfer_size - 1;
         isaac_float4 value = transferArray.pointer[ I ][ lookup_value ];
         color.x = color.x + value.x * value.w;
         color.y = color.y + value.y * value.w;
@@ -112,7 +112,7 @@ template <
     typename TSourceList,
     typename TChainList,
     typename TTransferArray,
-    size_t Ttransfer_func_size
+    size_t Ttransfer_size
 >
 #if ISAAC_ALPAKA == 1
     struct IsaacFillRectKernel
@@ -237,7 +237,7 @@ template <
                 if ( ISAAC_FOR_EACH_DIM_TWICE(3, coord, < isaac_size_d[0].local_size, && ) 1 )
                 {
                     isaac_float4 value = {0, 0, 0, 0};
-                    isaac_for_each_3_params( sources, merge_source_iterator<Ttransfer_func_size>() , value, coord, transferArray);
+                    isaac_for_each_3_params( sources, merge_source_iterator<Ttransfer_size>() , value, coord, transferArray);
                     if ( mpl::size< TSourceList >::type::value > 1)
                         value = value / isaac_float( mpl::size< TSourceList >::type::value );
                     isaac_float oma = isaac_float(1) - color.w;

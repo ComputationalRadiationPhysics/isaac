@@ -17,7 +17,7 @@
 
 #include <boost/preprocessor.hpp>
 
-#define ISAAC_MAX_RECEIVE 32768 //32kb
+#define ISAAC_MAX_RECEIVE 262144 //256kb
 #define ISAAC_Z_NEAR 1.0f
 #define ISAAC_Z_FAR 100.0f
 

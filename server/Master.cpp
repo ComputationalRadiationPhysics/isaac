@@ -79,6 +79,8 @@ MetaDataClient* Master::addDataClient()
 
 size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 {
+	char go = 42;
+	send(group->video->connector->getSockFD(),&go,1,0);
 	int count = 0;
 	while (count < group->video_buffer_size)
 	{
@@ -155,7 +157,7 @@ errorCode Master::run()
 				bool delete_message = true;
 				if (message->type == PERIOD)
 				{
-					if (insitu->t->group->video == NULL) //Later!
+					if (insitu->t->group == NULL || insitu->t->group->video == NULL) //Later!
 					{
 						delete_message = false;
 						insitu->t->connector->clientSendMessage( message );
@@ -172,7 +174,7 @@ errorCode Master::run()
 							json_object_set( insitu->t->group->initData, "position", js );
 						if ( js = json_object_get(message->json_root, "distance") )
 							json_object_set( insitu->t->group->initData, "distance", js );
-						//Allocate and send video
+						//Allocate, receive and send video
 						uint8_t*video_buffer=(uint8_t*)malloc(insitu->t->group->video_buffer_size);
 						receiveVideo(insitu->t->group,video_buffer);
 						//Send json data
@@ -359,6 +361,9 @@ errorCode Master::run()
 						dc->t->masterSendMessage(new MessageContainer(UPDATE,root));
 						for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED,NULL,group,1,url,ref));
+						//Send request for transfer functions
+						char buffer[] = "{\"type\": \"feedback\", \"request\": \"transfer\"}";
+						send(group->master->connector->getSockFD(),buffer,strlen(buffer),0);
 					}
 				}
 				if (message->type == STOP)
