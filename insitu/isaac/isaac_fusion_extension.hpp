@@ -22,38 +22,47 @@ namespace isaac
 {
 
 
-template<int N>
-struct isaac_for_each_unrolled_3_params
+template<int N,int I>
+struct isaac_for_each_unrolled_4_params
 {
 	ISAAC_NO_HOST_DEVICE_WARNING
-	template<typename I0, typename F, typename P1, typename P2, typename P3>
-	ISAAC_HOST_DEVICE_INLINE static void call(I0 const& i0, F const& f, P1& p1, P2& p2, P3& p3)
+	template<typename I0, typename F, typename P1, typename P2, typename P3, typename P4>
+	ISAAC_HOST_DEVICE_INLINE static void call(I0 const& i0, F const& f, P1& p1, P2& p2, P3& p3, P4& p4)
 	{
-		f(N - 1,*i0,p1,p2,p3);
-		isaac_for_each_unrolled_3_params<N-1>::call(boost::fusion::next(i0), f, p1, p2, p3);
+		f(N - I,*i0,p1,p2,p3,p4);
+		isaac_for_each_unrolled_4_params<N,I-1>::call(boost::fusion::next(i0), f, p1, p2, p3, p4);
 	}
 };
 
-template<>
-struct isaac_for_each_unrolled_3_params<0>
+template<int N>
+struct isaac_for_each_unrolled_4_params<N,0>
 {
 	ISAAC_NO_HOST_DEVICE_WARNING
-	template<typename It, typename F, typename P1, typename P2, typename P3>
-	ISAAC_HOST_DEVICE_INLINE static void call(It const&, F const&, P1& p1, P2& p2, P3& p3)
+	template<typename It, typename F, typename P1, typename P2, typename P3, typename P4>
+	ISAAC_HOST_DEVICE_INLINE static void call(It const&, F const&, P1& p1, P2& p2, P3& p3, P4& p4)
 	{
 	}
 };
 
 ISAAC_NO_HOST_DEVICE_WARNING
-template <typename Sequence, typename F,typename P1,typename P2, typename P3>
-ISAAC_HOST_DEVICE_INLINE void isaac_for_each_3_params(Sequence& seq, F const& f, P1& p1, P2& p2, P3& p3)
+template <typename Sequence, typename F,typename P1,typename P2, typename P3, typename P4>
+ISAAC_HOST_DEVICE_INLINE void isaac_for_each_4_params(Sequence& seq, F const& f, P1& p1, P2& p2, P3& p3, P4& p4)
 {
 	typedef typename boost::fusion::result_of::begin<Sequence>::type begin;
 	typedef typename boost::fusion::result_of::end<Sequence>::type end;
-	isaac_for_each_unrolled_3_params
+	isaac_for_each_unrolled_4_params
 	<
+		boost::fusion::result_of::distance<begin, end>::type::value,
 		boost::fusion::result_of::distance<begin, end>::type::value
-	>::call(boost::fusion::begin(seq), f, p1, p2, p3);
+	>::call(boost::fusion::begin(seq), f, p1, p2, p3, p4);
+}
+
+ISAAC_NO_HOST_DEVICE_WARNING
+template <typename Sequence, typename F,typename P1,typename P2,typename P3>
+ISAAC_HOST_DEVICE_INLINE void isaac_for_each_3_params(Sequence& seq, F const& f, P1& p1, P2& p2, P3& p3)
+{
+	int i = 0;
+	isaac_for_each_4_params<Sequence,F,P1,int>(seq,f,p1,p2,p3,i);
 }
 
 ISAAC_NO_HOST_DEVICE_WARNING

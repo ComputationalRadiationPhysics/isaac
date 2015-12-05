@@ -76,9 +76,10 @@ class IsaacVisualization
                 typename TSource,
                 typename TJsonRoot,
                 typename TUnused1,
-                typename TUnused2
+                typename TUnused2,
+                typename TUnused3
             >
-            ISAAC_HOST_DEVICE_INLINE  void operator()( const int I,TSource& s, TJsonRoot& jsonRoot, TUnused1& unused1, TUnused2& unused2) const
+            ISAAC_HOST_DEVICE_INLINE  void operator()( const int I,TSource& s, TJsonRoot& jsonRoot, TUnused1& unused1, TUnused2& unused2, TUnused3& unused3) const
             {
                 #ifndef __CUDA_ARCH__
                     json_t *content = json_object();
@@ -125,6 +126,7 @@ class IsaacVisualization
             video_send_time(0),
             copy_time(0),
             sorting_time(0),
+            interpolation(false),
             framebuffer_prod(size_t(framebuffer_size.x) * size_t(framebuffer_size.y)),
             sources( sources )
             #if ISAAC_ALPAKA == 1
@@ -163,8 +165,8 @@ class IsaacVisualization
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
                 #if ISAAC_ALPAKA == 1
-                    transfer_d_buf[i] = alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>( acc, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) );
-                    transfer_h_buf[i] = alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) );
+                    transfer_d_buf.push_back( alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>( acc, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
+                    transfer_h_buf.push_back( alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
                     transfer_d.pointer[i] = alpaka::mem::view::getPtrNative( transfer_d_buf[i] );
                     transfer_h.pointer[i] = alpaka::mem::view::getPtrNative( transfer_h_buf[i] );
                 #else
@@ -251,6 +253,8 @@ class IsaacVisualization
                 json_t *json_sources_array = json_array();
                 json_object_set_new( json_root, "sources", json_sources_array );
                 
+                json_object_set_new( json_root, "interpolation", json_boolean( interpolation ) );
+                
                 isaac_for_each_1_params( sources, source_2_json_iterator(), json_sources_array );
 
                 json_object_set_new( json_root, "dimension", json_integer ( TSimDim::value ) );
@@ -332,6 +336,7 @@ class IsaacVisualization
             send_projection = false;
             send_rotation = false;
             send_transfer = false;
+            send_interpolation = false;
 
             //Handle messages
             json_t* message;
@@ -341,7 +346,6 @@ class IsaacVisualization
             {
                 message = json_object();
                 bool add_modelview = false;
-                bool add_transfer = false;
                 while (json_t* last = communicator->getLastMessage())
                 {
                     json_t* js;
@@ -361,6 +365,8 @@ class IsaacVisualization
                             send_projection = true;
                         if ( strcmp( target, "transfer" ) == 0 )
                             send_transfer = true;
+                        if ( strcmp( target, "interpolation" ) == 0 )
+                            send_interpolation = true;
                     }
                     //Search for scene changes
                     if (json_array_size( js = json_object_get(last, "rotation absolute") ) == 9)
@@ -463,28 +469,6 @@ class IsaacVisualization
                         distance += json_number_value( js );
                         json_object_del( last, "distance relative" );
                     }
-                    if (json_array_size( js = json_object_get(last, "transfer points") ) )
-                    {
-                        add_transfer = true;
-                        send_transfer = true;
-                        json_array_foreach(js, index, value)
-                        {
-                            transfer_h.description[index].clear();
-                            size_t index_2;
-                            json_t *element;
-                            json_array_foreach(value, index_2, element)
-                            {
-                                transfer_h.description[index].insert( std::pair< isaac_uint, isaac_float4> (
-                                    isaac_uint( json_number_value( json_object_get( element, "value" ) ) ), {
-                                        isaac_float( json_number_value( json_object_get( element, "r" ) ) ),
-                                        isaac_float( json_number_value( json_object_get( element, "g" ) ) ),
-                                        isaac_float( json_number_value( json_object_get( element, "b" ) ) ),
-                                        isaac_float( json_number_value( json_object_get( element, "a" ) ) ) } ) );
-                            }
-                        }
-                        json_object_del( last, "transfer points" );
-                    }
-
                     mergeJSON(message,last);
                     json_decref( last );
                 }
@@ -494,11 +478,6 @@ class IsaacVisualization
                     json_t *matrix;
                     json_object_set_new( message, "modelview", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix,modelview,16)
-                }
-                if (add_transfer)
-                {
-                    updateTransfer();
-                    //ToDO: Add transfer function
                 }
                 char* buffer = json_dumps( message, 0 );
                 strcpy( message_buffer, buffer );
@@ -525,7 +504,32 @@ class IsaacVisualization
             if (rank!= master && json_array_size( js = json_object_get(message, "modelview") ) == 16)
                 json_array_foreach(js, index, value)
                     modelview[index] = json_number_value( value );
-                    
+            if (json_array_size( js = json_object_get(message, "transfer points") ) )
+            {
+                json_array_foreach(js, index, value)
+                {
+                    transfer_h.description[index].clear();
+                    size_t index_2;
+                    json_t *element;
+                    json_array_foreach(value, index_2, element)
+                    {
+                        transfer_h.description[index].insert( std::pair< isaac_uint, isaac_float4> (
+                            isaac_uint( json_number_value( json_object_get( element, "value" ) ) ), {
+                                isaac_float( json_number_value( json_object_get( element, "r" ) ) ),
+                                isaac_float( json_number_value( json_object_get( element, "g" ) ) ),
+                                isaac_float( json_number_value( json_object_get( element, "b" ) ) ),
+                                isaac_float( json_number_value( json_object_get( element, "a" ) ) ) } ) );
+                    }
+                }
+                updateTransfer();
+                send_transfer = true;
+            }
+            if ( js = json_object_get(message, "interpolation") )
+            {
+                interpolation = json_boolean_value ( js );
+                send_interpolation = true;
+            }
+
             json_t* metadata = json_object_get( message, "metadata" );
             if (metadata)
                 json_incref(metadata);
@@ -649,6 +653,8 @@ class IsaacVisualization
                         }
                     }
                 }
+                if ( send_interpolation )
+                    json_object_set_new( json_root, "interpolation", json_boolean( interpolation ) );
                 char* buffer = json_dumps( json_root, 0 );
                 communicator->serverSend(buffer);
                 free(buffer);
@@ -713,18 +719,18 @@ class IsaacVisualization
             calcInverse(inverse,projection_matrix,modelview_matrix);
             for (int i = 0; i < 16; i++)
                 inverse_h[i] = static_cast<float>(inverse[i]);
-            size_h[0].global_size.x = myself->global_size[0];
-            size_h[0].global_size.y = myself->global_size[1];
+            size_h[0].global_size.value.x = myself->global_size[0];
+            size_h[0].global_size.value.y = myself->global_size[1];
             if (TSimDim::value > 2)
-                size_h[0].global_size.z = myself->global_size[2];
-            size_h[0].position.x = myself->position[0];
-            size_h[0].position.y = myself->position[1];
+                size_h[0].global_size.value.z = myself->global_size[2];
+            size_h[0].position.value.x = myself->position[0];
+            size_h[0].position.value.y = myself->position[1];
             if (TSimDim::value > 2)
-                size_h[0].position.z = myself->position[2];
-            size_h[0].local_size.x = myself->local_size[0];
-            size_h[0].local_size.y = myself->local_size[1];
+                size_h[0].position.value.z = myself->position[2];
+            size_h[0].local_size.value.x = myself->local_size[0];
+            size_h[0].local_size.value.y = myself->local_size[1];
             if (TSimDim::value > 2)
-                size_h[0].local_size.z = myself->local_size[2];
+                size_h[0].local_size.value.z = myself->local_size[2];
             size_h[0].max_global_size = static_cast<float>(max(max(uint32_t(myself->global_size[0]),uint32_t(myself->global_size[1])),uint32_t(myself->global_size[2])));
             
             #if ISAAC_ALPAKA == 1
@@ -771,18 +777,36 @@ class IsaacVisualization
                 const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
                 const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
                 auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
-                auto const test (alpaka::exec::create<TAcc> (workdiv,
-                    myself->fillRectKernel,
-                    alpaka::mem::view::getPtrNative(myself->inverse_d),
-                    alpaka::mem::view::getPtrNative(myself->size_d),
-                    alpaka::mem::view::getPtrNative(myself->framebuffer),
-                    myself->framebuffer_size,
-                    framebuffer_start,
-                    myself->sources,
-                    step,
-                    bg_color,
-                    myself->transfer_d));
-                alpaka::stream::enqueue(myself->stream, test);
+                if (myself->interpolation)
+                {
+                    auto const test (alpaka::exec::create<TAcc> (workdiv,
+                        myself->fillRectKernel_interpolation,
+                        alpaka::mem::view::getPtrNative(myself->inverse_d),
+                        alpaka::mem::view::getPtrNative(myself->size_d),
+                        alpaka::mem::view::getPtrNative(myself->framebuffer),
+                        myself->framebuffer_size,
+                        framebuffer_start,
+                        myself->sources,
+                        step,
+                        bg_color,
+                        myself->transfer_d));
+                    alpaka::stream::enqueue(myself->stream, test);
+                }
+                else
+                {
+                    auto const test (alpaka::exec::create<TAcc> (workdiv,
+                        myself->fillRectKernel,
+                        alpaka::mem::view::getPtrNative(myself->inverse_d),
+                        alpaka::mem::view::getPtrNative(myself->size_d),
+                        alpaka::mem::view::getPtrNative(myself->framebuffer),
+                        myself->framebuffer_size,
+                        framebuffer_start,
+                        myself->sources,
+                        step,
+                        bg_color,
+                        myself->transfer_d));
+                    alpaka::stream::enqueue(myself->stream, test);
+                }
                 alpaka::wait::wait(myself->stream);
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
                 ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
@@ -791,14 +815,24 @@ class IsaacVisualization
             #else
                 dim3 block (block_size.x, block_size.y);
                 dim3 grid  (grid_size.x, grid_size.y);
-                IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size > <<<grid, block>>>(
-                    myself->framebuffer,
-                    myself->framebuffer_size,
-                    framebuffer_start,
-                    myself->sources,
-                    step,
-                    bg_color,
-                    myself->transfer_d);
+                if (myself->interpolation)
+                    IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size, 1 > <<<grid, block>>>(
+                        myself->framebuffer,
+                        myself->framebuffer_size,
+                        framebuffer_start,
+                        myself->sources,
+                        step,
+                        bg_color,
+                        myself->transfer_d);
+                else
+                    IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size, 0 > <<<grid, block>>>(
+                        myself->framebuffer,
+                        myself->framebuffer_size,
+                        framebuffer_start,
+                        myself->sources,
+                        step,
+                        bg_color,
+                        myself->transfer_d);
                 ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
                 ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
@@ -918,6 +952,8 @@ class IsaacVisualization
         bool send_distance;
         bool send_projection;
         bool send_transfer;
+        bool send_interpolation;
+        bool interpolation;
         IceTDouble modelview[16];
         IsaacCommunicator* communicator;
         IsaacCommunicator* video_communicator;
@@ -932,7 +968,8 @@ class IsaacVisualization
         IsaacVisualizationMetaEnum thr_metaTargets;
         pthread_t visualizationThread;
         #if ISAAC_ALPAKA == 1
-            IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size > fillRectKernel;
+            IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size, 1 > fillRectKernel_interpolation;
+            IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size, 0 > fillRectKernel;
             std::vector< alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> > transfer_d_buf;
             std::vector< alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> > transfer_h_buf;
         #endif

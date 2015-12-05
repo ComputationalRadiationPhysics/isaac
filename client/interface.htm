@@ -18,7 +18,7 @@
 	Port:<input type="text" id="port" value="2459">
 	<input type="button" value="Connect" id="connect">
 	<br/><input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()"> Show video and control in one window
-	<br/><input type="checkbox" id="wireframe_checkbox" checked onchange="wireframe_checkbox_checkbox_click()"> Show wireframe bounding box
+	<br/><input type="checkbox" id="wireframe_checkbox" checked onchange="wireframe_checkbox_click()"> Show wireframe bounding box
 	<br/><input type="checkbox" id="no_stream_checkbox" onchange="no_stream_checkbox_click()"> Show stream url instead of video
 </form>
 <div id="status">Status: Not connected</div>
@@ -30,6 +30,7 @@
 		<div id="video_div" style="position: relative; top: 0; left: 0;">
 			<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls="false" windowless="true"/>
 			<div contentEditable="true" id="url_div" style="display:none;"></div><br/>
+			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation<br/>
 			<canvas id="transfer" width="412" height="16"></canvas>
 			<table border="1"><tr id="transfer_form"></tr></table>
 			<form>
@@ -594,6 +595,7 @@ document.getElementById("connect").onclick = function()
 						distance = obj["distance"];
 						rotation = obj["rotation"];
 						sources = obj["sources"];
+						document.getElementById("interpolation_checkbox").checked = obj["interpolation"];
 						
 						preview.width = obj["framebuffer width"];
 						preview.height = obj["framebuffer height"];
@@ -637,6 +639,8 @@ document.getElementById("connect").onclick = function()
 							rotation = obj["rotation"];
 						if (obj.hasOwnProperty("distance"))
 							distance = obj["distance"];
+						if (obj.hasOwnProperty("interpolation"))
+							document.getElementById("interpolation_checkbox").checked = obj["interpolation"];
 					}
 					if (obj.hasOwnProperty("transfer array"))
 					{
@@ -811,9 +815,15 @@ function one_window_checkbox_click()
 	}
 };
 
-function wireframe_checkbox_checkbox_click()
+function wireframe_checkbox_click()
 {
 	wireframe = document.getElementById("wireframe_checkbox").checked;
+};
+
+function interpolation_checkbox_click()
+{
+	var status = document.getElementById("interpolation_checkbox").checked;
+	sendFeedback( "interpolation", status );
 };
 
 function no_stream_checkbox_click()

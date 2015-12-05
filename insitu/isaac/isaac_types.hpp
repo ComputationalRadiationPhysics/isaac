@@ -164,8 +164,8 @@ ISAAC_OVERLOAD_OPERATOR_CREATE(size)
 #define ISAAC_DIM_SUBDEF(Z, J, I ) \
     template <> \
     struct BOOST_PP_CAT( isaac_, BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES_DIM ) ) \
-    < size_t( BOOST_PP_INC(J) ) > : \
-    BOOST_PP_CAT( isaac_, BOOST_PP_CAT( BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES ) , BOOST_PP_INC(J) ) ) {};
+    < size_t( BOOST_PP_INC(J) ) > { \
+    BOOST_PP_CAT( isaac_, BOOST_PP_CAT( BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES ) , BOOST_PP_INC(J) ) ) value; };
     
 #define ISAAC_DIM_DEF(Z, I, unused) \
     template < size_t > \
@@ -187,6 +187,7 @@ struct isaac_size_struct
     isaac_size_dim < simdim > position;
     isaac_size_dim < simdim > local_size;
 };
+
 
 template< int N >
 struct transfer_d_struct

@@ -73,9 +73,7 @@ class TestSource1
 				nIndex.z * width_mul_height
 			];
 			isaac_float_dim<3> result;
-			result.x = value.x;
-			result.y = value.y;
-			result.z = value.z;
+			result.value = value;
 			return result;
 		}
 };
@@ -119,7 +117,7 @@ class TestSource2
 				nIndex.z * width_mul_height
 			];
 			isaac_float_dim<1> result;
-			result.x = value;
+			result.value.x = value;
 			return result;
 		}
 };

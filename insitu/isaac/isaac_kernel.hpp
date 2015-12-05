@@ -32,7 +32,12 @@ template <>
 ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> isaacLength<4>( isaac_float_dim<4> v )
 {
     isaac_float_dim<1> result;
-    result.x = sqrt(v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w);
+    result.value.x = sqrt(
+        v.value.x * v.value.x +
+        v.value.y * v.value.y +
+        v.value.z * v.value.z +
+        v.value.w * v.value.w
+    );
     return result;
 }
 
@@ -40,7 +45,11 @@ template <>
 ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> isaacLength<3>( isaac_float_dim<3> v )
 {
     isaac_float_dim<1> result;
-    result.x = sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    result.value.x = sqrt(
+        v.value.x * v.value.x +
+        v.value.y * v.value.y +
+        v.value.z * v.value.z
+    );
     return result;
 }
 
@@ -48,7 +57,10 @@ template <>
 ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> isaacLength<2>( isaac_float_dim<2> v )
 {
     isaac_float_dim<1> result;
-    result.x = sqrt(v.x * v.x + v.y * v.y);
+    result.value.x = sqrt(
+        v.value.x * v.value.x +
+        v.value.y * v.value.y
+    );
     return result;
 }
 
@@ -56,7 +68,7 @@ template <>
 ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> isaacLength<1>( isaac_float_dim<1> v )
 {
     isaac_float_dim<1> result;
-    result.x = v.x;
+    result.value.x = fabs(v.value.x);
     return result;
 }
 
@@ -70,7 +82,7 @@ struct IsaacChainLength
     }
 };
 
-template < size_t Ttransfer_size >
+template < size_t Ttransfer_size, isaac_int Tinterpolation >
 struct merge_source_iterator
 {
     ISAAC_NO_HOST_DEVICE_WARNING
@@ -78,26 +90,109 @@ struct merge_source_iterator
     <
         typename TSource,
         typename TColor,
-        typename TCoord,
+        typename TPos,
+        typename TLocalSize,
         typename TTransferArray
     >
     ISAAC_HOST_DEVICE_INLINE  void operator()(
         const int I,
         TSource& source,
         TColor& color,
-        TCoord& coord,
+        TPos& pos,
+        TLocalSize& local_size,
         TTransferArray& transferArray) const
     {
-        auto data = source[coord];
-        isaac_float_dim<1> result = IsaacChainLength::call< TSource::feature_dim >( data );
-        isaac_uint lookup_value = isaac_uint( round(result.x * isaac_float( Ttransfer_size ) ) );
-        if (lookup_value >= Ttransfer_size )
-            lookup_value = Ttransfer_size - 1;
-        isaac_float4 value = transferArray.pointer[ I ][ lookup_value ];
-        color.x = color.x + value.x * value.w;
-        color.y = color.y + value.y * value.w;
-        color.z = color.z + value.z * value.w;
-        color.w = color.w + value.w;
+        bool error = false;
+        isaac_float_dim < TSource::feature_dim > data;
+        if (Tinterpolation == 0)
+        {
+            isaac_uint3 coord =
+            {
+                isaac_uint(round(pos.x)),
+                isaac_uint(round(pos.y)),
+                isaac_uint(round(pos.z))
+            };
+            if ( ISAAC_FOR_EACH_DIM_TWICE(3, coord, >= local_size.value, || ) 0 )
+                error = true;
+            else
+                data = source[coord];
+        }
+        else
+        {
+            isaac_uint3 coord;
+            isaac_float_dim < TSource::feature_dim > data8[2][2][2];
+            for (int x = 0; x < 2; x++)
+                for (int y = 0; y < 2; y++)
+                    for (int z = 0; z < 2; z++)
+                    {
+                        coord.x = isaac_uint(x?ceil(pos.x):floor(pos.x));
+                        coord.y = isaac_uint(y?ceil(pos.y):floor(pos.y));
+                        coord.z = isaac_uint(z?ceil(pos.z):floor(pos.z));
+                        if ( coord.x >= local_size.value.x )
+                        {
+                            coord.x = isaac_uint(x?floor(pos.x):ceil(pos.x));
+                            if ( coord.x >= local_size.value.x )
+                            {
+                                error = true;
+                                break;
+                            }
+                        }
+                        if ( coord.y >= local_size.value.y )
+                        {
+                            coord.y = isaac_uint(y?floor(pos.y):ceil(pos.y));
+                            if ( coord.y >= local_size.value.y )
+                            {
+                                error = true;
+                                break;
+                            }
+                        }
+                        if ( coord.z >= local_size.value.z )
+                        {
+                            coord.z = isaac_uint(z?floor(pos.z):ceil(pos.z));
+                            if ( coord.z >= local_size.value.z )
+                            {
+                                error = true;
+                                break;
+                            }
+                        }
+                        data8[x][y][z] = source[coord];
+                    }
+            if (!error)
+            {
+                isaac_float_dim < 3 > pos_in_cube =
+                {
+                    pos.x - floor(pos.x),
+                    pos.y - floor(pos.y),
+                    pos.z - floor(pos.z)
+                };
+                isaac_float_dim < TSource::feature_dim > data4[2][2];
+                for (int x = 0; x < 2; x++)
+                    for (int y = 0; y < 2; y++)
+                        data4[x][y].value =
+                            data8[x][y][0].value * (isaac_float(1) - pos_in_cube.value.z) +
+                            data8[x][y][1].value * (                 pos_in_cube.value.z);
+                isaac_float_dim < TSource::feature_dim > data2[2];
+                for (int x = 0; x < 2; x++)
+                    data2[x].value =
+                        data4[x][0].value * (isaac_float(1) - pos_in_cube.value.y) +
+                        data4[x][1].value * (                 pos_in_cube.value.y);
+                data.value =
+                    data2[0].value * (isaac_float(1) - pos_in_cube.value.x) +
+                    data2[1].value * (                 pos_in_cube.value.x);
+            }
+        }
+        if (!error)
+        {
+            isaac_float_dim<1> result = IsaacChainLength::call< TSource::feature_dim >( data );
+            isaac_uint lookup_value = isaac_uint( round(result.value.x * isaac_float( Ttransfer_size ) ) );
+            if (lookup_value >= Ttransfer_size )
+                lookup_value = Ttransfer_size - 1;
+            isaac_float4 value = transferArray.pointer[ I ][ lookup_value ];
+            color.x = color.x + value.x * value.w;
+            color.y = color.y + value.y * value.w;
+            color.z = color.z + value.z * value.w;
+            color.w = color.w + value.w;
+        }
     }
 };
 
@@ -112,7 +207,8 @@ template <
     typename TSourceList,
     typename TChainList,
     typename TTransferArray,
-    size_t Ttransfer_size
+    size_t Ttransfer_size,
+    isaac_int Tinterpolation
 >
 #if ISAAC_ALPAKA == 1
     struct IsaacFillRectKernel
@@ -182,9 +278,9 @@ template <
             //move to local grid
             isaac_int3 move =
             {
-                isaac_int(isaac_size_d[0].global_size.x) / isaac_int(2) - isaac_int(isaac_size_d[0].position.x),
-                isaac_int(isaac_size_d[0].global_size.y) / isaac_int(2) - isaac_int(isaac_size_d[0].position.y),
-                isaac_int(isaac_size_d[0].global_size.z) / isaac_int(2) - isaac_int(isaac_size_d[0].position.z)
+                isaac_int(isaac_size_d[0].global_size.value.x) / isaac_int(2) - isaac_int(isaac_size_d[0].position.value.x),
+                isaac_int(isaac_size_d[0].global_size.value.y) / isaac_int(2) - isaac_int(isaac_size_d[0].position.value.y),
+                isaac_int(isaac_size_d[0].global_size.value.z) / isaac_int(2) - isaac_int(isaac_size_d[0].position.value.z)
             };
             isaac_float3 move_f =
             {
@@ -202,9 +298,9 @@ template <
             isaac_float3 count_start =  - start / step_vec;
             isaac_float3 local_size_f =
             {
-                isaac_float(isaac_size_d[0].local_size.x),
-                isaac_float(isaac_size_d[0].local_size.y),
-                isaac_float(isaac_size_d[0].local_size.z)
+                isaac_float(isaac_size_d[0].local_size.value.x),
+                isaac_float(isaac_size_d[0].local_size.value.y),
+                isaac_float(isaac_size_d[0].local_size.value.z)
             };
             isaac_float3 count_end = ( local_size_f - start ) / step_vec;
 
@@ -232,25 +328,20 @@ template <
             isaac_float factor = isaac_float(2) / isaac_size_d[0].max_global_size;
             for (isaac_int i = 0; i < count; i++)
             {
-                isaac_uint3 coord;
-                ISAAC_FOR_EACH_DIM_TWICE(3, coord, = (isaac_uint)pos, ; )
-                if ( ISAAC_FOR_EACH_DIM_TWICE(3, coord, < isaac_size_d[0].local_size, && ) 1 )
+                isaac_float4 value = {0, 0, 0, 0};
+                isaac_for_each_4_params( sources, merge_source_iterator<Ttransfer_size,Tinterpolation>() , value, pos, isaac_size_d[0].local_size, transferArray);
+                if ( mpl::size< TSourceList >::type::value > 1)
+                    value = value / isaac_float( mpl::size< TSourceList >::type::value );
+                isaac_float oma = isaac_float(1) - color.w;
+                value = value * factor;
+                isaac_float4 color_add =
                 {
-                    isaac_float4 value = {0, 0, 0, 0};
-                    isaac_for_each_3_params( sources, merge_source_iterator<Ttransfer_size>() , value, coord, transferArray);
-                    if ( mpl::size< TSourceList >::type::value > 1)
-                        value = value / isaac_float( mpl::size< TSourceList >::type::value );
-                    isaac_float oma = isaac_float(1) - color.w;
-                    value = value * factor;
-                    isaac_float4 color_add =
-                    {
-                        oma * value.x, // * value.w does merge_source_iterator
-                        oma * value.y, // * value.w does merge_source_iterator
-                        oma * value.z, // * value.w does merge_source_iterator
-                        oma * value.w
-                    };
-                    color = color + color_add;
-                }
+                    oma * value.x, // * value.w does merge_source_iterator
+                    oma * value.y, // * value.w does merge_source_iterator
+                    oma * value.z, // * value.w does merge_source_iterator
+                    oma * value.w
+                };
+                color = color + color_add;
                 pos = pos + step_vec;
             }
             ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], color )

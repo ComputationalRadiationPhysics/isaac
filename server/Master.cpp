@@ -164,7 +164,7 @@ errorCode Master::run()
 					}
 					else
 					{
-						//Let's see, whether rotation, projection or modelview are broadcastet and change them in the initData
+						//Let's see, whether some options are broadcastet and change them in the initData
 						json_t* js;
 						if (json_array_size( js = json_object_get(message->json_root, "projection") ) == 16)
 							json_object_set( insitu->t->group->initData, "projection", js );
@@ -174,6 +174,8 @@ errorCode Master::run()
 							json_object_set( insitu->t->group->initData, "position", js );
 						if ( js = json_object_get(message->json_root, "distance") )
 							json_object_set( insitu->t->group->initData, "distance", js );
+						if ( js = json_object_get(message->json_root, "interpolation") )
+							json_object_set( insitu->t->group->initData, "interpolation", js );
 						//Allocate, receive and send video
 						uint8_t*video_buffer=(uint8_t*)malloc(insitu->t->group->video_buffer_size);
 						receiveVideo(insitu->t->group,video_buffer);
