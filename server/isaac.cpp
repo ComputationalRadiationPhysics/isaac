@@ -18,7 +18,9 @@
 #ifdef ISAAC_SDL
 	#include "SDLImageConnector.hpp"
 #endif
-#include "RTPImageConnector.hpp"
+#ifdef ISAAC_GST
+	#include "RTPImageConnector.hpp"
+#endif
 
 #define ISAAC_VERSION "1.0"
 
@@ -114,11 +116,13 @@ int main(int argc, char **argv)
 		else
 			master.addImageConnector(sDLImageConnector);
 	#endif
-	RTPImageConnector* rTPImageConnector = new RTPImageConnector(url,false,jpeg);
-	if (rTPImageConnector->init(5000,5100))
-		delete rTPImageConnector;
-	else
-		master.addImageConnector(rTPImageConnector);
+	#ifdef ISAAC_GST
+		RTPImageConnector* rTPImageConnector = new RTPImageConnector(url,false,jpeg);
+		if (rTPImageConnector->init(5000,5100))
+			delete rTPImageConnector;
+		else
+			master.addImageConnector(rTPImageConnector);
+	#endif
 	if (master.run())
 	{
 		printf("Error while running isaac\n");

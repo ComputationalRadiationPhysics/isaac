@@ -6,7 +6,6 @@ set(SRCS
 	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/WebSocketDataConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/ImageConnector.cpp
-	${CMAKE_SOURCE_DIR}/server/RTPImageConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnectorMaster.cpp
 	${CMAKE_SOURCE_DIR}/server/Master.cpp
@@ -19,7 +18,6 @@ set(HDRS
 	${CMAKE_SOURCE_DIR}/server/Common.hpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/ImageConnector.hpp
-	${CMAKE_SOURCE_DIR}/server/RTPImageConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnectorMaster.hpp
 	${CMAKE_SOURCE_DIR}/server/WebSocketDataConnector.hpp
@@ -38,15 +36,31 @@ if (ISAAC_SDL)
 	add_definitions(-DISAAC_SDL)
 	set(SRCS ${SRCS} ${CMAKE_SOURCE_DIR}/server/SDLImageConnector.cpp)
 	set(HDRS ${HDRS} ${CMAKE_SOURCE_DIR}/server/SDLImageConnector.hpp)
-endif ()
+endif (ISAAC_SDL)
+
+find_package (PkgConfig REQUIRED)
+
+option(ISAAC_GST "Use Gstreamer" ON)
+if (ISAAC_GST)
+	pkg_search_module(GST REQUIRED gstreamer-1.0)
+	set(LIBS ${LIBS} ${GST_LIBRARIES} )
+	set(INCLUDE ${INCLUDE} ${GST_INCLUDE_DIRS})
+
+	pkg_search_module(GST_APP REQUIRED gstreamer-app-1.0)
+	set(LIBS ${LIBS} ${GST_APP_LIBRARIES})
+	set(INCLUDE ${INCLUDE} ${GST_APP_INCLUDE_DIRS})
+
+	set(SRCS ${SRCS} ${CMAKE_SOURCE_DIR}/server/RTPImageConnector.cpp)
+	set(HDRS ${HDRS} ${CMAKE_SOURCE_DIR}/server/RTPImageConnector.hpp)
+
+	add_definitions(-DISAAC_GST)
+endif (ISAAC_GST)
 
 add_definitions(-std=c++11)
 
 add_executable(isaac ${HDRS} ${SRCS})
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules")
-
-find_package (PkgConfig REQUIRED)
 
 find_package (Jansson REQUIRED)
 set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
@@ -58,14 +72,6 @@ set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIR})
 
 find_package (Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
-
-pkg_search_module(GST REQUIRED gstreamer-1.0)
-set(LIBS ${LIBS} ${GST_LIBRARIES} )
-set(INCLUDE ${INCLUDE} ${GST_INCLUDE_DIRS})
-
-pkg_search_module(GST_APP REQUIRED gstreamer-app-1.0)
-set(LIBS ${LIBS} ${GST_APP_LIBRARIES})
-set(INCLUDE ${INCLUDE} ${GST_APP_INCLUDE_DIRS})
 
 include_directories(isaac ${INCLUDE})	
 target_link_libraries(isaac ${LIBS})
@@ -107,7 +113,7 @@ if (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
 		include_directories(example_cuda ${EXAMPLE_INCLUDE} ${CUDA_INCLUDE_DIRS})
 		CUDA_ADD_EXECUTABLE(example_cuda ${CMAKE_SOURCE_DIR}/insitu/example.cu)
 		target_link_libraries(example_cuda ${EXAMPLE_LIBS} ${CUDA_LIBRARIES})
-	endif()
+	endif(BUILD_EXAMPLE_CUDA)
 	
 	if (BUILD_EXAMPLE_ALPAKA)
 		set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/requirement-modules/alpaka/" CACHE STRING  "The location of the alpaka library")
@@ -120,5 +126,5 @@ if (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
 		list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
 		ALPAKA_ADD_EXECUTABLE(example_alpaka ${CMAKE_SOURCE_DIR}/insitu/isaac.hpp ${CMAKE_SOURCE_DIR}/insitu/example.cu)
 		target_link_libraries(example_alpaka ${EXAMPLE_LIBS})
-	endif()
-endif ()
+	endif(BUILD_EXAMPLE_ALPAKA)
+endif (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
