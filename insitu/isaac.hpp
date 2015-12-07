@@ -15,6 +15,11 @@
 
 #pragma once
 
+//Hack for a bug, which occurs only in Cuda 7.0
+#if __CUDACC_VER__ < 70500
+    #define BOOST_RESULT_OF_USE_TR1
+#endif
+
 #include <boost/config/select_compiler_config.hpp>
 
 #include <string>
