@@ -852,7 +852,7 @@ class IsaacVisualization
             //Sending
             ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
             if (myself->video_communicator)
-                myself->video_communicator->serverSendFrame(icetImageGetColorui(*image),icetImageGetNumPixels(*image)*4);
+                myself->video_communicator->serverSendFrame(icetImageGetColorui(*image),myself->framebuffer_size.x,myself->framebuffer_size.y,4);
             ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
 
             myself->metaNr++;

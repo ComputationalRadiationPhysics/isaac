@@ -19,6 +19,9 @@
 #include "ThreadList.hpp"
 #include <sys/socket.h>
 #include <string>
+#if ISAAC_JPEG == 1
+    #include <jpeglib.h>
+#endif
 
 volatile sig_atomic_t Master::force_exit = 0;
 
@@ -77,19 +80,88 @@ MetaDataClient* Master::addDataClient()
 	return client;
 }
 
+void isaac_jpeg_init_source(j_decompress_ptr cinfo)
+{
+}
+boolean isaac_jpeg_fill_input_buffer(j_decompress_ptr cinfo)
+{
+	return true;
+}
+void isaac_jpeg_skip_input_data(j_decompress_ptr cinfo,long num_bytes)
+{
+}
+boolean isaac_jpeg_resync_to_restart(j_decompress_ptr cinfo, int desired)
+{
+	return true;
+}
+void isaac_jpeg_term_source(j_decompress_ptr cinfo)
+{
+}
+
 size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 {
 	char go = 42;
 	send(group->video->connector->getSockFD(),&go,1,0);
-	int count = 0;
-	while (count < group->video_buffer_size)
+	uint32_t count;
+	recv(group->video->connector->getSockFD(),&count,4,0);
+	bool jpeg = true;
+	if (count == 0)
 	{
-		int r = recv(group->video->connector->getSockFD(),&(video_buffer[count]),group->video_buffer_size-count,0);
+		jpeg = false,
+		count == group->video_buffer_size;
+	}
+	uint32_t received = 0;
+	uint8_t* temp_buffer = video_buffer;
+	if (jpeg)
+		temp_buffer = (uint8_t*)malloc(count);
+	while (received < count)
+	{
+		int r = recv(group->video->connector->getSockFD(),&(temp_buffer[received]),count - received,0);
 		if (r <= 0)
 			break;
-		count += r;
+		received += r;
 	}
-	return count;
+	if (jpeg)
+	{
+		#if ISAAC_JPEG == 1
+			struct jpeg_decompress_struct cinfo;
+			struct jpeg_error_mgr jerr;
+			cinfo.err = jpeg_std_error(&jerr);
+			jpeg_source_mgr src;
+			src.init_source = &isaac_jpeg_init_source;
+			src.fill_input_buffer = &isaac_jpeg_fill_input_buffer;
+			src.skip_input_data = &isaac_jpeg_skip_input_data;
+			src.resync_to_restart = &isaac_jpeg_resync_to_restart;
+			src.term_source = &isaac_jpeg_term_source;
+			jpeg_create_decompress(&cinfo);
+			cinfo.src = &src;
+			cinfo.src->next_input_byte = (JOCTET*)(temp_buffer);
+			cinfo.src->bytes_in_buffer = count;
+			(void) jpeg_read_header(&cinfo, TRUE);
+			(void) jpeg_start_decompress(&cinfo);
+			int row_stride = cinfo.output_width * cinfo.output_components;
+			JSAMPARRAY buffer = (*cinfo.mem->alloc_sarray)
+				((j_common_ptr) &cinfo, JPOOL_IMAGE, row_stride, 1);
+			while (cinfo.output_scanline < cinfo.output_height)
+			{
+				int y = cinfo.output_scanline;
+				(void) jpeg_read_scanlines(&cinfo, buffer, 1);
+				for (int x = 0; x < cinfo.output_width; x++)
+				{
+					video_buffer[4*(x+y*cinfo.output_width)+0] = buffer[0][x*3+0];
+					video_buffer[4*(x+y*cinfo.output_width)+1] = buffer[0][x*3+1];
+					video_buffer[4*(x+y*cinfo.output_width)+2] = buffer[0][x*3+2];
+				}
+			}
+			(void) jpeg_finish_decompress(&cinfo);
+			jpeg_destroy_decompress(&cinfo);
+			
+		#else
+			memset( video_buffer, rand()%255, group->video_buffer_size );
+		#endif
+		free(temp_buffer);
+	}
+	return received;
 }
 
 std::string Master::getStream(std::string connector,std::string name,std::string ref)

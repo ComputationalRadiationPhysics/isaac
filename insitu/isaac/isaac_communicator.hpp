@@ -21,6 +21,10 @@
 #include <netdb.h> 
 #include <unistd.h>
 
+#if ISAAC_JPEG == 1
+    #include <jpeglib.h>
+#endif
+
 #include "isaac_macros.hpp"
 
 namespace isaac
@@ -103,13 +107,60 @@ class IsaacCommunicator
 			isaac_int n = send(sockfd,content,l,0);
 			return n;
 		}
-		isaac_int serverSendFrame(void* ptr,isaac_int count)
+		static void isaac_init_destination(j_compress_ptr cinfo)
 		{
-			//let's first for message, whether the master is reading
+		}
+		static boolean isaac_jpeg_empty_output_buffer(j_compress_ptr cinfo)
+		{
+			return true;
+		}
+		static void isaac_jpeg_term_destination(j_compress_ptr cinfo)
+		{
+		}
+		isaac_int serverSendFrame(void* ptr,isaac_uint width,isaac_uint height,isaac_uint depth)
+		{
+			//let's first wait for message, whether the master is reading
+			uint32_t count = width*height*depth;
 			char go;
 			recv(sockfd,&go,1,0);
 			if (go != 42)
 				return 0;
+			//First the size
+			#if ISAAC_JPEG == 1
+				struct jpeg_compress_struct cinfo;
+				struct jpeg_error_mgr jerr;
+				jpeg_destination_mgr dest;
+				dest.init_destination = &isaac_init_destination;
+				dest.empty_output_buffer = &isaac_jpeg_empty_output_buffer;
+				dest.term_destination = &isaac_jpeg_term_destination;
+				cinfo.err = jpeg_std_error(&jerr);
+				jpeg_create_compress(&cinfo);
+				cinfo.dest = &dest;
+				std::vector<char> jpeg_buffer;
+				jpeg_buffer.resize( count );
+				cinfo.dest->next_output_byte = (JOCTET*)(jpeg_buffer.data());
+				cinfo.dest->free_in_buffer = count;
+				cinfo.image_width = width;
+				cinfo.image_height = height;
+				cinfo.input_components = depth;
+				cinfo.in_color_space = JCS_EXT_RGBX;
+				jpeg_set_defaults(&cinfo);
+				jpeg_start_compress(&cinfo, TRUE);
+				while (cinfo.next_scanline < cinfo.image_height)
+				{
+					JSAMPROW row_pointer[1];
+					row_pointer[0] = & ((JSAMPROW)ptr)[cinfo.next_scanline * width * depth];
+					(void) jpeg_write_scanlines(&cinfo, row_pointer, 1);
+				}
+				jpeg_finish_compress(&cinfo);
+				count -= cinfo.dest->free_in_buffer;
+				ptr = jpeg_buffer.data();
+				jpeg_destroy_compress(&cinfo);
+				send(sockfd,&count,4,0);
+			#else
+				uint32_t s = 0;
+				send(sockfd,&s,4,0);
+			#endif
 			isaac_int n = 0;
 			isaac_int div = count / ISAAC_MAX_RECEIVE; //256kb per message
 			isaac_int rest = count % ISAAC_MAX_RECEIVE; //rest

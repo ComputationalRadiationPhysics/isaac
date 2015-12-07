@@ -56,6 +56,15 @@ if (ISAAC_GST)
 	add_definitions(-DISAAC_GST)
 endif (ISAAC_GST)
 
+option(ISAAC_JPEG "Use JPEG compression between visualization and isaac server" ON)
+if (ISAAC_JPEG)
+	find_package(JPEG REQUIRED)
+	set(INCLUDE ${INCLUDE} ${JPEG_INCLUDE_DIR})
+	set(LIBS ${LIBS} ${JPEG_LIBRARY})
+
+	add_definitions(-DISAAC_JPEG)
+endif (ISAAC_JPEG)
+
 add_definitions(-std=c++11)
 
 add_executable(isaac ${HDRS} ${SRCS})
@@ -81,9 +90,12 @@ option(BUILD_EXAMPLE_ALPAKA "Build the example using alpaka." OFF)
 
 
 if (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
+	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${JANSSON_INCLUDE_DIRS})
+	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${JPEG_INCLUDE_DIR})
+
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${JANSSON_LIBRARIES})
-	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${JANSSON_INCLUDE_DIRS})
+	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${JPEG_LIBRARY})
 
 	find_package (IceT REQUIRED)
 	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${ICET_CORE_LIBS})
