@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 		using DevAcc = alpaka::dev::Dev<Acc>;
 		using DevHost = alpaka::dev::DevCpu;
 		
-		DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(0));
+		DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(rank % alpaka::dev::DevMan<Acc>::getDevCount()));
 		DevHost devHost (alpaka::dev::cpu::getDev());
 		Stream  stream  (devAcc);
 
@@ -279,6 +279,9 @@ int main(int argc, char **argv)
 		const alpaka::Vec<SimDim, size_t> local_size(size_t(64),size_t(64),size_t(64));
 		const alpaka::Vec<SimDim, size_t> position(p[0]*64,p[1]*64,p[2]*64);
 	#else
+		int devCount;
+		cudaGetDeviceCount( &devCount );
+		cudaSetDevice( rank % devCount );
 		typedef boost::mpl::int_<3> SimDim;
 		std::vector<size_t> global_size;
 			global_size.push_back(d[0]*64);
