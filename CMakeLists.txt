@@ -62,6 +62,9 @@ if (ISAAC_JPEG)
 	set(INCLUDE ${INCLUDE} ${JPEG_INCLUDE_DIR})
 	set(LIBS ${LIBS} ${JPEG_LIBRARY})
 
+	set(SRCS ${SRCS} ${CMAKE_SOURCE_DIR}/server/URIImageConnector.cpp)
+	set(HDRS ${HDRS} ${CMAKE_SOURCE_DIR}/server/URIImageConnector.hpp)
+
 	add_definitions(-DISAAC_JPEG)
 endif (ISAAC_JPEG)
 

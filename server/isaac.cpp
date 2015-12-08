@@ -21,6 +21,9 @@
 #ifdef ISAAC_GST
 	#include "RTPImageConnector.hpp"
 #endif
+#ifdef ISAAC_JPEG
+	#include "URIImageConnector.hpp"
+#endif
 
 #define ISAAC_VERSION "1.0"
 
@@ -36,7 +39,6 @@ int main(int argc, char **argv)
 {
 	int outer_port = 2459;
 	int inner_port = 2460;
-	bool jpeg = false;
 	const char __name[] = "ISAAC Visualization server";
 	const char __url[] = "127.0.0.1";
 	const char* name = __name;
@@ -55,7 +57,6 @@ int main(int argc, char **argv)
 			printf(" --inner_port: Set port for the simulations to connect to. Default 2460\n");
 			printf("        --url: Set the url to connect to from outside. Default 127.0.0.1\n");
 			printf("       --name: Set the name of the server.\n");
-			printf("       --jpeg: Use JPEG stream instead of H264. Needs very big bandwidth!\n");
 			printf("    --version: Shows the version\n");
 			return 0;
 		}
@@ -65,9 +66,6 @@ int main(int argc, char **argv)
 			printf("Isaac version " ISAAC_VERSION "\n");
 			return 0;
 		}
-		else
-		if (strcmp(argv[nr],"--jpeg") == 0)
-			jpeg = true;
 		else
 		if (strcmp(argv[nr],"--outer_port") == 0)
 		{
@@ -117,11 +115,25 @@ int main(int argc, char **argv)
 			master.addImageConnector(sDLImageConnector);
 	#endif
 	#ifdef ISAAC_GST
-		RTPImageConnector* rTPImageConnector = new RTPImageConnector(url,false,jpeg);
-		if (rTPImageConnector->init(5000,5100))
+		RTPImageConnector* rTPImageConnector = new RTPImageConnector(url,false,false);
+		if (rTPImageConnector->init(5000,5099))
 			delete rTPImageConnector;
 		else
 			master.addImageConnector(rTPImageConnector);
+	#endif
+	#ifdef ISAAC_GST
+		rTPImageConnector = new RTPImageConnector(url,false,true);
+		if (rTPImageConnector->init(5100,5199))
+			delete rTPImageConnector;
+		else
+			master.addImageConnector(rTPImageConnector);
+	#endif
+	#ifdef ISAAC_JPEG
+		URIImageConnector* uRIImageConnector = new URIImageConnector();
+		if (uRIImageConnector->init(0,0))
+			delete uRIImageConnector;
+		else
+			master.addImageConnector(uRIImageConnector);
 	#endif
 	if (master.run())
 	{

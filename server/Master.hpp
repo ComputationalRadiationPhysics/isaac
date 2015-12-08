@@ -17,7 +17,7 @@
 #define __MASTER
 
 #include <string>
-#include <list>
+#include <vector>
 #include "Common.hpp"
 #include "MetaDataConnector.hpp"
 class MetaDataConnector;
@@ -113,9 +113,10 @@ class Master
 	private:
 		InsituConnectorMaster insituMaster;
 		json_t* masterHello;
+		json_t* masterHelloConnectorList;
 		std::string name;
-		std::list< MetaDataConnectorContainer > dataConnectorList;
-		std::list< ImageConnectorContainer > imageConnectorList;
+		std::vector< MetaDataConnectorContainer > dataConnectorList;
+		std::vector< ImageConnectorContainer > imageConnectorList;
 		ThreadList< InsituConnectorGroup* > insituConnectorGroupList;
 		ThreadList< MetaDataClient* > dataClientList;
 		int inner_port;

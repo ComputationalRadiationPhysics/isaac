@@ -39,6 +39,8 @@ Master::Master(std::string name,int inner_port)
 	masterHello = json_object();
 	json_object_set_new( masterHello, "type", json_string( "hello" ) );
 	json_object_set_new( masterHello, "name", json_string( name.c_str() ) );
+	masterHelloConnectorList = json_array();
+	json_object_set_new( masterHello, "streams", masterHelloConnectorList );
 }
 
 errorCode Master::addDataConnector(MetaDataConnector *dataConnector)
@@ -58,6 +60,10 @@ errorCode Master::addImageConnector(ImageConnector *imageConnector)
 	d.connector = imageConnector;
 	d.thread = 0;
 	imageConnectorList.push_back(d);
+	json_t* element = json_object();
+	json_object_set_new( element, "name", json_string( imageConnector->getName().c_str() ) );
+	json_object_set_new( element, "id", json_integer( imageConnectorList.size() - 1 ) ); //last element
+	json_array_append_new( masterHelloConnectorList, element );
 	return 0;
 }
 
@@ -166,7 +172,15 @@ size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 
 std::string Master::getStream(std::string connector,std::string name,std::string ref)
 {
-	void* reference = (void*)std::stol(ref);
+	void* reference;
+	try
+	{
+		reference = (void*)std::stol(ref);
+	}
+	catch (...)
+	{
+		return "";
+	}
 	std::string result ("");
 	ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr group = insituConnectorGroupList.getFront();
 	while (group)
@@ -201,12 +215,12 @@ errorCode Master::run()
 	}
 	pthread_create(&insituThread,NULL,Runable::run_runable,&insituMaster);
 	
-	for (std::list<MetaDataConnectorContainer>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+	for (auto it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		printf("Launching %s\n",(*it).connector->getName().c_str());
 		pthread_create(&((*it).thread),NULL,Runable::run_runable,(*it).connector);
 	}
-	for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+	for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 	{
 		printf("Launching %s\n",(*it).connector->getName().c_str());
 		pthread_create(&((*it).thread),NULL,Runable::run_runable,(*it).connector);
@@ -255,7 +269,8 @@ errorCode Master::run()
 						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc=dataClientList.getFront();
 						while(dc)
 						{
-							if(dc->t->doesObserve(insitu->t->group->getID()))
+							int stream;
+							if(dc->t->doesObserve(insitu->t->group->getID(),stream))
 								dc->t->masterSendMessage(new MessageContainer(message->type,message->json_root,true));
 							dc=dc->next;
 						}
@@ -264,7 +279,7 @@ errorCode Master::run()
 						if(l==0)
 							container->suicide();
 						else
-							for(std::list<ImageConnectorContainer>::iterator ic=imageConnectorList.begin();ic!=imageConnectorList.end();ic++)
+							for(auto ic=imageConnectorList.begin();ic!=imageConnectorList.end();ic++)
 								(*ic).connector->masterSendMessage(container);
 					}
 				}
@@ -322,7 +337,7 @@ errorCode Master::run()
 							dc->t->masterSendMessage(new MessageContainer(REGISTER,group->initData,true));
 							dc = dc->next;
 						}
-						for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+						for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_ADDED,NULL,group,1));
 					}
 				}
@@ -344,7 +359,7 @@ errorCode Master::run()
 							dc->t->masterSendMessage(new MessageContainer(EXIT_PLUGIN,message->json_root,true));
 							dc = dc->next;
 						}
-						for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+						for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_FINISHED,NULL,group,1));
 						//Now let's remove the whole group
 						group->master->group = NULL;
@@ -406,9 +421,14 @@ errorCode Master::run()
 				if (message->type == OBSERVE)
 				{
 					int id = json_integer_value( json_object_get(message->json_root, "observe id") );
+					int stream = json_integer_value( json_object_get(message->json_root, "stream") );
+					if ( stream < 0 )
+						stream = 0;
+					if ( stream >= imageConnectorList.size() )
+						stream = imageConnectorList.size()-1;
 					const char* url = json_string_value( json_object_get(message->json_root, "url") );
 					void* ref = (void*)dc->t;
-					dc->t->observe( id );
+					dc->t->observe( id, stream );
 					InsituConnectorGroup* group = NULL;
 					ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
 					while (it)
@@ -433,8 +453,7 @@ errorCode Master::run()
 							json_object_set( root, "distance", js );
 						json_object_set_new( root, "type", json_string( "update" ) );
 						dc->t->masterSendMessage(new MessageContainer(UPDATE,root));
-						for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
-							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED,NULL,group,1,url,ref));
+						imageConnectorList[ stream ].connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED,NULL,group,1,url,ref));
 						//Send request for transfer functions
 						char buffer[] = "{\"type\": \"feedback\", \"request\": \"transfer\"}";
 						send(group->master->connector->getSockFD(),buffer,strlen(buffer),0);
@@ -445,7 +464,8 @@ errorCode Master::run()
 					int id = json_integer_value( json_object_get(message->json_root, "observe id") );
 					const char* url = json_string_value( json_object_get(message->json_root, "url") );
 					void* ref = (void*)dc->t;
-					dc->t->stopObserve( id );
+					int stream = 0;
+					dc->t->stopObserve( id, stream );
 					InsituConnectorGroup* group = NULL;
 					ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
 					while (it)
@@ -458,8 +478,7 @@ errorCode Master::run()
 						it = it->next;
 					}
 					if (group)
-						for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
-							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED_STOPPED,NULL,group,1,url,ref));
+						imageConnectorList[ stream ].connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED_STOPPED,NULL,group,1,url,ref));
 				}
 				if (message->type == CLOSED)
 				{
@@ -467,10 +486,10 @@ errorCode Master::run()
 					ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr gr = insituConnectorGroupList.getFront();
 					while (gr)
 					{
-						if (dc->t->doesObserve(gr->t->getID()))
+						int stream;
+						if (dc->t->doesObserve(gr->t->getID(), stream))
 						{
-							for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
-								(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED_STOPPED,NULL,gr->t,1,"",ref));
+							imageConnectorList[ stream ].connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED_STOPPED,NULL,gr->t,1,"",ref));
 						}
 						gr = gr->next;
 					}
@@ -485,7 +504,7 @@ errorCode Master::run()
 		///////////////////////////////////////
 		// Iterate over all image connectors //
 		///////////////////////////////////////
-		for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+		for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 		{
 			while (ImageBufferContainer* message = (*it).connector->masterGetMessage())
 			{
@@ -507,6 +526,21 @@ errorCode Master::run()
 					}
 					json_decref( root );
 				}
+				if (message->type == SEND_JSON)
+				{
+					ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+					while (dc)
+					{
+						if (dc->t == message->reference)
+						{
+							json_t* root = json_object();
+							json_object_set_new( root, "type", json_string ("period video") );
+							json_object_set_new( root, "payload", json_string ( (char*)(message->buffer) ) );
+							dc->t->masterSendMessage(new MessageContainer(PERIOD_VIDEO,root));
+						}
+						dc = dc->next;
+					}
+				}
 				message->suicide();
 			}
 		}
@@ -521,22 +555,22 @@ errorCode Master::run()
 	//Yeah... "finish"
 	pthread_join(insituThread,NULL);
 	printf("Done\n");
-	for (std::list<MetaDataConnectorContainer>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+	for (auto it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		printf("Asking %s to exit\n",(*it).connector->getName().c_str());
 		(*it).connector->masterSendMessage(new MessageContainer(FORCE_EXIT));
 	}
-	for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+	for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 	{
 		printf("Asking %s to exit\n",(*it).connector->getName().c_str());
 		(*it).connector->masterSendMessage(new ImageBufferContainer(IMG_FORCE_EXIT,NULL,NULL,1));
 	}
-	for (std::list<MetaDataConnectorContainer>::iterator it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
+	for (auto it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		pthread_join((*it).thread,NULL);
 		printf("%s finished\n",(*it).connector->getName().c_str());
 	}
-	for (std::list<ImageConnectorContainer>::iterator it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+	for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 	{
 		pthread_join((*it).thread,NULL);
 		printf("%s finished\n",(*it).connector->getName().c_str());

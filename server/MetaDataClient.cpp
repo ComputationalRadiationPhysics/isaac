@@ -21,18 +21,24 @@ MetaDataClient::MetaDataClient()
 	
 }
 
-void MetaDataClient::observe(int nr)
+void MetaDataClient::observe(int nr,int stream)
 {
-	observeList.push_back(nr);
-	observeList.unique();
+	observeList.insert( std::pair<int,int>(nr,stream) );
 }
 
-void MetaDataClient::stopObserve(int nr)
+void MetaDataClient::stopObserve(int nr,int& stream)
 {
-	observeList.remove(nr);
+	auto it = observeList.find( nr );
+	if (it != observeList.end())
+		stream = it->second;
+	observeList.erase(nr);
 }
 
-bool MetaDataClient::doesObserve(int nr)
+bool MetaDataClient::doesObserve(int nr,int& stream)
 {
-	return (std::find(observeList.begin(), observeList.end(), nr) != observeList.end());
+	auto it = observeList.find( nr );
+	if (it == observeList.end())
+		return false;
+	stream = it->second;
+	return true;
 }

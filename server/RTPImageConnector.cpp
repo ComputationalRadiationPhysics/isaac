@@ -27,7 +27,10 @@ RTPImageConnector::RTPImageConnector(std::string url,bool zerolatency,bool raw)
 
 std::string RTPImageConnector::getName()
 {
-	return "RTPImageConnector";
+	if (raw)
+		return "JPEG_RTP_Stream";
+	else
+		return "H264_RTP_Stream";
 }
 
 #define GST_LOAD_ELEMENT_OR_DIE(stream,element) \

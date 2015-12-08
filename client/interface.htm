@@ -19,7 +19,13 @@
 	<input type="button" value="Connect" id="connect">
 	<br/><input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()"> Show video and control in one window
 	<br/><input type="checkbox" id="wireframe_checkbox" checked onchange="wireframe_checkbox_click()"> Show wireframe bounding box
-	<br/><input type="checkbox" id="no_stream_checkbox" onchange="no_stream_checkbox_click()"> Show stream url instead of video
+	<br/><select id="stream_select" onchange="stream_select_click()">
+		<option value="h264_vlc">H264 Stream (with vlc)</option>
+		<option value="jpeg_vlc">JPEG Stream (with vlc)</option>
+		<option value="h264_url">H264 Stream (only url)</option>
+		<option value="jpeg_url">JPEG Stream (only url)</option>
+		<option value="jpeg_raw">JPEG Stream (html5 only)</option>	
+	</select> Select stream (before observing!)
 </form>
 <div id="status">Status: Not connected</div>
 </p>
@@ -85,7 +91,9 @@ var particles = null;
 var plugins = new Array();
 var one_window = true;
 var wireframe = true;
-var no_stream = false;
+var stream = 0;
+var stream_img = new Image;
+stream_img.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==";
 
 var projection = [
 	1, 0, 0, 0,
@@ -141,6 +149,13 @@ function mulMatrix( matrix1 , matrix2)
 			              + matrix1[y+2*4] * matrix2[2+x*4]
 			              + matrix1[y+3*4] * matrix2[3+x*4];
 	return result;
+}
+
+function stream_is_raw( number )
+{
+	if (number >= 2 && number <=3)
+		return true;
+	return false;
 }
 
 function mulMatrix4(matrix,p)
@@ -253,10 +268,21 @@ function redraw()
 	];
 	modelview = mulMatrix( distance_m, mulMatrix( rotation_m, position_m ) );
 	
-	p_ctx.clearRect(0, 0, preview.clientWidth, preview.clientHeight);
+	if (stream == 4)
+		p_ctx.drawImage(stream_img,0,0);
+	else
+		p_ctx.clearRect(0, 0, preview.clientWidth, preview.clientHeight);
 	p_ctx.fillStyle = "#000000";
-	if (one_window && !no_stream)
-		p_ctx.strokeStyle = '#ffffff';
+	if (one_window && !stream_is_raw( stream ))
+	{
+		if (stream == 4)
+		{
+			p_ctx.globalAlpha=0.5;
+			p_ctx.strokeStyle = '#ffffff';
+		}
+		else
+			p_ctx.strokeStyle = '#ffffff';
+	}
 	else
 		p_ctx.strokeStyle = '#000000';
 	p_ctx.lineWidth = 2;
@@ -269,6 +295,7 @@ function redraw()
 		point( particles[p] );
 	}
 	p_ctx.stroke();
+	p_ctx.globalAlpha=1.0;
 }
 
 var last_feedback_send = 0;
@@ -394,9 +421,15 @@ function observeSimulation(id)
 {
 	stopObserverSimulation();
 	observe_id = id;
+	var connector_id = 0; //h264 rtp
+	if (stream == 1 || stream == 3)
+		connector_id = 1; //jpeg rtp
+	if (stream == 4)
+		connector_id = 2; //jpeg uri
 	var obj =
 	{
 		"type" : "observe",
+		"stream" : connector_id,
 		"observe id" : observe_id
 	};
 	socket.send(JSON.stringify(obj));
@@ -536,6 +569,7 @@ document.getElementById("connect").onclick = function()
 					while (table.rows.length > 1)
 						table.deleteRow(1);
 					document.getElementById("list_td").style.display = 'initial';
+					document.getElementById("debug").innerHTML = JSON.stringify(obj);
 				}
 				if (obj["type"] == "register")
 				{
@@ -600,7 +634,7 @@ document.getElementById("connect").onclick = function()
 						preview.height = obj["framebuffer height"];
 						video.width = obj["framebuffer width"];
 						video.height = obj["framebuffer height"];
-						if (!no_stream)
+						if (!stream_is_raw( stream ))
 							video.playlist.items.clear();
 						observeSimulation(obj["id"]);
 						redraw();
@@ -610,7 +644,7 @@ document.getElementById("connect").onclick = function()
 				if (obj["type"] == "register video")
 				{
 					var url = "http://" + document.getElementById("url").value + ":" + document.getElementById("port").value + "/" + obj["connector"] + "/" + obj["name"] + "/" + obj["reference"];
-					if (no_stream)
+					if (stream_is_raw( stream ))
 						document.getElementById("url_div").textContent =  url;
 					else
 					{
@@ -738,6 +772,10 @@ document.getElementById("connect").onclick = function()
 						video.playlist.stop();
 					}
 				}
+				if (obj["type"] == "period video")
+				{
+					stream_img.src = obj["payload"];
+				}
 			};
 			socket.onclose = function()
 			{
@@ -825,10 +863,10 @@ function interpolation_checkbox_click()
 	sendFeedback( "interpolation", status );
 };
 
-function no_stream_checkbox_click()
+function stream_select_click()
 {
-	no_stream = document.getElementById("no_stream_checkbox").checked;
-	if (no_stream)
+	stream = document.getElementById("stream_select").selectedIndex;
+	if ( stream_is_raw( stream ) )
 	{
 		document.getElementById("video").style.display = 'none';
 		document.getElementById("url_div").style.display = 'inline';
@@ -841,7 +879,10 @@ function no_stream_checkbox_click()
 		document.getElementById("preview_div").style.position = 'absolute';
 		document.getElementById("preview_div").style.top = '0';
 		document.getElementById("preview_div").style.left = '0';
-		document.getElementById("preview_div").style.opacity = '0.5';
+		if (stream == 4)
+			document.getElementById("preview_div").style.opacity = '1.0';
+		else
+			document.getElementById("preview_div").style.opacity = '0.5';
 	}
 };
 

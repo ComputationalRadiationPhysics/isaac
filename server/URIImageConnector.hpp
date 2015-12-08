@@ -15,16 +15,20 @@
 
 #pragma once
 
-#include "MessageAble.hpp"
-#include <map>
+#include "ImageConnector.hpp"
+#include "Runable.hpp"
+#include <jpeglib.h>
+#include <list>
+#include <vector>
 
-class MetaDataClient : public MessageAble<MessageContainer>
+class URIImageConnector : public ImageConnector
 {
 	public:
-		MetaDataClient();
-		void observe(int nr,int stream);
-		void stopObserve(int nr,int& stream);
-		bool doesObserve(int nr,int& stream);
+		URIImageConnector();
+		~URIImageConnector();
+		errorCode init(int minport,int maxport);
+		errorCode run();
+		std::string getName();
 	private:
-		std::map<int,int> observeList;
+		std::map<void*,InsituConnectorGroup*> streams;
 };
