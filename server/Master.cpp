@@ -21,6 +21,7 @@
 #include <string>
 #if ISAAC_JPEG == 1
     #include <jpeglib.h>
+    #include <setjmp.h>
 #endif
 
 volatile sig_atomic_t Master::force_exit = 0;
@@ -104,6 +105,20 @@ void isaac_jpeg_term_source(j_decompress_ptr cinfo)
 {
 }
 
+struct isaac_jpeg_error_mgr {
+	struct jpeg_error_mgr pub;
+	jmp_buf setjmp_buffer;
+};
+typedef struct isaac_jpeg_error_mgr * isaac_jpeg_error_ptr;
+
+METHODDEF(void)
+isaac_jpeg_error_exit (j_common_ptr cinfo)
+{
+	isaac_jpeg_error_ptr err = (isaac_jpeg_error_ptr) cinfo->err;
+	(*cinfo->err->output_message) (cinfo);
+	longjmp(err->setjmp_buffer, 1);
+}
+
 size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 {
 	char go = 42;
@@ -131,8 +146,15 @@ size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 	{
 		#if ISAAC_JPEG == 1
 			struct jpeg_decompress_struct cinfo;
-			struct jpeg_error_mgr jerr;
-			cinfo.err = jpeg_std_error(&jerr);
+			struct isaac_jpeg_error_mgr jerr;
+			cinfo.err = jpeg_std_error(&jerr.pub);
+			jerr.pub.error_exit = isaac_jpeg_error_exit;
+			if (setjmp(jerr.setjmp_buffer))
+			{
+				jpeg_destroy_decompress(&cinfo);
+				printf("Got invalid jpeg from simulation. Ignoring.\n");
+				return 0;
+			}
 			jpeg_source_mgr src;
 			src.init_source = &isaac_jpeg_init_source;
 			src.fill_input_buffer = &isaac_jpeg_fill_input_buffer;

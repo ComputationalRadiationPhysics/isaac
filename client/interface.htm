@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <title>ISAAC Control Page</title>
 </head>
+<style>
+    * {
+      font-family: sans-serif;
+    }
+</style>
 <body>
 <script src="jscolor.js"></script>
 <h3>Preview and camera setting</h3>
@@ -89,9 +94,9 @@ var socket = null;
 var observe_id = -1;
 var particles = null;
 var plugins = new Array();
-var one_window = true;
-var wireframe = true;
-var stream = 0;
+var one_window = document.getElementById("one_window_checkbox").checked;
+var wireframe = document.getElementById("wireframe_checkbox").checked;
+var stream = document.getElementById("stream_select").selectedIndex;
 var stream_img = new Image;
 stream_img.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==";
 
