@@ -45,7 +45,7 @@
 			<canvas id="transfer" width="412" height="16"></canvas>
 			<table border="1"><tr id="transfer_form"></tr></table>
 			<form>
-				<input type="button" value="Send example metadada" id="metadata">
+				<input type="button" value="Pause" id="pause">
 				<input type="button" value="Stop observing" id="stop">
 				<input type="button" value="Stop simulation" id="exit">
 			</form>
@@ -574,7 +574,6 @@ document.getElementById("connect").onclick = function()
 					while (table.rows.length > 1)
 						table.deleteRow(1);
 					document.getElementById("list_td").style.display = 'initial';
-					document.getElementById("debug").innerHTML = JSON.stringify(obj);
 				}
 				if (obj["type"] == "register")
 				{
@@ -663,7 +662,7 @@ document.getElementById("connect").onclick = function()
 					{
 						if (obj["metadata"].hasOwnProperty("reference particles"))
 							particles = obj["metadata"]["reference particles"];
-						//document.getElementById("debug").innerHTML = JSON.stringify(obj["metadata"]).replace(/{/g,"<br/>{").replace(/}/g,"}<br/>");
+						document.getElementById("debug").innerHTML = JSON.stringify(obj["metadata"]).replace(/{/g,"<br/>{").replace(/}/g,"}<br/>");
 					}
 					var d = new Date();
 					var	now = d.getTime();
@@ -810,7 +809,7 @@ document.getElementById("stop").onclick = function()
 	stopObserverSimulation();
 }
 
-document.getElementById("metadata").onclick = function()
+document.getElementById("pause").onclick = function()
 {
 	var obj =
 	{
@@ -818,8 +817,7 @@ document.getElementById("metadata").onclick = function()
 		"observe id" : observe_id,
 		"metadata" :
 		{
-			"some string" : "Jet fuel doesn't melt steel beams!",
-			"some int" : 42
+			"pause" : true
 		}
 	};
 	socket.send(JSON.stringify(obj));

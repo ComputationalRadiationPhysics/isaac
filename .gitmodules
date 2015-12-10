@@ -10,3 +10,6 @@
 [submodule "requirement-modules/jansson"]
 	path = requirement-modules/jansson
 	url = https://github.com/akheron/jansson.git
+[submodule "requirement-modules/libjpeg-turbo"]
+	path = requirement-modules/libjpeg-turbo
+	url = git@github.com:libjpeg-turbo/libjpeg-turbo.git
