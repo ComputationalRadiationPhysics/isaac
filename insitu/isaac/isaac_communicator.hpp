@@ -107,16 +107,18 @@ class IsaacCommunicator
 			isaac_int n = send(sockfd,content,l,0);
 			return n;
 		}
-		static void isaac_init_destination(j_compress_ptr cinfo)
-		{
-		}
-		static boolean isaac_jpeg_empty_output_buffer(j_compress_ptr cinfo)
-		{
-			return true;
-		}
-		static void isaac_jpeg_term_destination(j_compress_ptr cinfo)
-		{
-		}
+		#if ISAAC_JPEG == 1
+			static void isaac_init_destination(j_compress_ptr cinfo)
+			{
+			}
+			static boolean isaac_jpeg_empty_output_buffer(j_compress_ptr cinfo)
+			{
+				return true;
+			}
+			static void isaac_jpeg_term_destination(j_compress_ptr cinfo)
+			{
+			}
+		#endif
 		isaac_int serverSendFrame(void* ptr,isaac_uint width,isaac_uint height,isaac_uint depth)
 		{
 			//let's first wait for message, whether the master is reading
@@ -164,7 +166,7 @@ class IsaacCommunicator
 			isaac_int n = 0;
 			isaac_int div = count / ISAAC_MAX_RECEIVE; //256kb per message
 			isaac_int rest = count % ISAAC_MAX_RECEIVE; //rest
-			for (isaac_int i = 0; i <=  div; i++)
+			for (isaac_int i = 0; i <= div; i++)
 			{
 				isaac_int r = -1;
 				while (r < 0)

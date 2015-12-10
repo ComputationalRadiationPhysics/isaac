@@ -87,37 +87,39 @@ MetaDataClient* Master::addDataClient()
 	return client;
 }
 
-void isaac_jpeg_init_source(j_decompress_ptr cinfo)
-{
-}
-boolean isaac_jpeg_fill_input_buffer(j_decompress_ptr cinfo)
-{
-	return true;
-}
-void isaac_jpeg_skip_input_data(j_decompress_ptr cinfo,long num_bytes)
-{
-}
-boolean isaac_jpeg_resync_to_restart(j_decompress_ptr cinfo, int desired)
-{
-	return true;
-}
-void isaac_jpeg_term_source(j_decompress_ptr cinfo)
-{
-}
+#if ISAAC_JPEG == 1
+	void isaac_jpeg_init_source(j_decompress_ptr cinfo)
+	{
+	}
+	boolean isaac_jpeg_fill_input_buffer(j_decompress_ptr cinfo)
+	{
+		return true;
+	}
+	void isaac_jpeg_skip_input_data(j_decompress_ptr cinfo,long num_bytes)
+	{
+	}
+	boolean isaac_jpeg_resync_to_restart(j_decompress_ptr cinfo, int desired)
+	{
+		return true;
+	}
+	void isaac_jpeg_term_source(j_decompress_ptr cinfo)
+	{
+	}
 
-struct isaac_jpeg_error_mgr {
-	struct jpeg_error_mgr pub;
-	jmp_buf setjmp_buffer;
-};
-typedef struct isaac_jpeg_error_mgr * isaac_jpeg_error_ptr;
+	struct isaac_jpeg_error_mgr {
+		struct jpeg_error_mgr pub;
+		jmp_buf setjmp_buffer;
+	};
+	typedef struct isaac_jpeg_error_mgr * isaac_jpeg_error_ptr;
 
-METHODDEF(void)
-isaac_jpeg_error_exit (j_common_ptr cinfo)
-{
-	isaac_jpeg_error_ptr err = (isaac_jpeg_error_ptr) cinfo->err;
-	(*cinfo->err->output_message) (cinfo);
-	longjmp(err->setjmp_buffer, 1);
-}
+	METHODDEF(void)
+	isaac_jpeg_error_exit (j_common_ptr cinfo)
+	{
+		isaac_jpeg_error_ptr err = (isaac_jpeg_error_ptr) cinfo->err;
+		(*cinfo->err->output_message) (cinfo);
+		longjmp(err->setjmp_buffer, 1);
+	}
+#endif
 
 size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 {
@@ -129,7 +131,7 @@ size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 	if (count == 0)
 	{
 		jpeg = false,
-		count == group->video_buffer_size;
+		count = group->video_buffer_size;
 	}
 	uint32_t received = 0;
 	uint8_t* temp_buffer = video_buffer;
