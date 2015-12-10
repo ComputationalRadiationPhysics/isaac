@@ -109,7 +109,7 @@ class IsaacVisualization
             const TDomainSize global_size,
             const TDomainSize local_size,
             const TDomainSize position,
-            TSourceList sources
+            TSourceList& sources
             ) :
             #if ISAAC_ALPAKA == 1
                 host(host),
@@ -601,6 +601,7 @@ class IsaacVisualization
                 else
                     MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, master, MPI_COMM_WORLD);
             }
+
             if (rank == master)
             {
                 json_object_set_new( json_root, "type", json_string( "period" ) );
@@ -664,6 +665,7 @@ class IsaacVisualization
                 communicator->serverSend(buffer);
                 free(buffer);
             }
+
             json_decref( json_root );
             recreateJSON();
 
@@ -845,7 +847,7 @@ class IsaacVisualization
             #endif
             ISAAC_STOP_TIME_MEASUREMENT( myself->copy_time, +=, copy, myself->getTicksUs() )
         }
-        
+
         static void* visualizationFunction(void* dummy)
         {
             IceTImage* image = (IceTImage*)dummy;
@@ -854,7 +856,6 @@ class IsaacVisualization
             if (myself->video_communicator)
                 myself->video_communicator->serverSendFrame(icetImageGetColorui(*image),myself->framebuffer_size.x,myself->framebuffer_size.y,4);
             ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
-
             myself->metaNr++;
             return 0;
         }
@@ -968,7 +969,7 @@ class IsaacVisualization
         isaac_int master;
         isaac_int numProc;
         isaac_uint metaNr;
-        TSourceList sources;
+        TSourceList& sources;
         IceTContext icetContext;
         IsaacVisualizationMetaEnum thr_metaTargets;
         pthread_t visualizationThread;
