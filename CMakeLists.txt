@@ -56,7 +56,7 @@ if (ISAAC_GST)
 	add_definitions(-DISAAC_GST)
 endif (ISAAC_GST)
 
-option(ISAAC_JPEG "Use JPEG compression between visualization and isaac server" ON)
+option(ISAAC_JPEG "Use JPEG compression between visualization and isaac server. Deactivating will not work with big images. And with big I am talking about bigger than 800x600." ON)
 if (ISAAC_JPEG)
 	find_package(JPEG REQUIRED)
 	set(INCLUDE ${INCLUDE} ${JPEG_INCLUDE_DIR})

@@ -94,7 +94,7 @@ callback_isaac(
 		size_t len )
 {
 	int n, m;
-	char buf[LWS_SEND_BUFFER_PRE_PADDING + MAX_RECEIVE +
+	char buf[LWS_SEND_BUFFER_PRE_PADDING + ISAAC_MAX_RECEIVE +
 						  LWS_SEND_BUFFER_POST_PADDING];
 	char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 	struct per_session_data__isaac *pss = (struct per_session_data__isaac *)user;
@@ -170,7 +170,7 @@ static struct libwebsocket_protocols protocols[] = {
 		"isaac-json-protocol",
 		callback_isaac,
 		sizeof(struct per_session_data__isaac),
-		MAX_RECEIVE,
+		ISAAC_MAX_RECEIVE,
 	},
 	{ NULL, NULL, 0, 0 } /* terminator */
 };

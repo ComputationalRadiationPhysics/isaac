@@ -23,7 +23,7 @@ typedef int ClientRef;
 typedef int ObserverRef;
 typedef int errorCode;
 
-#define MAX_RECEIVE 262144 //256kb
+#define ISAAC_MAX_RECEIVE 2097152 //2 MB
 
 typedef enum
 {

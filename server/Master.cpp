@@ -24,6 +24,9 @@
     #include <setjmp.h>
 #endif
 
+#include <boost/archive/iterators/binary_from_base64.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
+
 volatile sig_atomic_t Master::force_exit = 0;
 
 void sighandler(int sig)
@@ -77,7 +80,7 @@ MetaDataClient* Master::addDataClient()
 	ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr mom = insituConnectorGroupList.getFront();
 	while (mom)
 	{
-		if (mom->t->master && mom->t->video)
+		if (mom->t->master)
 		{
 			json_incref( mom->t->initData );
 			client->masterSendMessage(new MessageContainer(REGISTER,mom->t->initData,true));
@@ -121,29 +124,62 @@ MetaDataClient* Master::addDataClient()
 	}
 #endif
 
-size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
+void Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char* payload)
 {
-	char go = 42;
-	send(group->video->connector->getSockFD(),&go,1,0);
-	uint32_t count;
-	recv(group->video->connector->getSockFD(),&count,4,0);
-	bool jpeg = true;
-	if (count == 0)
-	{
-		jpeg = false,
-		count = group->video_buffer_size;
-	}
-	uint32_t received = 0;
+	//Search for : in payload
+	char* colon = strchr(payload, ':');
+	if (colon == NULL)
+		return;
+	colon++;
+	//Search for ; in payload
+	char* semicolon = strchr(colon, ';');
+	if (semicolon == NULL)
+		return;
+	//Search for , in payload
+	char* comma = strchr(semicolon, ',');
+	if (comma == NULL)
+		return;
+	semicolon[0] = 0; //in colon is now the image type
+	//After the comma the base64 stream starts
+	comma++;
+	int whole_length = strlen(comma);
+	comma[whole_length-1] = 0;
+	
+	bool jpeg = false;
+	if (strcmp(colon, "image/jpeg") == 0)
+		jpeg = true;
+	
 	uint8_t* temp_buffer = video_buffer;
 	if (jpeg)
-		temp_buffer = (uint8_t*)malloc(count);
-	while (received < count)
+		temp_buffer = (uint8_t*)malloc(strlen(comma)+4); //Should always be enough
+	
+	//base64 -> binary data	
+	using namespace boost::archive::iterators;
+	typedef
+		transform_width
+		<
+			binary_from_base64
+			<
+				const uint8_t *
+			>,
+			8,
+			6
+		> 
+		base64_dec;
+
+	try
 	{
-		int r = recv(group->video->connector->getSockFD(),&(temp_buffer[received]),count - received,0);
-		if (r <= 0)
-			break;
-		received += r;
+		base64_dec src_it(comma);
+		for(int i = 0; i < (whole_length+1)*3/4; ++i)
+		{
+			temp_buffer[i] = *src_it;
+			++src_it;
+		}
 	}
+	catch (dataflow_exception&)
+	{
+	}
+	
 	if (jpeg)
 	{
 		#if ISAAC_JPEG == 1
@@ -155,7 +191,8 @@ size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 			{
 				jpeg_destroy_decompress(&cinfo);
 				printf("Got invalid jpeg from simulation. Ignoring.\n");
-				return 0;
+				free(payload);
+				return;
 			}
 			jpeg_source_mgr src;
 			src.init_source = &isaac_jpeg_init_source;
@@ -166,7 +203,7 @@ size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 			jpeg_create_decompress(&cinfo);
 			cinfo.src = &src;
 			cinfo.src->next_input_byte = (JOCTET*)(temp_buffer);
-			cinfo.src->bytes_in_buffer = count;
+			cinfo.src->bytes_in_buffer = group->getVideoBufferSize();
 			(void) jpeg_read_header(&cinfo, TRUE);
 			(void) jpeg_start_decompress(&cinfo);
 			int row_stride = cinfo.output_width * cinfo.output_components;
@@ -184,14 +221,13 @@ size_t Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer)
 				}
 			}
 			(void) jpeg_finish_decompress(&cinfo);
-			jpeg_destroy_decompress(&cinfo);
-			
+			jpeg_destroy_decompress(&cinfo);		
+			free(temp_buffer);
 		#else
 			memset( video_buffer, rand()%255, group->video_buffer_size );
 		#endif
-		free(temp_buffer);
 	}
-	return received;
+	free(payload);
 }
 
 std::string Master::getStream(std::string connector,std::string name,std::string ref)
@@ -267,7 +303,7 @@ errorCode Master::run()
 				bool delete_message = true;
 				if (message->type == PERIOD)
 				{
-					if (insitu->t->group == NULL || insitu->t->group->video == NULL) //Later!
+					if (insitu->t->group == NULL) //Later!
 					{
 						delete_message = false;
 						insitu->t->connector->clientSendMessage( message );
@@ -286,9 +322,6 @@ errorCode Master::run()
 							json_object_set( insitu->t->group->initData, "distance", js );
 						if ( js = json_object_get(message->json_root, "interpolation") )
 							json_object_set( insitu->t->group->initData, "interpolation", js );
-						//Allocate, receive and send video
-						uint8_t*video_buffer=(uint8_t*)malloc(insitu->t->group->video_buffer_size);
-						receiveVideo(insitu->t->group,video_buffer);
 						//Send json data
 						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc=dataClientList.getFront();
 						while(dc)
@@ -298,17 +331,36 @@ errorCode Master::run()
 								dc->t->masterSendMessage(new MessageContainer(message->type,message->json_root,true));
 							dc=dc->next;
 						}
-						int l=imageConnectorList.size();
-						ImageBufferContainer *container=new ImageBufferContainer(UPDATE_BUFFER,video_buffer,insitu->t->group,l);
-						if(l==0)
-							container->suicide();
-						else
-							for(auto ic=imageConnectorList.begin();ic!=imageConnectorList.end();ic++)
-								(*ic).connector->masterSendMessage(container);
 					}
 				}
 				else
-				if (message->type == REGISTER || message->type == REGISTER_VIDEO) //Saving the metadata description for later
+				if (message->type == PERIOD_VIDEO)
+				{
+					json_t* payload = json_object_get( message->json_root, "payload" );
+					if (payload)
+					{
+						if (insitu->t->group == NULL) //Later!
+						{
+							delete_message = false;
+							insitu->t->connector->clientSendMessage( message );
+						}
+						else
+						{
+							//Allocate, receive and send video
+							uint8_t*video_buffer=(uint8_t*)malloc(insitu->t->group->video_buffer_size);
+							receiveVideo(insitu->t->group,video_buffer,json_dumps( payload , JSON_ENCODE_ANY ));
+							int l=imageConnectorList.size();
+							ImageBufferContainer *container=new ImageBufferContainer(UPDATE_BUFFER,video_buffer,insitu->t->group,l);
+							if(l==0)
+								container->suicide();
+							else
+								for(auto ic=imageConnectorList.begin();ic!=imageConnectorList.end();ic++)
+									(*ic).connector->masterSendMessage(container);
+						}
+					}
+				}				
+				else
+				if (message->type == REGISTER) //Saving the metadata description for later
 				{
 					//Get group
 					std::string name( json_string_value( json_object_get( message->json_root, "name" ) ) );
@@ -340,19 +392,12 @@ errorCode Master::run()
 							delete_message = false;
 							printf("New connection, giving id %i (control)\n",insitu->t->connector->getID());
 							break;
-						case REGISTER_VIDEO:
-							printf("New connection, giving id %i (video)\n",insitu->t->connector->getID());
-							break;
 					}
 					
-					if (message->type == REGISTER_VIDEO)
-						group->video = insitu->t;
-					else
-					{
-						group->master = insitu->t;
-						group->id = insitu->t->connector->getID();
-					}
-					if (group->master && group->video)
+					group->master = insitu->t;
+					group->id = insitu->t->connector->getID();
+
+					if (group->master)
 					{
 						printf("Group complete, sending to connected interfaces\n");
 						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
@@ -387,7 +432,6 @@ errorCode Master::run()
 							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_FINISHED,NULL,group,1));
 						//Now let's remove the whole group
 						group->master->group = NULL;
-						group->video->group = NULL;
 						printf("Removed group %i\n",group->id);
 						ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
 						while (it)

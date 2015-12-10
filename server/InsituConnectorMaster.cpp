@@ -57,7 +57,7 @@ int InsituConnectorMaster::getSockFD()
 
 typedef struct
 {
-	char buffer[MAX_RECEIVE];
+	char buffer[ISAAC_MAX_RECEIVE];
 	int pos;
 	int count;
 } json_load_callback_struct;
@@ -72,7 +72,6 @@ size_t json_load_callback_function (void *buffer, size_t buflen, void *data)
 		return 1;
 	}
 	return 0;
-	//return recv(jlcb->sockfd,buffer,1,MSG_DONTWAIT);
 }
 
 errorCode InsituConnectorMaster::run()
@@ -131,9 +130,12 @@ errorCode InsituConnectorMaster::run()
 					recv(fd_array[i].fd,&expected,4,0);
 					jlcb.count = 0;
 					while (jlcb.count < expected)
-						jlcb.count += recv(fd_array[i].fd,&(jlcb.buffer[jlcb.count]),expected-jlcb.count,0);
+					{
+						int add = recv(fd_array[i].fd,&(jlcb.buffer[jlcb.count]),expected-jlcb.count,0);
+						if (add > 0)
+							jlcb.count += add;
+					}
 					bool closed = false;
-					bool reused = false;
 					if (jlcb.count > 0)
 					{
 						jlcb.buffer[jlcb.count] = 0;
@@ -143,11 +145,6 @@ errorCode InsituConnectorMaster::run()
 							MessageType type = message->type;
 							if (type == REGISTER)
 								json_object_set_new( message->json_root, "id", json_integer( con_array[i]->connector->getID() ) );
-							if (type == REGISTER_VIDEO)
-							{
-								closed = true;
-								reused = true;
-							}
 							con_array[i]->connector->clientSendMessage(message);
 							if (type == EXIT_PLUGIN)
 							{
@@ -165,8 +162,7 @@ errorCode InsituConnectorMaster::run()
 					}
 					if (closed)
 					{
-						if (!reused)
-							close(fd_array[i].fd);
+						close(fd_array[i].fd);
 						fdnum--;
 						for (int j = i; j < fdnum; j++)
 						{

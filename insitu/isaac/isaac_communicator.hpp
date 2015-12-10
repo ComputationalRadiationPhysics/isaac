@@ -27,6 +27,11 @@
 
 #include "isaac_macros.hpp"
 
+#include <boost/archive/iterators/base64_from_binary.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
+#include <boost/archive/iterators/ostream_iterator.hpp>
+#include <sstream>
+
 namespace isaac
 {
 
@@ -70,7 +75,7 @@ class IsaacCommunicator
 			pthread_mutex_unlock(&deleteMessageMutex);
 			return result;
 		}
-		isaac_int serverConnect(bool video = false)
+		isaac_int serverConnect()
 		{
 			struct hostent *server;
 			server = gethostbyname(url.c_str());
@@ -96,8 +101,7 @@ class IsaacCommunicator
 				fprintf(stderr,"Could not connect to %s.\n",url.c_str());
 				return -3;
 			}
-			if (!video)
-				pthread_create(&readThread,NULL,run_readAndSetMessages,this);
+			pthread_create(&readThread,NULL,run_readAndSetMessages,this);
 			return 0;
 		}
 		isaac_int serverSend(const char* content)
@@ -119,15 +123,10 @@ class IsaacCommunicator
 			{
 			}
 		#endif
-		isaac_int serverSendFrame(void* ptr,isaac_uint width,isaac_uint height,isaac_uint depth)
+		void serverSendFrame(void* ptr,isaac_uint width,isaac_uint height,isaac_uint depth)
 		{
-			//let's first wait for message, whether the master is reading
-			uint32_t count = width*height*depth;
-			char go;
-			recv(sockfd,&go,1,0);
-			if (go != 42)
-				return 0;
 			//First the size
+			uint32_t count = width*height*depth;
 			#if ISAAC_JPEG == 1
 				struct jpeg_compress_struct cinfo;
 				struct jpeg_error_mgr jerr;
@@ -158,22 +157,43 @@ class IsaacCommunicator
 				count -= cinfo.dest->free_in_buffer;
 				ptr = jpeg_buffer.data();
 				jpeg_destroy_compress(&cinfo);
-				send(sockfd,&count,4,0);
-			#else
-				uint32_t s = 0;
-				send(sockfd,&s,4,0);
 			#endif
-			isaac_int n = 0;
-			isaac_int div = count / ISAAC_MAX_RECEIVE; //256kb per message
-			isaac_int rest = count % ISAAC_MAX_RECEIVE; //rest
-			for (isaac_int i = 0; i <= div; i++)
-			{
-				isaac_int r = -1;
-				while (r < 0)
-					r = send(sockfd,&(((char*)ptr)[i*ISAAC_MAX_RECEIVE]),i == div ? rest : ISAAC_MAX_RECEIVE,0);
-				n += r;
-			}
-			return n;
+
+			using namespace boost::archive::iterators;
+			std::stringstream payload;
+			typedef
+				base64_from_binary
+				<
+					transform_width
+					<
+						const unsigned char *,
+						6,
+						8
+					>
+				> 
+				base64_text; // compose all the above operations in to a new iterator
+
+			std::copy(
+				base64_text( (char*)ptr ),
+				base64_text( (char*)ptr + count),
+				boost::archive::iterators::ostream_iterator<char>(payload)
+			);
+			
+			#if ISAAC_JPEG == 1
+				char header[] = "{\"type\": \"period video\", \"payload\": \"data:image/jpeg;base64,";
+			#else
+				char header[] = "{\"type\": \"period video\", \"payload\": \"data:image/raw-rgba;base64,";
+			#endif
+			char footer[] = "\"}";
+			int hl = strlen(header);
+			int pl = payload.str().length();
+			int fl = strlen(footer);
+			char* message = (char*)malloc(hl+pl+fl+1);
+			memcpy(  message        ,header,hl);
+			memcpy(&(message[hl   ]),payload.str().c_str(),pl);
+			memcpy(&(message[hl+pl]),footer,fl+1); //with 0
+			serverSend( message );
+			free(message);
 		}
 		void serverDisconnect()
 		{

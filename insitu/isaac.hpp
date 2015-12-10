@@ -150,12 +150,10 @@ class IsaacVisualization
             if (rank == master)
             {
                 this->communicator = new IsaacCommunicator(server_url,server_port);
-                this->video_communicator = new IsaacCommunicator(server_url,server_port);
             }
             else
             {
                 this->communicator = NULL;
-                this->video_communicator = NULL;
             }
             setPerspective( 45.0f, (isaac_float)framebuffer_size.x/(isaac_float)framebuffer_size.y,ISAAC_Z_NEAR, ISAAC_Z_FAR);
             look_at[0] = 0.0f;
@@ -304,8 +302,6 @@ class IsaacVisualization
             isaac_int failed = 0;
             if (communicator && communicator->serverConnect())
                 failed = 1;
-            if (failed == 0 && video_communicator && video_communicator->serverConnect(true))
-                failed = 1;
             MPI_Bcast(&failed,sizeof(failed), MPI_INT, master, MPI_COMM_WORLD);
             if (failed)
                 return -1;
@@ -315,17 +311,6 @@ class IsaacVisualization
                 communicator->serverSend(buffer);
                 free(buffer);
                 json_decref( json_root );
-            
-                if (video_communicator)
-                {
-                    json_root = json_object();
-                    json_object_set_new( json_root, "type", json_string( "register video" ) );
-                    json_object_set_new( json_root, "name", json_string( name.c_str() ) );
-                    char* buffer = json_dumps( json_root, 0 );
-                    video_communicator->serverSend(buffer);
-                    free(buffer);
-                    json_decref( json_root );
-                }            
                 recreateJSON();
             }
             return 0;
@@ -541,7 +526,7 @@ class IsaacVisualization
             json_decref(message);
             thr_metaTargets = metaTargets;
 
-           //Calc order
+            //Calc order
             ISAAC_START_TIME_MEASUREMENT( sorting, getTicksUs() )
             //Every rank calculates it's distance to the camera
             IceTDouble point[4] =
@@ -579,95 +564,6 @@ class IsaacVisualization
             ISAAC_START_TIME_MEASUREMENT( merge, getTicksUs() )
             IceTImage image = icetDrawFrame(projection,modelview,background_color);
             ISAAC_STOP_TIME_MEASUREMENT( merge_time, +=, merge, getTicksUs() )
-
-            //Message sending
-            char* buffer = json_dumps( json_root, 0 );
-            strcpy( message_buffer, buffer );
-            free(buffer);
-            if (thr_metaTargets == META_MERGE)
-            {
-                if (rank == master)
-                {
-                    char receive_buffer[numProc][ISAAC_MAX_RECEIVE];
-                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, receive_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, MPI_COMM_WORLD);
-                    for (isaac_int i = 0; i < numProc; i++)
-                    {
-                        if (i == master)
-                            continue;
-                        json_t* js = json_loads(receive_buffer[i], 0, NULL);
-                        mergeJSON( json_root, js );
-                    }
-                }
-                else
-                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, master, MPI_COMM_WORLD);
-            }
-
-            if (rank == master)
-            {
-                json_object_set_new( json_root, "type", json_string( "period" ) );
-                json_object_set_new( json_root, "meta nr", json_integer( metaNr ) );
-
-                json_t *matrix;
-                if ( send_projection )
-                {
-                    json_object_set_new( json_root, "projection", matrix = json_array() );
-                    ISAAC_JSON_ADD_MATRIX(matrix,projection,16)
-                }
-                if ( send_look_at )
-                {
-                    json_object_set_new( json_root, "position", matrix = json_array() );
-                    ISAAC_JSON_ADD_MATRIX(matrix,look_at,3)
-                }
-                if ( send_rotation )
-                {
-                    json_object_set_new( json_root, "rotation", matrix = json_array() );
-                    ISAAC_JSON_ADD_MATRIX(matrix, rotation,9)
-                }
-                if ( send_distance )
-                    json_object_set_new( json_root, "distance", json_real( distance ) );
-                if ( send_transfer )
-                {
-                    json_object_set_new( json_root, "transfer array", matrix = json_array() );
-                    for (size_t i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
-                    {
-                        json_t* transfer = json_array();
-                        json_array_append_new( matrix, transfer );
-                        for (size_t j = 0; j < TTransfer_size; j++)
-                        {
-                            json_t* color = json_array();
-                            json_array_append_new( transfer, color );
-                            json_array_append_new( color, json_integer( isaac_uint( transfer_h.pointer[i][j].x * isaac_float(255) ) ) );
-                            json_array_append_new( color, json_integer( isaac_uint( transfer_h.pointer[i][j].y * isaac_float(255) ) ) );
-                            json_array_append_new( color, json_integer( isaac_uint( transfer_h.pointer[i][j].z * isaac_float(255) ) ) );
-                            json_array_append_new( color, json_integer( isaac_uint( transfer_h.pointer[i][j].w * isaac_float(255) ) ) );
-                        }
-                    }
-                    json_object_set_new( json_root, "transfer points", matrix = json_array() );
-                    for (size_t i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
-                    {
-                        json_t* points = json_array();
-                        json_array_append_new( matrix, points );
-                        for(auto it = transfer_h.description[i].begin(); it != transfer_h.description[i].end(); it++)
-                        {
-                            json_t* p = json_object();
-                            json_array_append_new( points, p);
-                            json_object_set_new(p, "value", json_integer( it->first ) );
-                            json_object_set_new(p, "r", json_real( it->second.x ) );
-                            json_object_set_new(p, "g", json_real( it->second.y ) );
-                            json_object_set_new(p, "b", json_real( it->second.z ) );
-                            json_object_set_new(p, "a", json_real( it->second.w ) );
-                        }
-                    }
-                }
-                if ( send_interpolation )
-                    json_object_set_new( json_root, "interpolation", json_boolean( interpolation ) );
-                char* buffer = json_dumps( json_root, 0 );
-                communicator->serverSend(buffer);
-                free(buffer);
-            }
-
-            json_decref( json_root );
-            recreateJSON();
 
             #ifdef ISAAC_THREADING
                 pthread_create(&visualizationThread,NULL,visualizationFunction,&image);
@@ -850,11 +746,101 @@ class IsaacVisualization
 
         static void* visualizationFunction(void* dummy)
         {
+            char message_buffer[ISAAC_MAX_RECEIVE];
+            //Message sending
+            char* buffer = json_dumps( myself->json_root, 0 );
+            strcpy( message_buffer, buffer );
+            free(buffer);
+            if (myself->thr_metaTargets == META_MERGE)
+            {
+                if (myself->rank == myself->master)
+                {
+                    char receive_buffer[myself->numProc][ISAAC_MAX_RECEIVE];
+                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, receive_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, myself->master, MPI_COMM_WORLD);
+                    for (isaac_int i = 0; i < myself->numProc; i++)
+                    {
+                        if (i == myself->master)
+                            continue;
+                        json_t* js = json_loads(receive_buffer[i], 0, NULL);
+                        mergeJSON( myself->json_root, js );
+                    }
+                }
+                else
+                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, myself->master, MPI_COMM_WORLD);
+            }
+
+            if (myself->rank == myself->master)
+            {
+                json_object_set_new( myself->json_root, "type", json_string( "period" ) );
+                json_object_set_new( myself->json_root, "meta nr", json_integer( myself->metaNr ) );
+
+                json_t *matrix;
+                if ( myself->send_projection )
+                {
+                    json_object_set_new( myself->json_root, "projection", matrix = json_array() );
+                    ISAAC_JSON_ADD_MATRIX(matrix,myself->projection,16)
+                }
+                if ( myself->send_look_at )
+                {
+                    json_object_set_new( myself->json_root, "position", matrix = json_array() );
+                    ISAAC_JSON_ADD_MATRIX(matrix,myself->look_at,3)
+                }
+                if ( myself->send_rotation )
+                {
+                    json_object_set_new( myself->json_root, "rotation", matrix = json_array() );
+                    ISAAC_JSON_ADD_MATRIX(matrix, myself->rotation,9)
+                }
+                if ( myself->send_distance )
+                    json_object_set_new( myself->json_root, "distance", json_real( myself->distance ) );
+                if ( myself->send_transfer )
+                {
+                    json_object_set_new( myself->json_root, "transfer array", matrix = json_array() );
+                    for (size_t i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+                    {
+                        json_t* transfer = json_array();
+                        json_array_append_new( matrix, transfer );
+                        for (size_t j = 0; j < TTransfer_size; j++)
+                        {
+                            json_t* color = json_array();
+                            json_array_append_new( transfer, color );
+                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].x * isaac_float(255) ) ) );
+                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].y * isaac_float(255) ) ) );
+                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].z * isaac_float(255) ) ) );
+                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].w * isaac_float(255) ) ) );
+                        }
+                    }
+                    json_object_set_new( myself->json_root, "transfer points", matrix = json_array() );
+                    for (size_t i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+                    {
+                        json_t* points = json_array();
+                        json_array_append_new( matrix, points );
+                        for(auto it = myself->transfer_h.description[i].begin(); it != myself->transfer_h.description[i].end(); it++)
+                        {
+                            json_t* p = json_object();
+                            json_array_append_new( points, p);
+                            json_object_set_new(p, "value", json_integer( it->first ) );
+                            json_object_set_new(p, "r", json_real( it->second.x ) );
+                            json_object_set_new(p, "g", json_real( it->second.y ) );
+                            json_object_set_new(p, "b", json_real( it->second.z ) );
+                            json_object_set_new(p, "a", json_real( it->second.w ) );
+                        }
+                    }
+                }
+                if ( myself->send_interpolation )
+                    json_object_set_new( myself->json_root, "interpolation", json_boolean( myself->interpolation ) );
+                char* buffer = json_dumps( myself->json_root, 0 );
+                myself->communicator->serverSend(buffer);
+                free(buffer);
+            }
+
+            json_decref( myself->json_root );
+            myself->recreateJSON();
+            
+            //Sending video
             IceTImage* image = (IceTImage*)dummy;
-            //Sending
             ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
-            if (myself->video_communicator)
-                myself->video_communicator->serverSendFrame(icetImageGetColorui(*image),myself->framebuffer_size.x,myself->framebuffer_size.y,4);
+            if (myself->communicator)
+                myself->communicator->serverSendFrame(icetImageGetColorui(*image),myself->framebuffer_size.x,myself->framebuffer_size.y,4);
             ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
             myself->metaNr++;
             return 0;
@@ -962,7 +948,6 @@ class IsaacVisualization
         bool interpolation;
         IceTDouble modelview[16];
         IsaacCommunicator* communicator;
-        IsaacCommunicator* video_communicator;
         json_t *json_root;
         json_t *json_meta_root;
         isaac_int rank;

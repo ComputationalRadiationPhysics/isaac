@@ -50,7 +50,6 @@ class InsituConnectorGroup
 	friend class Master;
 	public:
 		InsituConnectorGroup(std::string name) :
-			video( NULL ),
 			master( NULL ),
 			initData( NULL ),
 			id( 0 ),
@@ -86,7 +85,6 @@ class InsituConnectorGroup
 		}
 	private:
 		InsituConnectorContainer* master;
-		InsituConnectorContainer* video;
 		int nodes;
 		std::string name;
 		json_t* initData;
@@ -106,7 +104,7 @@ class Master
 		errorCode addDataConnector(MetaDataConnector *dataConnector);
 		errorCode addImageConnector(ImageConnector *imageConnector);
 		MetaDataClient* addDataClient();
-		size_t receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer);
+		void receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char* payload);
 		errorCode run();
 		std::string getStream(std::string connector,std::string name,std::string ref);
 		static volatile sig_atomic_t force_exit;
