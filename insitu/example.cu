@@ -377,21 +377,32 @@ int main(int argc, char **argv)
 	int count = 0;
 	int drawing_time = 0;
 	int simulation_time = 0;
+	bool pause = false;
 	while (!force_exit)
 	{
-		a += 0.01f;
-		int start_simulation = visualization.getTicksUs();
-		#if ISAAC_ALPAKA == 0
-			int stream = 0;
-		#endif
-		update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
-		simulation_time +=visualization.getTicksUs() - start_simulation;
-		//Every frame we fill the metadata with data instead of descriptions
-		if (rank == MASTER_RANK)
+		////////////////
+		// Simulation //
+		////////////////
+		if (!pause)
 		{
-			json_object_set_new( visualization.getJsonMetaRoot(), "energy", json_real( a ) );
-			json_object_set_new( visualization.getJsonMetaRoot(), "speed", json_real( a*a ) );
+			a += 0.01f;
+			int start_simulation = visualization.getTicksUs();
+			#if ISAAC_ALPAKA == 0
+				int stream = 0;
+			#endif
+			update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
+			simulation_time +=visualization.getTicksUs() - start_simulation;
+			//Every frame we fill the metadata with data instead of descriptions
+			if (rank == MASTER_RANK)
+			{
+				json_object_set_new( visualization.getJsonMetaRoot(), "energy", json_real( a ) );
+				json_object_set_new( visualization.getJsonMetaRoot(), "speed", json_real( a*a ) );
+			}
 		}
+
+		///////////////////
+		// Metadata fill //
+		///////////////////
 		#ifdef SEND_PARTICLES
 			//every thread fills "his" particles
 			json_t *particle_array = json_array();
@@ -410,7 +421,10 @@ int main(int argc, char **argv)
 			}
 			json_object_set_new( visualization.getJsonMetaRoot(), "reference particles", particle_array );
 		#endif
-		//Visualize and send data to the server
+
+		///////////////////
+		// Visualization //
+		///////////////////
 		int start_drawing = visualization.getTicksUs();
 		#ifdef SEND_PARTICLES
 			json_t* meta = visualization.doVisualization(META_MERGE);
@@ -418,7 +432,10 @@ int main(int argc, char **argv)
 			json_t* meta = visualization.doVisualization(META_MASTER);
 		#endif
 		drawing_time +=visualization.getTicksUs() - start_drawing;
-		//New metadata from the server?
+
+		///////////////////
+		// Message check //
+		///////////////////
 		if (meta)
 		{
 			//Let's print it to stdout
@@ -426,16 +443,19 @@ int main(int argc, char **argv)
 			printf("META (%i): %s\n",rank,buffer);
 			free(buffer);
 			//And let's also check for an exit message
-			if ( rank == MASTER_RANK && json_integer_value( json_object_get(meta, "exit") ) )
+			if ( json_integer_value( json_object_get(meta, "exit") ) )
 				force_exit = 1;
+			if ( json_boolean_value( json_object_get(meta, "pause") ) )
+				pause = !pause;
 			//Deref the jansson json root! Otherwise we would get a memory leak
 			json_decref( meta );
 		}
-		//printf("%i: Sent dummy meta data\n",rank);
-		//sync
-		MPI_Bcast((void*)&force_exit,sizeof(force_exit), MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
 		usleep(100);
 		count++;
+
+		//////////////////
+		// Debug output //
+		//////////////////
 		if (rank == MASTER_RANK)
 		{
 			int end = visualization.getTicksUs();
