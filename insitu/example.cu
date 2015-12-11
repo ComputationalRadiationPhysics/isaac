@@ -392,17 +392,16 @@ int main(int argc, char **argv)
 			#endif
 			update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
 			simulation_time +=visualization.getTicksUs() - start_simulation;
-			//Every frame we fill the metadata with data instead of descriptions
-			if (rank == MASTER_RANK)
-			{
-				json_object_set_new( visualization.getJsonMetaRoot(), "energy", json_real( a ) );
-				json_object_set_new( visualization.getJsonMetaRoot(), "speed", json_real( a*a ) );
-			}
 		}
 
 		///////////////////
 		// Metadata fill //
 		///////////////////
+		if (rank == MASTER_RANK)
+		{
+			json_object_set_new( visualization.getJsonMetaRoot(), "energy", json_real( a ) );
+			json_object_set_new( visualization.getJsonMetaRoot(), "speed", json_real( a*a ) );
+		}
 		#ifdef SEND_PARTICLES
 			//every thread fills "his" particles
 			json_t *particle_array = json_array();
