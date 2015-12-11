@@ -79,12 +79,9 @@ class IsaacVisualization
             template
             <
                 typename TSource,
-                typename TJsonRoot,
-                typename TUnused1,
-                typename TUnused2,
-                typename TUnused3
+                typename TJsonRoot
             >
-            ISAAC_HOST_DEVICE_INLINE  void operator()( const int I,TSource& s, TJsonRoot& jsonRoot, TUnused1& unused1, TUnused2& unused2, TUnused3& unused3) const
+            ISAAC_HOST_DEVICE_INLINE  void operator()( const int I,TSource& s, TJsonRoot& jsonRoot) const
             {
                 #ifndef __CUDA_ARCH__
                     json_t *content = json_object();
@@ -258,7 +255,7 @@ class IsaacVisualization
                 
                 json_object_set_new( json_root, "interpolation", json_boolean( interpolation ) );
                 
-                isaac_for_each_1_params( sources, source_2_json_iterator(), json_sources_array );
+                isaac_for_each_params( sources, source_2_json_iterator(), json_sources_array );
 
                 json_object_set_new( json_root, "dimension", json_integer ( TSimDim::value ) );
                 json_object_set_new( json_root, "width", json_integer ( global_size[0] ) );

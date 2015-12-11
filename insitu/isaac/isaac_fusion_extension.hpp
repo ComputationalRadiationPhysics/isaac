@@ -23,63 +23,38 @@ namespace isaac
 
 
 template<int N,int I>
-struct isaac_for_each_unrolled_4_params
+struct isaac_for_each_unrolled_params
 {
 	ISAAC_NO_HOST_DEVICE_WARNING
-	template<typename I0, typename F, typename P1, typename P2, typename P3, typename P4>
-	ISAAC_HOST_DEVICE_INLINE static void call(I0 const& i0, F const& f, P1& p1, P2& p2, P3& p3, P4& p4)
+	template<typename I0, typename F, typename... P>
+	ISAAC_HOST_DEVICE_INLINE static void call(I0 const& i0, F const& f, P&... p)
 	{
-		f(N - I,*i0,p1,p2,p3,p4);
-		isaac_for_each_unrolled_4_params<N,I-1>::call(boost::fusion::next(i0), f, p1, p2, p3, p4);
+		f(N - I,*i0,p...);
+		isaac_for_each_unrolled_params<N,I-1>::call(boost::fusion::next(i0), f, p...);
 	}
 };
 
 template<int N>
-struct isaac_for_each_unrolled_4_params<N,0>
+struct isaac_for_each_unrolled_params<N,0>
 {
 	ISAAC_NO_HOST_DEVICE_WARNING
-	template<typename It, typename F, typename P1, typename P2, typename P3, typename P4>
-	ISAAC_HOST_DEVICE_INLINE static void call(It const&, F const&, P1& p1, P2& p2, P3& p3, P4& p4)
+	template<typename It, typename F, typename... P>
+	ISAAC_HOST_DEVICE_INLINE static void call(It const&, F const&, P&... p)
 	{
 	}
 };
 
 ISAAC_NO_HOST_DEVICE_WARNING
-template <typename Sequence, typename F,typename P1,typename P2, typename P3, typename P4>
-ISAAC_HOST_DEVICE_INLINE void isaac_for_each_4_params(Sequence& seq, F const& f, P1& p1, P2& p2, P3& p3, P4& p4)
+template <typename Sequence, typename F,typename... P>
+ISAAC_HOST_DEVICE_INLINE void isaac_for_each_params(Sequence& seq, F const& f, P&... p)
 {
 	typedef typename boost::fusion::result_of::begin<Sequence>::type begin;
 	typedef typename boost::fusion::result_of::end<Sequence>::type end;
-	isaac_for_each_unrolled_4_params
+	isaac_for_each_unrolled_params
 	<
 		boost::fusion::result_of::distance<begin, end>::type::value,
 		boost::fusion::result_of::distance<begin, end>::type::value
-	>::call(boost::fusion::begin(seq), f, p1, p2, p3, p4);
+	>::call(boost::fusion::begin(seq), f, p...);
 }
-
-ISAAC_NO_HOST_DEVICE_WARNING
-template <typename Sequence, typename F,typename P1,typename P2,typename P3>
-ISAAC_HOST_DEVICE_INLINE void isaac_for_each_3_params(Sequence& seq, F const& f, P1& p1, P2& p2, P3& p3)
-{
-	int i = 0;
-	isaac_for_each_4_params<Sequence,F,P1,int>(seq,f,p1,p2,p3,i);
-}
-
-ISAAC_NO_HOST_DEVICE_WARNING
-template <typename Sequence, typename F,typename P1,typename P2>
-ISAAC_HOST_DEVICE_INLINE void isaac_for_each_2_params(Sequence& seq, F const& f, P1& p1, P2& p2)
-{
-	int i = 0;
-	isaac_for_each_3_params<Sequence,F,P1,int>(seq,f,p1,p2,i);
-}
-
-ISAAC_NO_HOST_DEVICE_WARNING
-template <typename Sequence, typename F,typename P1>
-ISAAC_HOST_DEVICE_INLINE void isaac_for_each_1_params(Sequence& seq, F const& f, P1& p1)
-{
-	int i = 0;
-	isaac_for_each_2_params<Sequence,F,P1,int>(seq,f,p1,i);
-}
-
 
 } //namespace isaac;

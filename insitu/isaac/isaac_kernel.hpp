@@ -329,7 +329,7 @@ template <
             for (isaac_int i = 0; i < count; i++)
             {
                 isaac_float4 value = {0, 0, 0, 0};
-                isaac_for_each_4_params( sources, merge_source_iterator<Ttransfer_size,Tinterpolation>() , value, pos, isaac_size_d[0].local_size, transferArray);
+                isaac_for_each_params( sources, merge_source_iterator<Ttransfer_size,Tinterpolation>() , value, pos, isaac_size_d[0].local_size, transferArray);
                 if ( mpl::size< TSourceList >::type::value > 1)
                     value = value / isaac_float( mpl::size< TSourceList >::type::value );
                 isaac_float oma = isaac_float(1) - color.w;
