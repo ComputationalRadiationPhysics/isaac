@@ -72,8 +72,6 @@ class IsaacVisualization
             using TFraDim = alpaka::dim::DimInt<1>;
             using TTexDim = alpaka::dim::DimInt<1>;
         #endif
-        using TChainList = boost::fusion::list< IsaacChainLength >;
-        
         struct source_2_json_iterator
         {
             template
@@ -89,6 +87,71 @@ class IsaacVisualization
                     json_object_set_new( content, "name", json_string ( s.name.c_str() ) );
                     json_object_set_new( content, "feature dimension", json_integer ( s.feature_dim ) );
                 #endif
+            }
+        };
+        
+        struct functor_2_json_iterator
+        {
+            template
+            <
+                typename TFunctor,
+                typename TJsonRoot
+            >
+            ISAAC_HOST_DEVICE_INLINE  void operator()( const int I,TFunctor& f, TJsonRoot& jsonRoot) const
+            {
+                #ifndef __CUDA_ARCH__
+                    json_t *content = json_object();
+                    json_array_append_new( jsonRoot, content );
+                    json_object_set_new( content, "name", json_string ( TFunctor::name.c_str() ) );
+                    json_object_set_new( content, "description", json_string ( TFunctor::description.c_str() ) );
+                    json_object_set_new( content, "uses parameter", json_boolean ( TFunctor::uses_parameter ) );
+                #endif
+            }
+        };
+
+        struct parse_functor_iterator
+        {
+            template
+            <
+                typename TFunctor,
+                typename TName,
+                typename TValue,
+                typename TFound
+            >
+            ISAAC_HOST_DEVICE_INLINE  void operator()( const int I,TFunctor& f, TName& name, TValue& value, TFound& found) const
+            {
+                #ifndef __CUDA_ARCH__
+                    if (!found && name == TFunctor::name)
+                    {
+                        value = I;
+                        found = true;
+                    }
+                #endif
+            }
+        };
+
+        struct update_functor_chain_iterator
+        {
+            template
+            <
+                typename TSource,
+                typename TFunctions,
+                typename TDest
+            >
+            ISAAC_HOST_DEVICE_INLINE  void operator()(
+                const int I,
+                TSource& source,
+                TFunctions& functions,
+                TDest& dest
+            ) const
+            {
+                isaac_int chain_nr = 0;
+                for (int i = 0; i < ISAAC_MAX_FUNCTORS; i++)
+                {
+                    chain_nr *= ISAAC_FUNCTOR_COUNT;
+                    chain_nr += functions[I].bytecode[i];
+                }
+                dest.nr[I] = chain_nr * 4 + TSource::feature_dim - 1;                
             }
         };
         
@@ -134,11 +197,15 @@ class IsaacVisualization
             #if ISAAC_ALPAKA == 1
                 ,framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_prod))
                 ,inverse_d(alpaka::mem::buf::alloc<isaac_float, size_t>(acc, size_t(16)))
+                ,parameter_d(alpaka::mem::buf::alloc<isaac_float4, size_t>(acc, size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value)))
                 ,size_d(alpaka::mem::buf::alloc<isaac_size_struct< TSimDim::value >, size_t>(acc, size_t(1)))
+                ,functor_chain_d(alpaka::mem::buf::alloc<isaac_functor_chain_pointer, size_t>(acc, size_t( ISAAC_FUNCTOR_COMPLEX * 4)))
         {
             #else
         {
                 ISAAC_CUDA_CHECK(cudaMalloc((uint32_t**)&framebuffer, sizeof(uint32_t)*framebuffer_prod));
+                ISAAC_CUDA_CHECK(cudaMalloc((isaac_functor_chain_pointer_N**)&functor_chain_d, sizeof(isaac_functor_chain_pointer_N) * ISAAC_FUNCTOR_COMPLEX * 4));
+                ISAAC_CUDA_CHECK(cudaMalloc((isaac_functor_chain_pointer_N**)&functor_chain_choose_d, sizeof(isaac_functor_chain_pointer_N) * boost::mpl::size< TSourceList >::type::value));
             #endif
             //INIT
             myself = this;
@@ -160,10 +227,26 @@ class IsaacVisualization
             distance = -5.0f;
             updateModelview();
             
+            //Create functor chain pointer lookup table
+            #if ISAAC_ALPAKA == 1
+            
+            #else
+                dim3 grid(1);
+                dim3 block(1);
+                fillFunctorChainPointerKernel<<<grid,block>>>( functor_chain_d );
+                ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
+            #endif
+            
+            //Init functions:
+            for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+                functions[i].source = std::string("idem");
+            updateFunctions();
+            
             //Transfer func memory:
             
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
+                source_weight.value[i] = isaac_float(1);
                 #if ISAAC_ALPAKA == 1
                     transfer_d_buf.push_back( alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>( acc, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
                     transfer_h_buf.push_back( alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
@@ -173,8 +256,8 @@ class IsaacVisualization
                     ISAAC_CUDA_CHECK(cudaMalloc((isaac_float4**)&(transfer_d.pointer[i]), sizeof(isaac_float4)*TTransfer_size));
                     transfer_h.pointer[i] = (isaac_float4*)malloc( sizeof(isaac_float4)*TTransfer_size );
                 #endif
-                transfer_h.description[i].insert( std::pair< isaac_uint, isaac_float4> (0, {1, 1, 1, 0} ));
-                transfer_h.description[i].insert( std::pair< isaac_uint, isaac_float4> (TTransfer_size, {1, 1, 1, 1} ));
+                transfer_h.description[i].insert( std::pair< isaac_uint, isaac_float4> (0             , getHSVA(isaac_float(2*i)*M_PI/isaac_float(boost::mpl::size< TSourceList >::type::value),1,1,0) ));
+                transfer_h.description[i].insert( std::pair< isaac_uint, isaac_float4> (TTransfer_size, getHSVA(isaac_float(2*i)*M_PI/isaac_float(boost::mpl::size< TSourceList >::type::value),1,1,1) ));
             }
             updateTransfer();
 
@@ -232,14 +315,12 @@ class IsaacVisualization
                 json_object_set_new( json_root, "nodes", json_integer( numProc ) );
                 json_object_set_new( json_root, "framebuffer width", json_integer ( framebuffer_size.x ) );
                 json_object_set_new( json_root, "framebuffer height", json_integer ( framebuffer_size.y ) );
-                //TODO: Read real values
-                json_object_set_new( json_root, "max chain", json_integer( 5 ) );
-                json_t *operators = json_array();
-                json_object_set_new( json_root, "operators", operators );
-                json_array_append_new( operators, json_string( "length(x)" ) );
-                json_array_append_new( operators, json_string( "pow(x,c)" ) );
-                json_array_append_new( operators, json_string( "add(x,c)" ) );
-                json_array_append_new( operators, json_string( "mul(x,c)" ) );
+                
+                json_object_set_new( json_root, "max functors", json_integer( ISAAC_MAX_FUNCTORS ) );
+                json_t *json_functors_array = json_array();
+                json_object_set_new( json_root, "functors", json_functors_array );
+                IsaacFunctorPool functors;
+                isaac_for_each_params( functors, functor_2_json_iterator(), json_functors_array );
 
                 json_t *matrix;
                 json_object_set_new( json_root, "projection", matrix = json_array() );
@@ -252,11 +333,10 @@ class IsaacVisualization
                 
                 json_t *json_sources_array = json_array();
                 json_object_set_new( json_root, "sources", json_sources_array );
-                
-                json_object_set_new( json_root, "interpolation", json_boolean( interpolation ) );
-                
                 isaac_for_each_params( sources, source_2_json_iterator(), json_sources_array );
 
+                json_object_set_new( json_root, "interpolation", json_boolean( interpolation ) );
+                
                 json_object_set_new( json_root, "dimension", json_integer ( TSimDim::value ) );
                 json_object_set_new( json_root, "width", json_integer ( global_size[0] ) );
                 if (TSimDim::value > 1)
@@ -264,6 +344,110 @@ class IsaacVisualization
                 if (TSimDim::value > 2)
                     json_object_set_new( json_root, "depth", json_integer ( global_size[2] ) );
             }
+        }
+        void updateFunctions()
+        {
+            IsaacFunctorPool functors;
+            isaac_float4 isaac_parameter_h[boost::mpl::size< TSourceList >::type::value * ISAAC_MAX_FUNCTORS];
+            for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+            {
+                functions[i].error_code = 0;
+                //Going from ! to !...
+                std::string source = functions[i].source;
+                size_t pos = 0;
+                bool again = true;
+                int elem = 0;
+                while (again && ((pos = source.find("|")) != std::string::npos || ((again = false) == false)) )
+                {
+                    if (elem >= ISAAC_MAX_FUNCTORS)
+                    {
+                        functions[i].error_code = 1;
+                        break;
+                    }
+                    std::string token = source.substr(0, pos);
+                    source.erase(0, pos + 1);
+                    //ignore " " in token
+                    token.erase(remove_if(token.begin(), token.end(), isspace), token.end());
+                    //search "(" and parse parameters
+                    size_t t_begin = token.find("(");
+                    if (t_begin == std::string::npos)
+                        memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(isaac_float4));
+                    else
+                    {
+                        size_t t_end = token.find(")");
+                        if (t_end == std::string::npos)
+                        {
+                            functions[i].error_code = -1;
+                            break;
+                        }
+                        if (t_end - t_begin == 1) //()
+                            memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(isaac_float4));
+                        else
+                        {
+                            std::string parameters = token.substr(t_begin+1, t_end-t_begin-1);
+                            size_t p_pos = 0;
+                            bool p_again = true;
+                            int p_elem = 0;
+                            isaac_float* parameter_array = (float*)&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]);
+                            while (p_again && ((p_pos = parameters.find(",")) != std::string::npos || ((p_again = false) == false)) )
+                            {
+                                if (p_elem >= 4)
+                                {
+                                    functions[i].error_code = 2;
+                                    break;
+                                }
+                                std::string par = parameters.substr(0, p_pos);
+                                parameters.erase(0, p_pos + 1);
+                                parameter_array[p_elem] = std::stof( par );
+                                p_elem++;
+                            }
+                            for (;p_elem < 4; p_elem++)
+                                parameter_array[p_elem] = parameter_array[p_elem - 1]; //last one repeated
+                        }
+                    }
+                    //parse token itself
+                    if (t_begin != std::string::npos)
+                        token = token.substr(0, t_begin);
+                    bool found = false;
+                    isaac_for_each_params( functors, parse_functor_iterator(), token, functions[i].bytecode[elem], found );
+                    if (!found)
+                    {
+                        functions[i].error_code = -2;
+                        break;
+                    }
+                    
+                    elem++;
+                }
+                for (;elem < ISAAC_MAX_FUNCTORS; elem++)
+                {
+                    functions[i].bytecode[elem] = 0; //last one idem
+                    memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(isaac_float4));
+                }
+                /*printf("Bytecode %i:",i);
+                for (int j = 0; j < ISAAC_MAX_FUNCTORS; j++)
+                    printf(" %i",functions[i].bytecode[j]);
+                printf("\n");
+                printf("Parameter %i:",i);
+                for (int j = 0; j < ISAAC_MAX_FUNCTORS; j++)
+                    printf(" (%.2f,%.2f,%.2f,%.2f)",isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + j].x,isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + j].y,isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + j].z,isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + j].w);
+                printf("\n");*/
+            }
+            #if ISAAC_ALPAKA == 1
+                alpaka::mem::buf::BufPlainPtrWrapper<THost, isaac_float4, TFraDim, size_t> parameter_buffer(isaac_parameter_h, host, size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value));
+                alpaka::mem::view::copy( stream, parameter_buffer, parameter_d, size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value));
+            #else
+                ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_parameter_d, isaac_parameter_h, sizeof( isaac_parameter_h )));
+                //Calculate functor chain nr per source
+                dest_array_struct< boost::mpl::size< TSourceList >::type::value > dest;
+                isaac_for_each_params( sources, update_functor_chain_iterator(), functions, dest);
+                dim3 grid(1);
+                dim3 block(1);
+                updateFunctorChainPointerKernel< boost::mpl::size< TSourceList >::type::value > <<<grid,block>>>(functor_chain_choose_d, functor_chain_d, dest);
+                ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
+                isaac_functor_chain_pointer_N* constant_ptr;
+                ISAAC_CUDA_CHECK(cudaGetSymbolAddress((void **)&constant_ptr, isaac_function_chaid_d));
+                ISAAC_CUDA_CHECK(cudaMemcpy(constant_ptr, functor_chain_choose_d, boost::mpl::size< TSourceList >::type::value * sizeof( isaac_functor_chain_pointer_N ), cudaMemcpyDeviceToDevice));
+            #endif
         }
         void updateTransfer()
         {
@@ -324,6 +508,7 @@ class IsaacVisualization
             send_rotation = false;
             send_transfer = false;
             send_interpolation = false;
+            send_functions = false;
 
             //Handle messages
             json_t* message;
@@ -354,6 +539,8 @@ class IsaacVisualization
                             send_transfer = true;
                         if ( strcmp( target, "interpolation" ) == 0 )
                             send_interpolation = true;
+                        if ( strcmp( target, "functions" ) == 0 )
+                            send_functions = true;
                     }
                     //Search for scene changes
                     if (json_array_size( js = json_object_get(last, "rotation absolute") ) == 9)
@@ -516,6 +703,13 @@ class IsaacVisualization
                 interpolation = json_boolean_value ( js );
                 send_interpolation = true;
             }
+            if (json_array_size( js = json_object_get(message, "functions") ) )
+            {
+                json_array_foreach(js, index, value)
+                    functions[index].source = std::string(json_string_value(value));
+                updateFunctions();
+                send_functions = true;
+            }
 
             json_t* metadata = json_object_get( message, "metadata" );
             if (metadata)
@@ -599,6 +793,7 @@ class IsaacVisualization
         uint64_t sorting_time;
     private:        
         static IsaacVisualization *myself;
+        
         static void drawCallBack(
             const IceTDouble * projection_matrix,
             const IceTDouble * modelview_matrix,
@@ -641,16 +836,6 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_size_d, size_h, sizeof(isaac_size_struct< TSimDim::value >)));
             #endif
             IceTUByte* pixels = icetImageGetColorub(result);
-            isaac_size2 grid_size=
-            {
-                size_t((readback_viewport[2]+15)/16),
-                size_t((readback_viewport[3]+15)/16)
-            };
-            isaac_size2 block_size=
-            {
-                size_t(16),
-                size_t(16)
-            };
             ISAAC_START_TIME_MEASUREMENT( kernel, myself->getTicksUs() )
             isaac_float step = 1.0f;
             isaac_float4 bg_color =
@@ -666,73 +851,68 @@ class IsaacVisualization
                 isaac_uint( readback_viewport[1] )
             };
             #if ISAAC_ALPAKA == 1
-                if ( boost::mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
-                {
-                    grid_size.x = size_t(readback_viewport[2]);
-                    grid_size.y = size_t(readback_viewport[3]);
-                    block_size.x = size_t(1);
-                    block_size.y = size_t(1);                    
-                }
-                const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
-                const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
-                const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
-                auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
-                if (myself->interpolation)
-                {
-                    auto const test (alpaka::exec::create<TAcc> (workdiv,
-                        myself->fillRectKernel_interpolation,
-                        alpaka::mem::view::getPtrNative(myself->inverse_d),
-                        alpaka::mem::view::getPtrNative(myself->size_d),
-                        alpaka::mem::view::getPtrNative(myself->framebuffer),
-                        myself->framebuffer_size,
-                        framebuffer_start,
-                        myself->sources,
-                        step,
-                        bg_color,
-                        myself->transfer_d));
-                    alpaka::stream::enqueue(myself->stream, test);
-                }
-                else
-                {
-                    auto const test (alpaka::exec::create<TAcc> (workdiv,
-                        myself->fillRectKernel,
-                        alpaka::mem::view::getPtrNative(myself->inverse_d),
-                        alpaka::mem::view::getPtrNative(myself->size_d),
-                        alpaka::mem::view::getPtrNative(myself->framebuffer),
-                        myself->framebuffer_size,
-                        framebuffer_start,
-                        myself->sources,
-                        step,
-                        bg_color,
-                        myself->transfer_d));
-                    alpaka::stream::enqueue(myself->stream, test);
-                }
+                IsaacFillRectKernelStruct
+                <
+                    TSimDim,
+                    TSourceList,
+                    mpl::vector<>,
+                    transfer_d_struct< boost::mpl::size< TSourceList >::type::value >,
+                    source_weight_struct< boost::mpl::size< TSourceList >::type::value >,
+                    alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t>,
+                    TTransfer_size,
+                    TAccDim,
+                    TAcc,
+                    TStream,
+                    alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t>,
+                    alpaka::mem::buf::Buf<TDevAcc, isaac_size_struct< TSimDim::value >, TFraDim, size_t>,
+                    alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TFraDim, size_t>,                    
+                    ISAAC_MAX_FUNCTORS
+                >
+                ::call(
+                    myself->inverse_d,
+                    myself->size_d,
+                    myself->parameter_d,
+                    myself->stream,
+                    myself->framebuffer,
+                    myself->framebuffer_size,
+                    framebuffer_start,
+                    myself->sources,
+                    step,
+                    bg_color,
+                    myself->transfer_d,
+                    myself->source_weight,
+                    readback_viewport,
+                    myself->interpolation,
+                    myself->functions[0].bytecode
+                );
                 alpaka::wait::wait(myself->stream);
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
                 ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
                 alpaka::mem::buf::BufPlainPtrWrapper<THost, uint32_t, TFraDim, size_t> result_buffer((uint32_t*)(pixels), myself->host, myself->framebuffer_prod);
                 alpaka::mem::view::copy(myself->stream, result_buffer, myself->framebuffer, myself->framebuffer_prod);
             #else
-                dim3 block (block_size.x, block_size.y);
-                dim3 grid  (grid_size.x, grid_size.y);
-                if (myself->interpolation)
-                    IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size, 1 > <<<grid, block>>>(
-                        myself->framebuffer,
-                        myself->framebuffer_size,
-                        framebuffer_start,
-                        myself->sources,
-                        step,
-                        bg_color,
-                        myself->transfer_d);
-                else
-                    IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size, 0 > <<<grid, block>>>(
-                        myself->framebuffer,
-                        myself->framebuffer_size,
-                        framebuffer_start,
-                        myself->sources,
-                        step,
-                        bg_color,
-                        myself->transfer_d);
+                IsaacFillRectKernelStruct
+                <
+                    TSimDim,
+                    TSourceList,
+//                    mpl::vector<>,
+                    transfer_d_struct< boost::mpl::size< TSourceList >::type::value >,
+                    source_weight_struct< boost::mpl::size< TSourceList >::type::value >,
+                    uint32_t*,
+                    TTransfer_size
+                >
+                ::call(
+                    myself->framebuffer,
+                    myself->framebuffer_size,
+                    framebuffer_start,
+                    myself->sources,
+                    step,
+                    bg_color,
+                    myself->transfer_d,
+                    myself->source_weight,
+                    readback_viewport,
+                    myself->interpolation
+                );
                 ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
                 ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
@@ -821,6 +1001,17 @@ class IsaacVisualization
                             json_object_set_new(p, "b", json_real( it->second.z ) );
                             json_object_set_new(p, "a", json_real( it->second.w ) );
                         }
+                    }
+                }
+                if ( myself->send_functions )
+                {
+                    json_object_set_new( myself->json_root, "functions", matrix = json_array() );
+                    for (size_t i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+                    {
+                        json_t* f = json_object();
+                        json_array_append_new( matrix, f );
+                        json_object_set_new(f, "source", json_string( myself->functions[i].source.c_str() ) );
+                        json_object_set_new(f, "error", json_integer( myself->functions[i].error_code ) );
                     }
                 }
                 if ( myself->send_interpolation )
@@ -925,12 +1116,15 @@ class IsaacVisualization
             alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t> framebuffer;
             alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t> inverse_d;
             alpaka::mem::buf::Buf<TDevAcc, isaac_size_struct< TSimDim::value >, TFraDim, size_t> size_d;
+            alpaka::mem::buf::Buf<TDevAcc, isaac_functor_chain_pointer >, TFraDim, size_t> functor_chain_d;
         #else
             size_t framebuffer_prod;
             TDomainSize global_size;
             TDomainSize local_size;
             TDomainSize position;        
             isaac_uint* framebuffer;
+            isaac_functor_chain_pointer_N* functor_chain_d;
+            isaac_functor_chain_pointer_N* functor_chain_choose_d;
         #endif
         IceTDouble projection[16];
         IceTDouble look_at[3];
@@ -942,6 +1136,7 @@ class IsaacVisualization
         bool send_projection;
         bool send_transfer;
         bool send_interpolation;
+        bool send_functions;
         bool interpolation;
         IceTDouble modelview[16];
         IsaacCommunicator* communicator;
@@ -956,14 +1151,15 @@ class IsaacVisualization
         IsaacVisualizationMetaEnum thr_metaTargets;
         pthread_t visualizationThread;
         #if ISAAC_ALPAKA == 1
-            IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size, 1 > fillRectKernel_interpolation;
-            IsaacFillRectKernel<TSimDim,TSourceList,TChainList,transfer_d_struct< boost::mpl::size< TSourceList >::type::value >, TTransfer_size, 0 > fillRectKernel;
             std::vector< alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> > transfer_d_buf;
             std::vector< alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> > transfer_h_buf;
+            alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TFraDim, size_t> parameter_d;
         #endif
         transfer_d_struct< boost::mpl::size< TSourceList >::type::value > transfer_d;
         transfer_h_struct< boost::mpl::size< TSourceList >::type::value > transfer_h;
+        source_weight_struct< boost::mpl::size< TSourceList >::type::value > source_weight;
         const static size_t transfer_size = TTransfer_size;
+        functions_struct functions[boost::mpl::size< TSourceList >::type::value];
 };
 
 #if ISAAC_ALPAKA == 1

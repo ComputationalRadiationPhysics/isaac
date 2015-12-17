@@ -297,6 +297,7 @@ int main(int argc, char **argv)
 			position.push_back(p[2]*64);
 	#endif
 
+	
 	size_t prod = local_size[0]*local_size[1]*local_size[2];
 
 	//Init Device memory
@@ -343,6 +344,7 @@ int main(int argc, char **argv)
 			TestSource2
 		>;
 	#endif
+	
 	SourceList sources( testSource1, testSource2 );
 	#if ISAAC_ALPAKA == 1
 		IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim,SourceList,alpaka::Vec<SimDim, size_t>, 1024 > visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);

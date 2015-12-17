@@ -202,6 +202,19 @@ struct transfer_h_struct
     std::map< isaac_uint, isaac_float4 > description[ N ];
 };
 
+struct functions_struct
+{
+    std::string source;
+    isaac_int bytecode[ISAAC_MAX_FUNCTORS];
+    isaac_int error_code;
+};
+
+template< int N >
+struct source_weight_struct
+{
+    isaac_float value[ N ];
+};
+
 typedef enum
 {
     META_MERGE = 0,
