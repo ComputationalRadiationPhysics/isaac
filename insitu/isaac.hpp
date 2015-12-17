@@ -73,7 +73,7 @@ class IsaacVisualization
             using TTexDim = alpaka::dim::DimInt<1>;
         #endif
         using TChainList = boost::fusion::list< IsaacChainLength >;
-        
+
         struct source_2_json_iterator
         {
             template
@@ -91,7 +91,7 @@ class IsaacVisualization
                 #endif
             }
         };
-        
+
         IsaacVisualization(
             #if ISAAC_ALPAKA == 1
                 THost host,
@@ -141,9 +141,10 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaMalloc((uint32_t**)&framebuffer, sizeof(uint32_t)*framebuffer_prod));
             #endif
             //INIT
+            MPI_Comm_dup(MPI_COMM_WORLD, &mpi_world);
             myself = this;
-            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            MPI_Comm_size(MPI_COMM_WORLD, &numProc);
+            MPI_Comm_rank(mpi_world, &rank);
+            MPI_Comm_size(mpi_world, &numProc);
             if (rank == master)
             {
                 this->communicator = new IsaacCommunicator(server_url,server_port);
@@ -159,9 +160,9 @@ class IsaacVisualization
             ISAAC_SET_IDENTITY(3,rotation)
             distance = -5.0f;
             updateModelview();
-            
+
             //Transfer func memory:
-            
+
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
                 #if ISAAC_ALPAKA == 1
@@ -180,7 +181,7 @@ class IsaacVisualization
 
             //ISAAC:
             IceTCommunicator icetComm;
-            icetComm = icetCreateMPICommunicator(MPI_COMM_WORLD);
+            icetComm = icetCreateMPICommunicator(mpi_world);
             icetContext = icetCreateContext(icetComm);
             icetDestroyMPICommunicator(icetComm);
             icetResetTiles();
@@ -188,24 +189,24 @@ class IsaacVisualization
             icetStrategy(ICET_STRATEGY_DIRECT);
             //icetStrategy(ICET_STRATEGY_SEQUENTIAL);
             //icetStrategy(ICET_STRATEGY_REDUCE);
-            
+
             icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC );
             //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_BSWAP );
             //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_RADIXK );
             //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_TREE );
-            
+
             /*IceTBoolean supports;
             icetGetBooleanv( ICET_STRATEGY_SUPPORTS_ORDERING, &supports );
             if (supports)
                 printf("yes\n");
             else
                 printf("no\n");*/
-            
+
             icetSetColorFormat(ICET_IMAGE_COLOR_RGBA_UBYTE);
             icetSetDepthFormat(ICET_IMAGE_DEPTH_NONE);
             icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
             icetEnable(ICET_ORDERED_COMPOSITE);
-            
+
             size_t max_size = max(uint32_t(global_size[0]),uint32_t(global_size[1]));
             if (TSimDim::value > 2)
                 max_size = max(uint32_t(global_size[2]),uint32_t(max_size));
@@ -222,7 +223,7 @@ class IsaacVisualization
             icetBoundingBoxf( f_x, f_x + f_l_width, f_y, f_y + f_l_height, f_z, f_z + f_l_depth);
             icetPhysicalRenderSize(framebuffer_size.x, framebuffer_size.y);
             icetDrawCallback( drawCallBack );
-            
+
             //JSON
             recreateJSON();
             if (rank == master)
@@ -249,12 +250,12 @@ class IsaacVisualization
                 json_object_set_new( json_root, "rotation", matrix = json_array() );
                 ISAAC_JSON_ADD_MATRIX(matrix,rotation,9)
                 json_object_set_new( json_root, "distance", json_real( distance ) );
-                
+
                 json_t *json_sources_array = json_array();
                 json_object_set_new( json_root, "sources", json_sources_array );
-                
+
                 json_object_set_new( json_root, "interpolation", json_boolean( interpolation ) );
-                
+
                 isaac_for_each_params( sources, source_2_json_iterator(), json_sources_array );
 
                 json_object_set_new( json_root, "dimension", json_integer ( TSimDim::value ) );
@@ -296,10 +297,10 @@ class IsaacVisualization
         }
         int init()
         {
-            isaac_int failed = 0;
+            int failed = 0;
             if (communicator && communicator->serverConnect())
                 failed = 1;
-            MPI_Bcast(&failed,sizeof(failed), MPI_INT, master, MPI_COMM_WORLD);
+            MPI_Bcast(&failed,1, MPI_INT, master, mpi_world);
             if (failed)
                 return -1;
             if (rank == master)
@@ -317,7 +318,7 @@ class IsaacVisualization
             //if (rank == master)
             //    printf("-----\n");
             ISAAC_WAIT_VISUALIZATION
-            
+
             send_distance = false;
             send_look_at = false;
             send_projection = false;
@@ -327,7 +328,7 @@ class IsaacVisualization
 
             //Handle messages
             json_t* message;
-            char message_buffer[ISAAC_MAX_RECEIVE];
+            char message_buffer[ISAAC_MAX_RECEIVE] = "{}";
             //Master merges all messages and broadcasts it.
             if (rank == master)
             {
@@ -467,20 +468,21 @@ class IsaacVisualization
                     ISAAC_JSON_ADD_MATRIX(matrix,modelview,16)
                 }
                 char* buffer = json_dumps( message, 0 );
-                strcpy( message_buffer, buffer );
+                strncpy( message_buffer, buffer, ISAAC_MAX_RECEIVE-1);
+                message_buffer[ ISAAC_MAX_RECEIVE-1 ] = 0;
                 free(buffer);
-                MPI_Bcast( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, MPI_COMM_WORLD);
+                MPI_Bcast( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, mpi_world);
             }
             else //The others just get the message
             {
-                MPI_Bcast( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, MPI_COMM_WORLD);
+                MPI_Bcast( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, mpi_world);
                 message = json_loads(message_buffer, 0, NULL);
             }
-            
+
             json_t* js;
             size_t index;
             json_t *value;
-            
+
             //Scene set?
             if (json_array_size( js = json_object_get(message, "projection") ) == 16)
             {
@@ -535,14 +537,14 @@ class IsaacVisualization
             };
             IceTDouble result[4];
             mulMatrixVector(result,modelview,point);
-            isaac_float point_distance = sqrt( result[0]*result[0] + result[1]*result[1] + result[2]*result[2] );
+            float point_distance = sqrt( result[0]*result[0] + result[1]*result[1] + result[2]*result[2] );
             //Allgather of the distances
-            isaac_float receive_buffer[numProc];
-            MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, MPI_COMM_WORLD);
+            float receive_buffer[numProc];
+            MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, mpi_world);
             //Putting to a std::multimap of {rank, distance}
-            std::multimap<isaac_float, isaac_int, std::less< isaac_float > > distance_map;
+            std::multimap<float, isaac_int, std::less< float > > distance_map;
             for (isaac_int i = 0; i < numProc; i++)
-                distance_map.insert( std::pair<isaac_float, isaac_int>( receive_buffer[i], i ) );
+                distance_map.insert( std::pair<float, isaac_int>( receive_buffer[i], i ) );
             //Putting in an array for IceT
             IceTInt icet_order_array[numProc];
             {
@@ -753,7 +755,7 @@ class IsaacVisualization
                 if (myself->rank == myself->master)
                 {
                     char receive_buffer[myself->numProc][ISAAC_MAX_RECEIVE];
-                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, receive_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, myself->master, MPI_COMM_WORLD);
+                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, receive_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, myself->master, myself->mpi_world);
                     for (isaac_int i = 0; i < myself->numProc; i++)
                     {
                         if (i == myself->master)
@@ -763,7 +765,7 @@ class IsaacVisualization
                     }
                 }
                 else
-                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, myself->master, MPI_COMM_WORLD);
+                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, myself->master, myself->mpi_world);
             }
 
             if (myself->rank == myself->master)
@@ -932,6 +934,7 @@ class IsaacVisualization
             TDomainSize position;        
             isaac_uint* framebuffer;
         #endif
+        MPI_Comm mpi_world;
         IceTDouble projection[16];
         IceTDouble look_at[3];
         IceTDouble rotation[9];
