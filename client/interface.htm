@@ -40,7 +40,8 @@
 	<div id="video_container_div" style="position: relative;">
 		<div id="video_div" style="position: relative; top: 0; left: 0;">
 			<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls="false" windowless="true"/>
-			<div contentEditable="true" id="url_div" style="display:none;"></div><br/>
+			<div id="url_div" style="display:none;"></div><br/>
+			<div id="functions_div"></div>
 			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation<br/>
 			<canvas id="transfer" width="412" height="16"></canvas>
 			<table border="1"><tr id="transfer_form"></tr></table>
@@ -67,7 +68,8 @@
 		<th>Name</th>
 		<th>ID</th>
 		<th>Nodes</th>
-		<th>Max chain</th>
+		<th>Max Functors</th>
+		<th>Functors</th>
 		<th>Dimension</th>
 		<th>Sources</th>
 		<th>Meta data</th>
@@ -99,6 +101,8 @@ var wireframe = document.getElementById("wireframe_checkbox").checked;
 var stream = document.getElementById("stream_select").selectedIndex;
 var stream_img = new Image;
 stream_img.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==";
+
+var functions = new Array();
 
 var projection = [
 	1, 0, 0, 0,
@@ -584,29 +588,37 @@ document.getElementById("connect").onclick = function()
 					row.insertCell(0).innerHTML = obj["name"];
 					row.insertCell(1).innerHTML = obj["id"];
 					row.insertCell(2).innerHTML = obj["nodes"];
-					row.insertCell(3).innerHTML = obj["max chain"];
+					row.insertCell(3).innerHTML = obj["max functors"];
+
 					var cell = row.insertCell(4);
+					for (element in obj["functors"])
+					{
+						var e = obj["functors"][element]
+						cell.innerHTML += "<b>" + e["name"] + ":</b> ";
+						cell.innerHTML += e["description"] + "<br/>";
+					}
+					var cell = row.insertCell(5);
 					var d = obj["dimension"];
 					cell.innerHTML += obj["width"];
 					if (d > 1)
 						cell.innerHTML += " * " + obj["height"];
 					if (d > 2)
 						cell.innerHTML += " * " + obj["depth"];
-					var cell = row.insertCell(5);
+					var cell = row.insertCell(6);
 					for (element in obj["sources"])
 					{
 						var e = obj["sources"][element]
 						cell.innerHTML += "<b>" + e["name"] + ":</b><br/>";
 						cell.innerHTML += " Feature dimension(" + e["feature dimension"] + ")<br/>";
 					}
-					var cell = row.insertCell(6);//.innerHTML = obj["metadata"].toSource();
+					var cell = row.insertCell(7);//.innerHTML = obj["metadata"].toSource();
 					for (element in obj["metadata"])
 					{
 						cell.innerHTML += "<b>" + element + ":</b> ";
 						cell.innerHTML += obj["metadata"][element];
 						cell.innerHTML += "<br/>";
 					}
-					var observeCell = row.insertCell(7);
+					var observeCell = row.insertCell(8);
 					var button = document.createElement("input");
 					button.type = "button";
 					button.value = "Observe";
@@ -678,6 +690,59 @@ document.getElementById("connect").onclick = function()
 							distance = obj["distance"];
 						if (obj.hasOwnProperty("interpolation"))
 							document.getElementById("interpolation_checkbox").checked = obj["interpolation"];
+					}
+					if (obj.hasOwnProperty("functions"))
+					{
+						var functions_div = document.getElementById("functions_div");
+						while (functions_div.firstChild) {
+							functions_div.removeChild(functions_div.firstChild);
+						}
+						functions = obj["functions"];
+						for (var f in functions)
+						{
+							var title = document.createElement("SPAN");
+							title.innerHTML = sources[f].name + " function: ";
+							functions_div.appendChild(title);
+							var function_string = document.createElement("INPUT");
+							function_string.value = functions[f].source;
+							function_string.size = 80;
+							function_string.id = "f_" + f + "_string";
+							functions_div.appendChild(function_string);
+							var error = document.createElement("SPAN");
+							switch (functions[f].error)
+							{
+								case 0:
+									error.innerHTML = ' <b><font color="green">Ok</font></b>';
+									break;
+								case 1:
+									error.innerHTML = ' <b><font color="orange">Too much functors, ignoring at least one</font></b>';
+									break;
+								case 2:
+									error.innerHTML = ' <b><font color="orange">Too much parameters, ignoring at least one</font></b>';
+									break;
+								case -1:
+									error.innerHTML = ' <b><font color="red">Missing )</font></b>';
+									break;
+								case -2:
+									error.innerHTML = ' <b><font color="red">Unknown functor</font></b>';
+									break;
+								default:
+									error.innerHTML = ' <b><font color="red">Fatal error</font></b>';
+							}
+							functions_div.appendChild(error);
+							functions_div.appendChild(document.createElement("BR"));
+						}
+						var function_button = document.createElement("INPUT");
+						function_button.type = "button";
+						function_button.value = "Update functions";
+						function_button.id = "f_button";
+						function_button.onclick = function()
+						{
+							for (var f in functions)
+								functions[f] = document.getElementById("f_" + f + "_string").value;
+							sendFeedback( "functions", functions );
+						};
+						functions_div.appendChild(function_button);
 					}
 					if (obj.hasOwnProperty("transfer array"))
 					{

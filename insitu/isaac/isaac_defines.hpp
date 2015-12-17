@@ -17,6 +17,19 @@
 
 #include <boost/preprocessor.hpp>
 
+#ifndef ISAAC_MAX_FUNCTORS
+    #define ISAAC_MAX_FUNCTORS 3
+#endif
+
+#define ISAAC_FUNCTOR_COUNT 5
+
+#define ISAAC_FUNCTOR_COMPLEX 25 //5^3
+
+#ifndef ISAAC_MAX_SOURCES
+    #define ISAAC_MAX_SOURCES 16
+#endif
+
+
 #define ISAAC_MAX_RECEIVE 262144 //256kb
 #define ISAAC_Z_NEAR 1.0f
 #define ISAAC_Z_FAR 100.0f
