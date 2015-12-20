@@ -44,6 +44,8 @@ class TestSource1
 	public:
 		static const std::string name;
 		static const size_t feature_dim = 3;
+		static const bool has_guard = false;
+		static const bool persistent = true;
 	
 		ISAAC_NO_HOST_DEVICE_WARNING
         TestSource1 (
@@ -53,19 +55,21 @@ class TestSource1
                 TStream stream,
             #endif
             isaac_float3* ptr,
-            size_t width,
-            size_t height
+            isaac_int width,
+            isaac_int height
         ) :
 		ptr(ptr),
 		width(width),
 		width_mul_height(width * height)
 		{}
 		
+		ISAAC_HOST_INLINE void update() {}
+		
 		isaac_float3* ptr;
-		isaac_uint width;
-		isaac_uint width_mul_height;
+		isaac_int width;
+		isaac_int width_mul_height;
 		ISAAC_NO_HOST_DEVICE_WARNING
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator[] (const isaac_uint3 nIndex)
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator[] (const isaac_int3 nIndex)
 		{
 			isaac_float3 value = ptr[
 				nIndex.x +
@@ -87,6 +91,8 @@ class TestSource2
 	public:
 		static const std::string name;
 		static const size_t feature_dim = 1;
+		static const bool has_guard = false;
+		static const bool persistent = false;
 
 		ISAAC_NO_HOST_DEVICE_WARNING
         TestSource2 (
@@ -96,20 +102,22 @@ class TestSource2
                 TStream stream,
             #endif
             isaac_float* ptr,
-            size_t width,
-            size_t height
+            isaac_int width,
+            isaac_int height
         ) :
 		ptr(ptr),
 		width(width),
 		width_mul_height(width * height)
 		{ }
+
+		ISAAC_HOST_INLINE void update() {}
 		
 		isaac_float* ptr;
-		isaac_uint width;
-		isaac_uint width_mul_height;
+		isaac_int width;
+		isaac_int width_mul_height;
 		
 		ISAAC_NO_HOST_DEVICE_WARNING		
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator[] (const isaac_uint3 nIndex)
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator[] (const isaac_int3 nIndex)
 		{
 			isaac_float value = ptr[
 				nIndex.x +
@@ -346,6 +354,7 @@ int main(int argc, char **argv)
 	#endif
 	
 	SourceList sources( testSource1, testSource2 );
+	
 	#if ISAAC_ALPAKA == 1
 		IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim,SourceList,alpaka::Vec<SimDim, size_t>, 1024 > visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
 	#else
@@ -464,7 +473,7 @@ int main(int argc, char **argv)
 			if (diff >= 1000000)
 			{
 				visualization.merge_time -= visualization.kernel_time + visualization.copy_time;
-				printf("FPS: %.1f \n\tSimulation: %.1f ms\n\tDrawing: %.1f ms\n\t\tSorting: %.1f ms\n\t\tMerge: %.1f ms\n\t\tKernel: %.1f ms\n\t\tCopy: %.1f ms\n\t\tVideo: %.1f ms\n",
+				printf("FPS: %.1f \n\tSimulation: %.1f ms\n\tDrawing: %.1f ms\n\t\tSorting: %.1f ms\n\t\tMerge: %.1f ms\n\t\tKernel: %.1f ms\n\t\tCopy: %.1f ms\n\t\tVideo: %.1f ms\n\t\tBuffer: %.1f ms\n",
 					(float)count*1000000.0f/(float)diff,
 					(float)simulation_time/1000.0f/(float)count,
 					(float)drawing_time/1000.0f/(float)count,
@@ -472,12 +481,14 @@ int main(int argc, char **argv)
 					(float)visualization.merge_time/1000.0f/(float)count,
 					(float)visualization.kernel_time/1000.0f/(float)count,
 					(float)visualization.copy_time/1000.0f/(float)count,
-					(float)visualization.video_send_time/1000.0f/(float)count);
+					(float)visualization.video_send_time/1000.0f/(float)count,
+					(float)visualization.buffer_time/1000.0f/(float)count);
 				visualization.sorting_time = 0;
 				visualization.merge_time = 0;
 				visualization.kernel_time = 0;
 				visualization.copy_time = 0;
 				visualization.video_send_time = 0;
+				visualization.buffer_time = 0;
 				drawing_time = 0;
 				simulation_time = 0;
 				start = end;

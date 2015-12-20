@@ -79,14 +79,12 @@ class IsaacVisualization
                 typename TSource,
                 typename TJsonRoot
             >
-            ISAAC_HOST_DEVICE_INLINE  void operator()( const int I,TSource& s, TJsonRoot& jsonRoot) const
+            ISAAC_HOST_INLINE  void operator()( const int I,TSource& s, TJsonRoot& jsonRoot) const
             {
-                #ifndef __CUDA_ARCH__
-                    json_t *content = json_object();
-                    json_array_append_new( jsonRoot, content );
-                    json_object_set_new( content, "name", json_string ( s.name.c_str() ) );
-                    json_object_set_new( content, "feature dimension", json_integer ( s.feature_dim ) );
-                #endif
+                json_t *content = json_object();
+                json_array_append_new( jsonRoot, content );
+                json_object_set_new( content, "name", json_string ( s.name.c_str() ) );
+                json_object_set_new( content, "feature dimension", json_integer ( s.feature_dim ) );
             }
         };
         
@@ -97,15 +95,13 @@ class IsaacVisualization
                 typename TFunctor,
                 typename TJsonRoot
             >
-            ISAAC_HOST_DEVICE_INLINE  void operator()( const int I,TFunctor& f, TJsonRoot& jsonRoot) const
+            ISAAC_HOST_INLINE  void operator()( const int I,TFunctor& f, TJsonRoot& jsonRoot) const
             {
-                #ifndef __CUDA_ARCH__
-                    json_t *content = json_object();
-                    json_array_append_new( jsonRoot, content );
-                    json_object_set_new( content, "name", json_string ( TFunctor::name.c_str() ) );
-                    json_object_set_new( content, "description", json_string ( TFunctor::description.c_str() ) );
-                    json_object_set_new( content, "uses parameter", json_boolean ( TFunctor::uses_parameter ) );
-                #endif
+                json_t *content = json_object();
+                json_array_append_new( jsonRoot, content );
+                json_object_set_new( content, "name", json_string ( TFunctor::name.c_str() ) );
+                json_object_set_new( content, "description", json_string ( TFunctor::description.c_str() ) );
+                json_object_set_new( content, "uses parameter", json_boolean ( TFunctor::uses_parameter ) );
             }
         };
 
@@ -118,15 +114,13 @@ class IsaacVisualization
                 typename TValue,
                 typename TFound
             >
-            ISAAC_HOST_DEVICE_INLINE  void operator()( const int I,TFunctor& f, TName& name, TValue& value, TFound& found) const
+            ISAAC_HOST_INLINE  void operator()( const int I,TFunctor& f, TName& name, TValue& value, TFound& found) const
             {
-                #ifndef __CUDA_ARCH__
-                    if (!found && name == TFunctor::name)
-                    {
-                        value = I;
-                        found = true;
-                    }
-                #endif
+                if (!found && name == TFunctor::name)
+                {
+                    value = I;
+                    found = true;
+                }
             }
         };
 
@@ -138,7 +132,7 @@ class IsaacVisualization
                 typename TFunctions,
                 typename TDest
             >
-            ISAAC_HOST_DEVICE_INLINE  void operator()(
+            ISAAC_HOST_INLINE  void operator()(
                 const int I,
                 TSource& source,
                 TFunctions& functions,
@@ -154,6 +148,65 @@ class IsaacVisualization
                 dest.nr[I] = chain_nr * 4 + TSource::feature_dim - 1;                
             }
         };
+        
+        struct allocate_pointer_array_iterator
+        {
+            template
+            <
+                typename TSource,
+                typename TArray,
+                typename TLocalSize
+            >
+            ISAAC_HOST_INLINE  void operator()(
+                const int I,
+                TSource& source,
+                TArray& pointer_array,
+                TLocalSize& local_size
+            ) const
+            {
+                if (TSource::persistent)
+                    pointer_array.pointer[I] = NULL;
+                else
+                    ISAAC_CUDA_CHECK(cudaMalloc((void**)&(pointer_array.pointer[I]), sizeof(isaac_float_dim< TSource::feature_dim >) * local_size[0] * local_size[1] * local_size[2]));
+            }
+        };
+        
+        struct update_pointer_array_iterator
+        {
+            template
+            <
+                typename TSource,
+                typename TArray,
+                typename TLocalSize
+            >
+            ISAAC_HOST_INLINE  void operator()(
+                const int I,
+                TSource& source,
+                TArray& pointer_array,
+                TLocalSize& local_size
+            ) const
+            {
+                source.update();
+                if (!TSource::persistent)
+                {
+                    isaac_size2 grid_size=
+                    {
+                        size_t((local_size[0]+15)/16),
+                        size_t((local_size[1]+15)/16),
+                    };
+                    isaac_size2 block_size=
+                    {
+                        size_t(16),
+                        size_t(16),
+                    };
+                    dim3 block (block_size.x, block_size.y);
+                    dim3 grid  (grid_size.x, grid_size.y);
+                    isaac_int3 local_size_array = { isaac_int(local_size[0]), isaac_int(local_size[1]), isaac_int(local_size[2]) };
+                    updateBufferKernel<<<grid,block>>>( source, pointer_array.pointer[ I ], local_size_array );
+                }
+            }
+        };
+        
         
         IsaacVisualization(
             #if ISAAC_ALPAKA == 1
@@ -191,6 +244,7 @@ class IsaacVisualization
             video_send_time(0),
             copy_time(0),
             sorting_time(0),
+            buffer_time(0),
             interpolation(false),
             framebuffer_prod(size_t(framebuffer_size.x) * size_t(framebuffer_size.y)),
             sources( sources )
@@ -242,8 +296,10 @@ class IsaacVisualization
                 functions[i].source = std::string("idem");
             updateFunctions();
             
-            //Transfer func memory:
+            //non persistent buffer memory
+            isaac_for_each_params(sources,allocate_pointer_array_iterator(),pointer_array,local_size);
             
+            //Transfer func memory:
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
                 source_weight.value[i] = isaac_float(1);
@@ -501,6 +557,11 @@ class IsaacVisualization
             //if (rank == master)
             //    printf("-----\n");
             ISAAC_WAIT_VISUALIZATION
+            
+            ISAAC_START_TIME_MEASUREMENT( buffer, getTicksUs() )
+            isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size );
+            ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
+            ISAAC_STOP_TIME_MEASUREMENT( buffer_time, +=, buffer, getTicksUs() )
             
             send_distance = false;
             send_look_at = false;
@@ -791,6 +852,7 @@ class IsaacVisualization
         uint64_t video_send_time;
         uint64_t copy_time;
         uint64_t sorting_time;
+        uint64_t buffer_time;
     private:        
         static IsaacVisualization *myself;
         
@@ -858,6 +920,7 @@ class IsaacVisualization
                     mpl::vector<>,
                     transfer_d_struct< boost::mpl::size< TSourceList >::type::value >,
                     source_weight_struct< boost::mpl::size< TSourceList >::type::value >,
+                    pointer_array_struct< boost::mpl::size< TSourceList >::type::value >,
                     alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t>,
                     TTransfer_size,
                     TAccDim,
@@ -898,6 +961,7 @@ class IsaacVisualization
 //                    mpl::vector<>,
                     transfer_d_struct< boost::mpl::size< TSourceList >::type::value >,
                     source_weight_struct< boost::mpl::size< TSourceList >::type::value >,
+                    pointer_array_struct< boost::mpl::size< TSourceList >::type::value >,
                     uint32_t*,
                     TTransfer_size
                 >
@@ -910,6 +974,7 @@ class IsaacVisualization
                     bg_color,
                     myself->transfer_d,
                     myself->source_weight,
+                    myself->pointer_array,
                     readback_viewport,
                     myself->interpolation
                 );
@@ -1158,6 +1223,7 @@ class IsaacVisualization
         transfer_d_struct< boost::mpl::size< TSourceList >::type::value > transfer_d;
         transfer_h_struct< boost::mpl::size< TSourceList >::type::value > transfer_h;
         source_weight_struct< boost::mpl::size< TSourceList >::type::value > source_weight;
+        pointer_array_struct< boost::mpl::size< TSourceList >::type::value > pointer_array;
         const static size_t transfer_size = TTransfer_size;
         functions_struct functions[boost::mpl::size< TSourceList >::type::value];
 };

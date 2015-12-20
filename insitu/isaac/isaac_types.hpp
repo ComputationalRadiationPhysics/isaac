@@ -215,6 +215,12 @@ struct source_weight_struct
     isaac_float value[ N ];
 };
 
+template< int N >
+struct pointer_array_struct
+{
+    void* pointer[ N ];
+};
+
 typedef enum
 {
     META_MERGE = 0,

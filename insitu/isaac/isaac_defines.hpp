@@ -40,6 +40,12 @@
     #define ISAAC_HOST_DEVICE_INLINE __device__ __host__ __forceinline__
 #endif
 
+#if ISAAC_ALPAKA == 1
+    #define ISAAC_HOST_INLINE ALPAKA_FN_HOST
+#else
+    #define ISAAC_HOST_INLINE __host__ __forceinline__
+#endif
+
 #ifdef __CUDACC__
     #define ISAAC_NO_HOST_DEVICE_WARNING _Pragma("hd_warning_disable")
 #else
