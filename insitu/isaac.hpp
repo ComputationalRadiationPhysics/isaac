@@ -1099,10 +1099,7 @@ class IsaacVisualization
                 {
                     json_object_set_new( myself->json_root, "weight", matrix = json_array() );
                     for (size_t i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
-                    {
-                        json_t* f = json_object();
                         json_array_append_new( matrix, json_real( myself->source_weight.value[i] ) );
-                    }
                 }
                 if ( myself->send_interpolation )
                     json_object_set_new( myself->json_root, "interpolation", json_boolean( myself->interpolation ) );
