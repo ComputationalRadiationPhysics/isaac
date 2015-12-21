@@ -42,6 +42,7 @@
 			<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls="false" windowless="true"/>
 			<div id="url_div" style="display:none;"></div><br/>
 			<div id="functions_div"></div>
+			<div id="weight_div"></div>
 			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation<br/>
 			<canvas id="transfer" width="412" height="16"></canvas>
 			<table border="1"><tr id="transfer_form"></tr></table>
@@ -103,6 +104,7 @@ var stream_img = new Image;
 stream_img.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==";
 
 var functions = new Array();
+var weight = new Array();
 
 var projection = [
 	1, 0, 0, 0,
@@ -546,6 +548,20 @@ function pad(num, size) {
     return s;
 }
 
+function createWeightFeedback( w, range_name, value_name )
+{
+	return function()
+	{
+		var myself = document.getElementById( range_name );
+		weight[w] = (myself.value/100)*(myself.value/100);
+		var value = document.getElementById( value_name );
+		if ( weight[w] == 0 )
+			value.innerHTML = ' <b><font color="red">Off</font></b> ';
+		else
+			value.innerHTML = ' <b><font color="green">' + weight[w].toFixed(1) + '</font></b> ';
+	};
+}
+
 document.getElementById("connect").onclick = function()
 {
 	if (socket != null && socket.readyState == 1)
@@ -743,6 +759,46 @@ document.getElementById("connect").onclick = function()
 							sendFeedback( "functions", functions );
 						};
 						functions_div.appendChild(function_button);
+					}
+					if (obj.hasOwnProperty("weight"))
+					{
+						var weight_div = document.getElementById("weight_div");
+						while (weight_div.firstChild) {
+							weight_div.removeChild(weight_div.firstChild);
+						}
+						weight = obj["weight"];
+						for (var w in weight)
+						{
+							var title = document.createElement("SPAN");
+							title.innerHTML = sources[w].name + ": ";
+							weight_div.appendChild(title);
+							var weight_range = document.createElement("INPUT");
+							weight_range.type = "range";
+							weight_range.min = 0;
+							weight_range.max = 316;
+							weight_range.value = Math.floor(Math.sqrt(weight[w])*100);
+							var range_name = "w_" + w + "_range";
+							var value_name = "w_" + w + "_value";
+							weight_range.id = range_name
+							weight_range.oninput = createWeightFeedback( w, range_name, value_name );
+							weight_div.appendChild(weight_range);
+							var value = document.createElement("SPAN");
+							if ( weight[w] == 0 )
+								value.innerHTML = ' <b><font color="red">Off</font></b> ';
+							else
+								value.innerHTML = ' <b><font color="green">' + weight[w].toFixed(1) + '</font></b> ';
+							value.id = value_name;
+							weight_div.appendChild(value);
+						}
+						var weight_button = document.createElement("INPUT");
+						weight_button.type = "button";
+						weight_button.value = "Update weights";
+						weight_button.id = "w_button";
+						weight_button.onclick = function()
+						{
+							sendFeedback( "weight", weight );
+						};
+						weight_div.appendChild(weight_button);
 					}
 					if (obj.hasOwnProperty("transfer array"))
 					{

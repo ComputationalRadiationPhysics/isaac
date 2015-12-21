@@ -281,7 +281,7 @@ class IsaacVisualization
             ISAAC_SET_IDENTITY(3,rotation)
             distance = -5.0f;
             updateModelview();
-            
+
             //Create functor chain pointer lookup table
             #if ISAAC_ALPAKA == 1
             
@@ -573,6 +573,7 @@ class IsaacVisualization
             send_transfer = false;
             send_interpolation = false;
             send_functions = false;
+            send_weight = false;
 
             //Handle messages
             json_t* message;
@@ -605,6 +606,8 @@ class IsaacVisualization
                             send_interpolation = true;
                         if ( strcmp( target, "functions" ) == 0 )
                             send_functions = true;
+                        if ( strcmp( target, "weight" ) == 0 )
+                            send_weight = true;
                     }
                     //Search for scene changes
                     if (json_array_size( js = json_object_get(last, "rotation absolute") ) == 9)
@@ -775,6 +778,12 @@ class IsaacVisualization
                 updateFunctions();
                 send_functions = true;
             }
+            if (json_array_size( js = json_object_get(message, "weight") ) )
+            {
+                json_array_foreach(js, index, value)
+                    source_weight.value[index] = json_number_value(value);
+                send_weight = true;
+            }
 
             json_t* metadata = json_object_get( message, "metadata" );
             if (metadata)
@@ -925,6 +934,7 @@ class IsaacVisualization
                     transfer_d_struct< boost::mpl::size< TSourceList >::type::value >,
                     source_weight_struct< boost::mpl::size< TSourceList >::type::value >,
                     pointer_array_struct< boost::mpl::size< TSourceList >::type::value >,
+                    mpl::vector<>,
                     alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t>,
                     TTransfer_size,
                     TAccDim,
@@ -933,7 +943,7 @@ class IsaacVisualization
                     alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t>,
                     alpaka::mem::buf::Buf<TDevAcc, isaac_size_struct< TSimDim::value >, TFraDim, size_t>,
                     alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TFraDim, size_t>,                    
-                    ISAAC_MAX_FUNCTORS
+                    boost::mpl::size< TSourceList >::type::value
                 >
                 ::call(
                     myself->inverse_d,
@@ -966,8 +976,10 @@ class IsaacVisualization
                     transfer_d_struct< boost::mpl::size< TSourceList >::type::value >,
                     source_weight_struct< boost::mpl::size< TSourceList >::type::value >,
                     pointer_array_struct< boost::mpl::size< TSourceList >::type::value >,
+                    mpl::vector<>,
                     uint32_t*,
-                    TTransfer_size
+                    TTransfer_size,
+                    boost::mpl::size< TSourceList >::type::value
                 >
                 ::call(
                     myself->framebuffer,
@@ -1081,6 +1093,15 @@ class IsaacVisualization
                         json_array_append_new( matrix, f );
                         json_object_set_new(f, "source", json_string( myself->functions[i].source.c_str() ) );
                         json_object_set_new(f, "error", json_integer( myself->functions[i].error_code ) );
+                    }
+                }
+                if ( myself->send_weight )
+                {
+                    json_object_set_new( myself->json_root, "weight", matrix = json_array() );
+                    for (size_t i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+                    {
+                        json_t* f = json_object();
+                        json_array_append_new( matrix, json_real( myself->source_weight.value[i] ) );
                     }
                 }
                 if ( myself->send_interpolation )
@@ -1207,6 +1228,7 @@ class IsaacVisualization
         bool send_transfer;
         bool send_interpolation;
         bool send_functions;
+        bool send_weight;
         bool interpolation;
         IceTDouble modelview[16];
         IsaacCommunicator* communicator;

@@ -22,7 +22,9 @@
 #include <boost/mpl/at.hpp>
 #include <boost/mpl/vector.hpp>
 #include <boost/mpl/back.hpp>
+#include <boost/mpl/bool.hpp>
 #include <boost/mpl/push_back.hpp>
+#include <boost/fusion/include/push_back.hpp>
 #include <boost/mpl/size.hpp>
 
 namespace isaac
@@ -137,7 +139,9 @@ struct merge_source_iterator
 {
     template
     <
+        typename NR,
         typename TSource,
+        typename TFilter,
         typename TColor,
         typename TPos,
         typename TLocalSize,
@@ -149,8 +153,9 @@ struct merge_source_iterator
 #endif
     >
     ISAAC_HOST_DEVICE_INLINE  void operator()(
-        const int I,
+        NR& nr,
         TSource& source,
+        TFilter& filter,
         TColor& color,
         TPos& pos,
         TLocalSize& local_size,
@@ -162,85 +167,88 @@ struct merge_source_iterator
 #endif
     ) const
     {
-        isaac_float_dim < TSource::feature_dim > data;
-        if (Tinterpolation == 0)
+        if ( mpl::at_c< TFilter, NR::value >::type::value )
         {
-            isaac_int3 coord =
+            isaac_float_dim < TSource::feature_dim > data;
+            if (Tinterpolation == 0)
             {
-                isaac_int(pos.x),
-                isaac_int(pos.y),
-                isaac_int(pos.z)
-            };
-            if (TSource::persistent)
-                data = source[coord];
+                isaac_int3 coord =
+                {
+                    isaac_int(pos.x),
+                    isaac_int(pos.y),
+                    isaac_int(pos.z)
+                };
+                if (TSource::persistent)
+                    data = source[coord];
+                else
+                {
+                    isaac_float_dim < TSource::feature_dim >* ptr = (isaac_float_dim < TSource::feature_dim >*)(pointerArray.pointer[ NR::value ] );
+                    data = ptr[coord.x + coord.y * local_size.value.x + coord.z * local_size.value.x * local_size.value.y];
+                };
+            }
             else
             {
-                isaac_float_dim < TSource::feature_dim >* ptr = (isaac_float_dim < TSource::feature_dim >*)(pointerArray.pointer[ I ] );
-                data = ptr[coord.x + coord.y * local_size.value.x + coord.z * local_size.value.x * local_size.value.y];
-            };
-        }
-        else
-        {
-            isaac_int3 coord;
-            isaac_float_dim < TSource::feature_dim > data8[2][2][2];
-            for (int x = 0; x < 2; x++)
-                for (int y = 0; y < 2; y++)
-                    for (int z = 0; z < 2; z++)
-                    {
-                        coord.x = isaac_int(x?ceil(pos.x):floor(pos.x));
-                        coord.y = isaac_int(y?ceil(pos.y):floor(pos.y));
-                        coord.z = isaac_int(z?ceil(pos.z):floor(pos.z));
-                        if (!TSource::has_guard)
+                isaac_int3 coord;
+                isaac_float_dim < TSource::feature_dim > data8[2][2][2];
+                for (int x = 0; x < 2; x++)
+                    for (int y = 0; y < 2; y++)
+                        for (int z = 0; z < 2; z++)
                         {
-                            if ( coord.x >= local_size.value.x )
-                                coord.x = isaac_int(x?floor(pos.x):ceil(pos.x));
-                            if ( coord.y >= local_size.value.y )
-                                coord.y = isaac_int(y?floor(pos.y):ceil(pos.y));
-                            if ( coord.z >= local_size.value.z )
-                                coord.z = isaac_int(z?floor(pos.z):ceil(pos.z));
+                            coord.x = isaac_int(x?ceil(pos.x):floor(pos.x));
+                            coord.y = isaac_int(y?ceil(pos.y):floor(pos.y));
+                            coord.z = isaac_int(z?ceil(pos.z):floor(pos.z));
+                            if (!TSource::has_guard)
+                            {
+                                if ( coord.x >= local_size.value.x )
+                                    coord.x = isaac_int(x?floor(pos.x):ceil(pos.x));
+                                if ( coord.y >= local_size.value.y )
+                                    coord.y = isaac_int(y?floor(pos.y):ceil(pos.y));
+                                if ( coord.z >= local_size.value.z )
+                                    coord.z = isaac_int(z?floor(pos.z):ceil(pos.z));
+                            }
+                            data8[x][y][z] = source[coord];
                         }
-                        data8[x][y][z] = source[coord];
-                    }
-            isaac_float_dim < 3 > pos_in_cube =
-            {
-                pos.x - floor(pos.x),
-                pos.y - floor(pos.y),
-                pos.z - floor(pos.z)
-            };
-            isaac_float_dim < TSource::feature_dim > data4[2][2];
-            for (int x = 0; x < 2; x++)
-                for (int y = 0; y < 2; y++)
-                    data4[x][y].value =
-                        data8[x][y][0].value * (isaac_float(1) - pos_in_cube.value.z) +
-                        data8[x][y][1].value * (                 pos_in_cube.value.z);
-            isaac_float_dim < TSource::feature_dim > data2[2];
-            for (int x = 0; x < 2; x++)
-                data2[x].value =
-                    data4[x][0].value * (isaac_float(1) - pos_in_cube.value.y) +
-                    data4[x][1].value * (                 pos_in_cube.value.y);
-            data.value =
-                data2[0].value * (isaac_float(1) - pos_in_cube.value.x) +
-                data2[1].value * (                 pos_in_cube.value.x);
+                isaac_float_dim < 3 > pos_in_cube =
+                {
+                    pos.x - floor(pos.x),
+                    pos.y - floor(pos.y),
+                    pos.z - floor(pos.z)
+                };
+                isaac_float_dim < TSource::feature_dim > data4[2][2];
+                for (int x = 0; x < 2; x++)
+                    for (int y = 0; y < 2; y++)
+                        data4[x][y].value =
+                            data8[x][y][0].value * (isaac_float(1) - pos_in_cube.value.z) +
+                            data8[x][y][1].value * (                 pos_in_cube.value.z);
+                isaac_float_dim < TSource::feature_dim > data2[2];
+                for (int x = 0; x < 2; x++)
+                    data2[x].value =
+                        data4[x][0].value * (isaac_float(1) - pos_in_cube.value.y) +
+                        data4[x][1].value * (                 pos_in_cube.value.y);
+                data.value =
+                    data2[0].value * (isaac_float(1) - pos_in_cube.value.x) +
+                    data2[1].value * (                 pos_in_cube.value.x);
+            }
+            isaac_float result = isaac_float(0);
+            #if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
+                if (TSource::feature_dim == 1)
+                    result = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chaid_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<1>* >(&data)), NR::value );
+                if (TSource::feature_dim == 2)
+                    result = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chaid_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<2>* >(&data)), NR::value );
+                if (TSource::feature_dim == 3)
+                    result = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chaid_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<3>* >(&data)), NR::value );
+                if (TSource::feature_dim == 4)
+                    result = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chaid_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), NR::value );
+            #endif
+            isaac_uint lookup_value = isaac_uint( round(result * isaac_float( Ttransfer_size ) ) );
+            if (lookup_value >= Ttransfer_size )
+                lookup_value = Ttransfer_size - 1;
+            isaac_float4 value = transferArray.pointer[ NR::value ][ lookup_value ] * sourceWeight.value[ NR::value ];
+            color.x = color.x + value.x * value.w;
+            color.y = color.y + value.y * value.w;
+            color.z = color.z + value.z * value.w;
+            color.w = color.w + value.w;
         }
-        isaac_float result = isaac_float(0);
-        #if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
-            if (TSource::feature_dim == 1)
-                result = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chaid_d[ I ])( *(reinterpret_cast< isaac_float_dim<1>* >(&data)), I );
-            if (TSource::feature_dim == 2)
-                result = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chaid_d[ I ])( *(reinterpret_cast< isaac_float_dim<2>* >(&data)), I );
-            if (TSource::feature_dim == 3)
-                result = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chaid_d[ I ])( *(reinterpret_cast< isaac_float_dim<3>* >(&data)), I );
-            if (TSource::feature_dim == 4)
-                result = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chaid_d[ I ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), I );
-        #endif
-        isaac_uint lookup_value = isaac_uint( round(result * isaac_float( Ttransfer_size ) ) );
-        if (lookup_value >= Ttransfer_size )
-            lookup_value = Ttransfer_size - 1;
-        isaac_float4 value = transferArray.pointer[ I ][ lookup_value ] * sourceWeight.value[ I ];
-        color.x = color.x + value.x * value.w;
-        color.y = color.y + value.y * value.w;
-        color.z = color.z + value.z * value.w;
-        color.w = color.w + value.w;
     }
 };
 
@@ -251,6 +259,7 @@ template <
     typename TTransferArray,
     typename TSourceWeight,
     typename TPointerArray,
+    typename TFilter,
     size_t Ttransfer_size,
     isaac_int Tinterpolation
 >
@@ -390,11 +399,12 @@ template <
             //Starting the main loop
             isaac_float4 color = {isaac_float(0),isaac_float(0),isaac_float(0),isaac_float(0)};
             isaac_float factor = isaac_float(2) / isaac_size_d[0].max_global_size;
+            TFilter filter;
             for (isaac_int i = first; i <= last; i++)
             {
                 pos = start + step_vec * isaac_float(i);                
                 isaac_float4 value = {0, 0, 0, 0};
-                isaac_for_each_params
+                isaac_for_each_with_mpl_params
                 (
                     sources,
                     merge_source_iterator
@@ -402,6 +412,7 @@ template <
                         Ttransfer_size,
                         Tinterpolation
                     >(),
+                    filter,
                     value,
                     pos,
                     isaac_size_d[0].local_size,
@@ -437,6 +448,131 @@ template <
     typename TTransferArray,
     typename TSourceWeight,
     typename TPointerArray,
+    typename TFilter,
+    typename TFramebuffer,
+    size_t TTransfer_size,
+#if ISAAC_ALPAKA == 1
+    typename TAccDim,
+    typename TAcc,
+    typename TStream,
+    typename TInverse,
+    typename TSize,
+    typename TParameter,
+#endif
+    int N
+>
+struct IsaacFillRectKernelStruct
+{
+    inline static void call(
+#if ISAAC_ALPAKA == 1
+        TInverse inverse_d,
+        TSize size_d,
+        TParameter parameter_d,
+        TStream stream,
+#endif
+        TFramebuffer framebuffer,
+        isaac_size2& framebuffer_size,
+        isaac_uint2& framebuffer_start,
+        TSourceList& sources,
+        isaac_float& step,
+        isaac_float4& background_color,
+        TTransferArray& transferArray,
+        TSourceWeight& sourceWeight,
+        TPointerArray& pointerArray,
+        const IceTInt * readback_viewport,
+        isaac_int interpolation
+    )
+    {
+        if (sourceWeight.value[ mpl::size< TSourceList >::type::value - N] == isaac_float(0) )
+            IsaacFillRectKernelStruct
+            <
+                TSimDim,
+                TSourceList,
+                TTransferArray,
+                TSourceWeight,
+                TPointerArray,
+                typename mpl::push_back< TFilter, mpl::false_ >::type,
+                TFramebuffer,
+                TTransfer_size,
+#if ISAAC_ALPAKA == 1
+                TAccDim,
+                TAcc,
+                TStream,
+                TInverse,
+                TSize,
+                TParameter,
+#endif
+                N - 1
+            >
+            ::call(
+#if ISAAC_ALPAKA == 1
+                inverse_d,
+                size_d,
+                parameter_d,
+                stream,
+#endif
+                framebuffer,
+                framebuffer_size,
+                framebuffer_start,
+                sources,
+                step,
+                background_color,
+                transferArray,
+                sourceWeight,
+                pointerArray,
+                readback_viewport,
+                interpolation
+            );
+    else
+            IsaacFillRectKernelStruct
+            <
+                TSimDim,
+                TSourceList,
+                TTransferArray,
+                TSourceWeight,
+                TPointerArray,
+                typename mpl::push_back< TFilter, mpl::true_ >::type,
+                TFramebuffer,
+                TTransfer_size,
+#if ISAAC_ALPAKA == 1
+                TAccDim,
+                TAcc,
+                TStream,
+                TInverse,
+                TSize,
+                TParameter,
+#endif
+                N - 1
+            >
+            ::call(
+#if ISAAC_ALPAKA == 1
+                inverse_d,
+                size_d,
+                parameter_d,
+                stream,
+#endif
+                framebuffer,
+                framebuffer_size,
+                framebuffer_start,
+                sources,
+                step,
+                background_color,
+                transferArray,
+                sourceWeight,
+                pointerArray,
+                readback_viewport,
+                interpolation
+            );
+    }
+};
+
+template <
+    typename TSimDim,
+    typename TSourceList,
+    typename TTransferArray,
+    typename TSourceWeight,
+    typename TPointerArray,
+    typename TFilter,
     typename TFramebuffer,
     size_t TTransfer_size
 #if ISAAC_ALPAKA == 1
@@ -446,9 +582,28 @@ template <
     ,typename TInverse
     ,typename TSize
     ,typename TParameter
-#endif    
+#endif
 >
 struct IsaacFillRectKernelStruct
+<
+    TSimDim,
+    TSourceList,
+    TTransferArray,
+    TSourceWeight,
+    TPointerArray,
+    TFilter,
+    TFramebuffer,
+    TTransfer_size,
+#if ISAAC_ALPAKA == 1
+    TAccDim,
+    TAcc,
+    TStream,
+    TInverse,
+    TSize,
+    TParameter,
+#endif
+    0 //<-- spezialisation
+>
 {
     inline static void call(
 #if ISAAC_ALPAKA == 1
@@ -481,7 +636,7 @@ struct IsaacFillRectKernelStruct
             size_t(16)
         };
         #if ISAAC_ALPAKA == 1
-            if ( boost::mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+            if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
             {
                 grid_size.x = size_t(readback_viewport[2]);
                 grid_size.y = size_t(readback_viewport[3]);
@@ -503,9 +658,10 @@ struct IsaacFillRectKernelStruct
                     TSimDim,
                     TSourceList,
                     TFunctorVector,
-                    transfer_d_struct< boost::mpl::size< TSourceList >::type::value >,
+                    transfer_d_struct< mpl::size< TSourceList >::type::value >,
                     TSourceWeight,
                     TPointerArray,
+                    TFilter,
                     TTransfer_size,
                     0
                 >
@@ -543,6 +699,7 @@ struct IsaacFillRectKernelStruct
                     TTransferArray,
                     TSourceWeight,
                     TPointerArray,
+                    TFilter,
                     TTransfer_size,
                     1
                 >
@@ -566,6 +723,7 @@ struct IsaacFillRectKernelStruct
                     TTransferArray,
                     TSourceWeight,
                     TPointerArray,
+                    TFilter,
                     TTransfer_size,
                     0
                 >
