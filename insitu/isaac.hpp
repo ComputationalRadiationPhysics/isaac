@@ -177,16 +177,18 @@ class IsaacVisualization
             <
                 typename TSource,
                 typename TArray,
-                typename TLocalSize
+                typename TLocalSize,
+                typename TWeight
             >
             ISAAC_HOST_INLINE  void operator()(
                 const int I,
                 TSource& source,
                 TArray& pointer_array,
-                TLocalSize& local_size
+                TLocalSize& local_size,
+                TWeight& weight
             ) const
             {
-                source.update();
+                source.update( weight.value[ I ] != isaac_float(0) );
                 if (!TSource::persistent)
                 {
                     isaac_size2 grid_size=
@@ -562,7 +564,7 @@ class IsaacVisualization
             ISAAC_WAIT_VISUALIZATION
             
             ISAAC_START_TIME_MEASUREMENT( buffer, getTicksUs() )
-            isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size );
+            isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size, source_weight );
             ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
             ISAAC_STOP_TIME_MEASUREMENT( buffer_time, +=, buffer, getTicksUs() )
             

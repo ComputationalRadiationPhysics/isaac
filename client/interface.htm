@@ -823,6 +823,7 @@ document.getElementById("connect").onclick = function()
 									input.type = button;
 									var picker = new jscolor(input);
 									input.jscolor = picker;
+									input.size = 6;
 									picker.closable = true;
 									picker.closeText = "Close";
 									picker.fromRGB( transfer_points[s][i].r * 255, transfer_points[s][i].g * 255, transfer_points[s][i].b * 255 );

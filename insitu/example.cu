@@ -63,7 +63,7 @@ class TestSource1
 		width_mul_height(width * height)
 		{}
 		
-		ISAAC_HOST_INLINE void update() {}
+		ISAAC_HOST_INLINE void update(bool enabled) {}
 		
 		isaac_float3* ptr;
 		isaac_int width;
@@ -110,7 +110,7 @@ class TestSource2
 		width_mul_height(width * height)
 		{ }
 
-		ISAAC_HOST_INLINE void update() {}
+		ISAAC_HOST_INLINE void update(bool enabled) {}
 		
 		isaac_float* ptr;
 		isaac_int width;
