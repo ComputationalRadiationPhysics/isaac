@@ -188,8 +188,9 @@ class IsaacVisualization
                 TWeight& weight
             ) const
             {
-                source.update( weight.value[ I ] != isaac_float(0) );
-                if (!TSource::persistent)
+                bool enabled = weight.value[ I ] != isaac_float(0);
+                source.update( enabled );
+                if (!TSource::persistent && enabled)
                 {
                     isaac_size2 grid_size=
                     {
