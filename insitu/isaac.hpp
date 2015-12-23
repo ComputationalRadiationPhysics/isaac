@@ -210,6 +210,53 @@ class IsaacVisualization
             }
         };
         
+        struct calc_minmax_iterator
+        {
+            template
+            <
+                typename TSource,
+                typename TArray,
+                typename TMinmax,
+                typename TLocalMinmax,
+                typename TLocalSize
+            >
+            ISAAC_HOST_INLINE  void operator()(
+                const int I,
+                TSource& source,
+                TArray& pointer_array,
+                TMinmax& minmax,
+                TLocalMinmax& local_minmax,
+                TLocalSize& local_size
+            ) const
+            {
+                isaac_size2 grid_size=
+                {
+                    size_t((local_size[0]+15)/16),
+                    size_t((local_size[1]+15)/16),
+                };
+                isaac_size2 block_size=
+                {
+                    size_t(16),
+                    size_t(16),
+                };
+                dim3 block (block_size.x, block_size.y);
+                dim3 grid  (grid_size.x, grid_size.y);
+                isaac_int3 local_size_array = { isaac_int(local_size[0]), isaac_int(local_size[1]), isaac_int(local_size[2]) };
+                minMaxKernel<<<grid,block>>>( source, I, local_minmax, local_size_array, pointer_array.pointer[ I ]);
+                minmax_struct local_minmax_array_h[ local_size_array.x * local_size_array.y ];
+                ISAAC_CUDA_CHECK(cudaMemcpy( local_minmax_array_h, local_minmax, sizeof(minmax_struct)*local_size_array.x * local_size_array.y, cudaMemcpyDeviceToHost));
+                minmax.min[ I ] =  FLT_MAX;
+                minmax.max[ I ] = -FLT_MAX;
+                for (int i = 0; i < local_size_array.x * local_size_array.y; i++)
+                {
+                    if ( local_minmax_array_h[i].min < minmax.min[ I ])
+                        minmax.min[ I ] = local_minmax_array_h[i].min;
+                    if ( local_minmax_array_h[i].max > minmax.max[ I ])
+                        minmax.max[ I ] = local_minmax_array_h[i].max;
+                }
+                ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
+            }
+        };
         
         IsaacVisualization(
             #if ISAAC_ALPAKA == 1
@@ -263,6 +310,7 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaMalloc((uint32_t**)&framebuffer, sizeof(uint32_t)*framebuffer_prod));
                 ISAAC_CUDA_CHECK(cudaMalloc((isaac_functor_chain_pointer_N**)&functor_chain_d, sizeof(isaac_functor_chain_pointer_N) * ISAAC_FUNCTOR_COMPLEX * 4));
                 ISAAC_CUDA_CHECK(cudaMalloc((isaac_functor_chain_pointer_N**)&functor_chain_choose_d, sizeof(isaac_functor_chain_pointer_N) * boost::mpl::size< TSourceList >::type::value));
+                ISAAC_CUDA_CHECK(cudaMalloc((minmax_struct**)&local_minmax_array_d, sizeof(minmax_struct) * local_size[0] * local_size[1]));
             #endif
             //INIT
             MPI_Comm_dup(MPI_COMM_WORLD, &mpi_world);
@@ -577,6 +625,7 @@ class IsaacVisualization
             send_interpolation = false;
             send_functions = false;
             send_weight = false;
+            send_minmax = false;
 
             //Handle messages
             json_t* message;
@@ -739,6 +788,14 @@ class IsaacVisualization
             size_t index;
             json_t *value;
 
+            //search for minmax requests
+            if ( js = json_object_get(message, "request") )
+            {
+                const char* target = json_string_value( js );
+                if ( strcmp( target, "minmax" ) == 0 )
+                    send_minmax = true;
+            }
+            
             //Scene set?
             if (json_array_size( js = json_object_get(message, "projection") ) == 16)
             {
@@ -787,12 +844,26 @@ class IsaacVisualization
                     source_weight.value[index] = json_number_value(value);
                 send_weight = true;
             }
-
             json_t* metadata = json_object_get( message, "metadata" );
             if (metadata)
                 json_incref(metadata);
             json_decref(message);
             thr_metaTargets = metaTargets;
+            
+            if (send_minmax)
+            {
+                isaac_for_each_params( sources, calc_minmax_iterator(), pointer_array, minmax_array, local_minmax_array_d, local_size );
+                if (rank == master)
+                {
+                    MPI_Reduce( MPI_IN_PLACE, minmax_array.min, boost::mpl::size< TSourceList >::type::value, MPI_FLOAT, MPI_MIN, master, mpi_world);
+                    MPI_Reduce( MPI_IN_PLACE, minmax_array.max, boost::mpl::size< TSourceList >::type::value, MPI_FLOAT, MPI_MAX, master, mpi_world);
+                }
+                else
+                {
+                    MPI_Reduce( minmax_array.min, NULL, boost::mpl::size< TSourceList >::type::value, MPI_FLOAT, MPI_MIN, master, mpi_world);
+                    MPI_Reduce( minmax_array.max, NULL, boost::mpl::size< TSourceList >::type::value, MPI_FLOAT, MPI_MAX, master, mpi_world);
+                }
+            }
 
             //Calc order
             ISAAC_START_TIME_MEASUREMENT( sorting, getTicksUs() )
@@ -1106,6 +1177,17 @@ class IsaacVisualization
                 }
                 if ( myself->send_interpolation )
                     json_object_set_new( myself->json_root, "interpolation", json_boolean( myself->interpolation ) );
+                if ( myself->send_minmax )
+                {
+                    json_object_set_new( myself->json_root, "minmax", matrix = json_array() );
+                    for (size_t i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+                    {
+                        json_t* v = json_object();
+                        json_array_append_new( matrix, v );
+                        json_object_set_new(v, "min", json_real( myself->minmax_array.min[i] ) );
+                        json_object_set_new(v, "max", json_real( myself->minmax_array.max[i] ) );
+                    }
+                }
                 char* buffer = json_dumps( myself->json_root, 0 );
                 myself->communicator->serverSend(buffer);
                 free(buffer);
@@ -1215,6 +1297,7 @@ class IsaacVisualization
             isaac_uint* framebuffer;
             isaac_functor_chain_pointer_N* functor_chain_d;
             isaac_functor_chain_pointer_N* functor_chain_choose_d;
+            minmax_struct* local_minmax_array_d;
         #endif
         MPI_Comm mpi_world;
         IceTDouble projection[16];
@@ -1229,6 +1312,7 @@ class IsaacVisualization
         bool send_interpolation;
         bool send_functions;
         bool send_weight;
+        bool send_minmax;
         bool interpolation;
         IceTDouble modelview[16];
         IsaacCommunicator* communicator;
@@ -1251,6 +1335,7 @@ class IsaacVisualization
         transfer_h_struct< boost::mpl::size< TSourceList >::type::value > transfer_h;
         source_weight_struct< boost::mpl::size< TSourceList >::type::value > source_weight;
         pointer_array_struct< boost::mpl::size< TSourceList >::type::value > pointer_array;
+        minmax_array_struct< boost::mpl::size< TSourceList >::type::value > minmax_array;
         const static size_t transfer_size = TTransfer_size;
         functions_struct functions[boost::mpl::size< TSourceList >::type::value];
 };

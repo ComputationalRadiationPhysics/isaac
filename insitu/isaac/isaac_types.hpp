@@ -221,6 +221,20 @@ struct pointer_array_struct
     void* pointer[ N ];
 };
 
+struct minmax_struct
+{
+    isaac_float min;
+    isaac_float max;
+};
+
+template< int N>
+struct minmax_array_struct
+{
+    isaac_float min[ N ];
+    isaac_float max[ N ];
+};
+
+
 typedef enum
 {
     META_MERGE = 0,

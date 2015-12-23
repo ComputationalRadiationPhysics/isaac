@@ -97,6 +97,7 @@ errorCode URIImageConnector::run()
 						cinfo.input_components = 4;
 						cinfo.in_color_space = JCS_EXT_RGBX;
 						jpeg_set_defaults(&cinfo);
+						jpeg_set_quality(&cinfo, 100, false);
 						jpeg_start_compress(&cinfo, TRUE);
 						while (cinfo.next_scanline < cinfo.image_height)
 						{

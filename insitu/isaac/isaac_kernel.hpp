@@ -27,6 +27,8 @@
 #include <boost/fusion/include/push_back.hpp>
 #include <boost/mpl/size.hpp>
 
+#include <float.h>
+
 namespace isaac
 {
 
@@ -777,6 +779,52 @@ __global__ void updateBufferKernel( TSource source, void* pointer, isaac_int3 lo
     isaac_float_dim < TSource::feature_dim >* ptr = (isaac_float_dim < TSource::feature_dim >*)(pointer);
     for (;coord.z < local_size.z; coord.z++)
         ptr[coord.x + coord.y * local_size.x + coord.z * local_size.x * local_size.y] = source[coord];
+}
+
+template
+<
+    typename TSource
+>
+__global__ void minMaxKernel( TSource source, int nr, minmax_struct* result, isaac_int3 local_size, void* pointer )
+{
+    isaac_int3 coord =
+    {
+        isaac_int(threadIdx.x + blockIdx.x * blockDim.x),
+        isaac_int(threadIdx.y + blockIdx.y * blockDim.y),
+        0
+    };
+    if ( ISAAC_FOR_EACH_DIM_TWICE(2, coord, >= local_size, || ) 0 )
+        return;
+    isaac_float min =  FLT_MAX;
+    isaac_float max = -FLT_MAX;
+    for (;coord.z < local_size.z; coord.z++)
+    {
+        isaac_float_dim < TSource::feature_dim > data;
+        if (TSource::persistent)
+            data = source[coord];
+        else
+        {
+            isaac_float_dim < TSource::feature_dim >* ptr = (isaac_float_dim < TSource::feature_dim >*)(pointer);
+            data = ptr[coord.x + coord.y * local_size.x + coord.z * local_size.x * local_size.y];
+        };
+        isaac_float value = isaac_float(0);
+        #if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
+            if (TSource::feature_dim == 1)
+                value = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chaid_d[ nr ])( *(reinterpret_cast< isaac_float_dim<1>* >(&data)), nr );
+            if (TSource::feature_dim == 2)
+                value = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chaid_d[ nr ])( *(reinterpret_cast< isaac_float_dim<2>* >(&data)), nr );
+            if (TSource::feature_dim == 3)
+                value = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chaid_d[ nr ])( *(reinterpret_cast< isaac_float_dim<3>* >(&data)), nr );
+            if (TSource::feature_dim == 4)
+                value = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chaid_d[ nr ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), nr );
+        #endif
+        if (value > max)
+            max = value;
+        if (value < min)
+            min = value;
+    }
+    result[coord.x +  coord.y * local_size.x].min = min;
+    result[coord.x +  coord.y * local_size.x].max = max;
 }
 
 } //namespace isaac;

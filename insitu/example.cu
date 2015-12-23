@@ -165,6 +165,8 @@ void update_data(
 	TPos& position,
 	TGlo& global_size)
 {
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	srand(0);
 	float s = sin(pos);
 	for (size_t x = 0; x < local_size[0]; x++)

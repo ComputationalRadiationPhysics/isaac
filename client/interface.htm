@@ -746,6 +746,9 @@ document.getElementById("connect").onclick = function()
 									error.innerHTML = ' <b><font color="red">Fatal error</font></b>';
 							}
 							functions_div.appendChild(error);
+							var minmax = document.createElement("SPAN");
+							minmax.id = "i_" + f + "_string";
+							functions_div.appendChild(minmax);
 							functions_div.appendChild(document.createElement("BR"));
 						}
 						var function_button = document.createElement("INPUT");
@@ -759,6 +762,20 @@ document.getElementById("connect").onclick = function()
 							sendFeedback( "functions", functions );
 						};
 						functions_div.appendChild(function_button);
+						var minmax_button = document.createElement("INPUT");
+						minmax_button.type = "button";
+						minmax_button.value = "Update minmax interval";
+						minmax_button.id = "i_button";
+						minmax_button.onclick = function()
+						{
+							sendFeedback( "request", "minmax" );
+						};
+						functions_div.appendChild(minmax_button);
+					}
+					if (obj.hasOwnProperty("minmax"))
+					{
+						for (var i in obj["minmax"])
+							document.getElementById("i_" + i + "_string").innerHTML = " [ "+obj["minmax"][i]["min"].toFixed(3)+" , "+obj["minmax"][i]["max"].toFixed(3)+" ]";
 					}
 					if (obj.hasOwnProperty("weight"))
 					{
