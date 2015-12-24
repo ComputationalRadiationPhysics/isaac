@@ -60,10 +60,10 @@
 #define ISAAC_SET_COLOR( dest, color ) \
     { \
         isaac_uint4 result; \
-        result.x = isaac_uint( min( isaac_float(1), color.x ) * 255.0f ); \
-        result.y = isaac_uint( min( isaac_float(1), color.y ) * 255.0f ); \
-        result.z = isaac_uint( min( isaac_float(1) ,color.z ) * 255.0f ); \
-        result.w = isaac_uint( min( isaac_float(1) ,color.w ) * 255.0f ); \
+        result.x = min( isaac_uint( min( isaac_float(1), color.x ) * 255.0f ), 255); \
+        result.y = min( isaac_uint( min( isaac_float(1), color.y ) * 255.0f ), 255); \
+        result.z = min( isaac_uint( min( isaac_float(1), color.z ) * 255.0f ), 255); \
+        result.w = min( isaac_uint( min( isaac_float(1), color.w ) * 255.0f ), 255); \
         dest = (result.w << 24) | (result.z << 16) | (result.y << 8) | (result.x << 0); \
     }
 

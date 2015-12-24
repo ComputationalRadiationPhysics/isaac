@@ -242,10 +242,13 @@ struct merge_source_iterator
                 if (TSource::feature_dim == 4)
                     result = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chaid_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), NR::value );
             #endif
-            isaac_uint lookup_value = isaac_uint( round(result * isaac_float( Ttransfer_size ) ) );
+            isaac_int lookup_value = isaac_int( round(result * isaac_float( Ttransfer_size ) ) );
+            if (lookup_value < 0 )
+                lookup_value = 0;
             if (lookup_value >= Ttransfer_size )
                 lookup_value = Ttransfer_size - 1;
-            isaac_float4 value = transferArray.pointer[ NR::value ][ lookup_value ] * sourceWeight.value[ NR::value ];
+            isaac_float4 value = transferArray.pointer[ NR::value ][ lookup_value ];
+            value.w *= sourceWeight.value[ NR::value ];
             color.x = color.x + value.x * value.w;
             color.y = color.y + value.y * value.w;
             color.z = color.z + value.z * value.w;
@@ -400,7 +403,7 @@ template <
 
             //Starting the main loop
             isaac_float4 color = {isaac_float(0),isaac_float(0),isaac_float(0),isaac_float(0)};
-            isaac_float factor = isaac_float(2) / isaac_size_d[0].max_global_size;
+            isaac_float factor = isaac_float(1) / isaac_size_d[0].max_global_size;
             TFilter filter;
             for (isaac_int i = first; i <= last; i++)
             {
@@ -425,8 +428,8 @@ template <
                     ,isaac_parameter_d 
 #endif
                 );
-                if ( mpl::size< TSourceList >::type::value > 1)
-                    value = value / isaac_float( mpl::size< TSourceList >::type::value );
+                /*if ( mpl::size< TSourceList >::type::value > 1)
+                    value = value / isaac_float( mpl::size< TSourceList >::type::value );*/
                 isaac_float oma = isaac_float(1) - color.w;
                 value = value * factor;
                 isaac_float4 color_add =
@@ -437,6 +440,8 @@ template <
                     oma * value.w
                 };
                 color = color + color_add;
+                if (color.w > isaac_float(1))
+                    color.w = isaac_float(1);
             }
             ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], color )
         }
