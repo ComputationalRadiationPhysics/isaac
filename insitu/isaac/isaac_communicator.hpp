@@ -38,30 +38,14 @@ namespace isaac
 class IsaacCommunicator
 {
 	public:
-		IsaacCommunicator(std::string url,isaac_uint port)
+		IsaacCommunicator(std::string url,isaac_uint port) :
+			id(0),
+			server_id(0),
+			url(url),
+			port(port),
+			sockfd(0)
 		{
 			pthread_mutex_init (&deleteMessageMutex, NULL);
-			this->url = url;
-			this->port = port;
-			this->sockfd = 0;
-		}
-		static size_t json_load_callback_function (void *buffer, size_t buflen, void *data)
-		{
-			return recv(*((isaac_int*)data),buffer,1,0);
-		}
-		void readAndSetMessages()
-		{
-			while (json_t * content = json_load_callback(json_load_callback_function,&sockfd,JSON_DISABLE_EOF_CHECK,NULL))
-			{
-				pthread_mutex_lock(&deleteMessageMutex);
-				messageList.push_back(content);
-				pthread_mutex_unlock(&deleteMessageMutex);
-			}
-		}
-		static void* run_readAndSetMessages(void* communicator)
-		{
-			((IsaacCommunicator*)communicator)->readAndSetMessages();
-			return 0;
 		}
 		json_t* getLastMessage()
 		{
@@ -106,9 +90,16 @@ class IsaacCommunicator
 		}
 		isaac_int serverSend(const char* content)
 		{
+			while (id > server_id + ISAAC_MAX_DIFFERENCE)
+				usleep(1000);
 			uint32_t l = strlen(content);
-			send(sockfd,&l,4,0);
-			isaac_int n = send(sockfd,content,l,0);
+			char id_string[32];
+			sprintf(id_string,",\"uid\":%i}",id);
+			uint32_t l_with_id = l + strlen(id_string) - 1;
+			send(sockfd,&l_with_id,4,0);
+			isaac_int n = send(sockfd,content,l-1,MSG_MORE); //without closing }
+			n += send(sockfd,id_string,strlen(id_string),0);
+			id++;
 			return n;
 		}
 		#if ISAAC_JPEG == 1
@@ -209,6 +200,36 @@ class IsaacCommunicator
 			pthread_mutex_destroy(&deleteMessageMutex);
 		}
 	private:
+		void readAndSetMessages()
+		{
+			while (json_t * content = json_load_callback(json_load_callback_function,&sockfd,JSON_DISABLE_EOF_CHECK,NULL))
+			{
+				//Search for ready messages:
+				json_t* js;
+				if (js = json_object_get( content, "done"))
+				{
+					server_id = json_integer_value( js );
+					json_decref( content );
+				}
+				else
+				{
+					pthread_mutex_lock(&deleteMessageMutex);
+					messageList.push_back(content);
+					pthread_mutex_unlock(&deleteMessageMutex);
+				}
+			}
+		}
+		static size_t json_load_callback_function (void *buffer, size_t buflen, void *data)
+		{
+			return recv(*((isaac_int*)data),buffer,1,0);
+		}
+		static void* run_readAndSetMessages(void* communicator)
+		{
+			((IsaacCommunicator*)communicator)->readAndSetMessages();
+			return 0;
+		}
+		isaac_uint id;
+		isaac_uint server_id;
 		std::string url;
 		isaac_uint port;
 		isaac_int sockfd;

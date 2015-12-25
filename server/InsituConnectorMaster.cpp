@@ -109,7 +109,6 @@ errorCode InsituConnectorMaster::run()
 					newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
 					if (newsockfd >= 0)
 					{
-						printf("New connection from Plugin established\n");
 						InsituConnector* insituConnector = new InsituConnector(newsockfd,nextFreeNumber++);
 						InsituConnectorContainer* d = new InsituConnectorContainer();
 						d->connector = insituConnector;
@@ -123,7 +122,7 @@ errorCode InsituConnectorMaster::run()
 			}
 			for (int i = 1; i < fdnum; i++)
 			{
-				if (fd_array[i].revents == POLLIN)
+				if (fd_array[i].revents & POLLIN)
 				{
 					jlcb.pos = 0;
 					uint32_t expected = 0;
@@ -150,6 +149,13 @@ errorCode InsituConnectorMaster::run()
 							{
 								closed = true;
 								break;
+							}
+							else
+							{
+								//send, which uid we just got
+								char buffer[32];
+								sprintf(buffer,"{\"done\": %lld}",json_integer_value( json_object_get(content, "uid") ) );
+								send(fd_array[i].fd,buffer,strlen(buffer),0);
 							}
 						}
 					}

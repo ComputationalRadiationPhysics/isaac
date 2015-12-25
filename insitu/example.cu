@@ -358,19 +358,19 @@ int main(int argc, char **argv)
 	SourceList sources( testSource1, testSource2 );
 	
 	#if ISAAC_ALPAKA == 1
-		IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim,SourceList,alpaka::Vec<SimDim, size_t>, 1024 > visualization(devHost,devAcc,stream,name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
+		auto visualization = new IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim,SourceList,alpaka::Vec<SimDim, size_t>, 1024 >(devHost,devAcc,stream,name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
 	#else
-		IsaacVisualization<SimDim,SourceList,std::vector<size_t>,1024> visualization(name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
+		auto visualization = new IsaacVisualization<SimDim,SourceList,std::vector<size_t>,1024>(name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
 	#endif
 	
 	//Setting up the metadata description (only master, but however slaves could then metadata metadata, too, it would be merged)
 	if (rank == MASTER_RANK)
 	{
-		json_object_set_new( visualization.getJsonMetaRoot(), "energy", json_string( "Engery in kJ" ) );
-		json_object_set_new( visualization.getJsonMetaRoot(), "speed", json_string( "Speed in multiplies of the speed of a hare" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "energy", json_string( "Engery in kJ" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "speed", json_string( "Speed in multiplies of the speed of a hare" ) );
 		#ifdef SEND_PARTICLES
 			json_t *particle_array = json_array();
-			json_object_set_new( visualization.getJsonMetaRoot(), "reference particles", particle_array );
+			json_object_set_new( visualization->getJsonMetaRoot(), "reference particles", particle_array );
 			json_array_append_new( particle_array, json_string( "X" ) );
 			json_array_append_new( particle_array, json_string( "Y" ) );
 			json_array_append_new( particle_array, json_string( "Z" ) );
@@ -378,7 +378,7 @@ int main(int argc, char **argv)
 	}
 
 	//finish init and sending the meta data scription to the isaac server
-	if (visualization.init())
+	if (visualization->init())
 	{
 		fprintf(stderr,"Isaac init failed.\n");
 		return -1;
@@ -386,7 +386,7 @@ int main(int argc, char **argv)
 	
 	float a = 0.0f;
 	volatile int force_exit = 0;
-	int start = visualization.getTicksUs();
+	int start = visualization->getTicksUs();
 	int count = 0;
 	int drawing_time = 0;
 	int simulation_time = 0;
@@ -399,12 +399,12 @@ int main(int argc, char **argv)
 		if (!pause)
 		{
 			a += 0.01f;
-			int start_simulation = visualization.getTicksUs();
+			int start_simulation = visualization->getTicksUs();
 			#if ISAAC_ALPAKA == 0
 				int stream = 0;
 			#endif
 			update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
-			simulation_time +=visualization.getTicksUs() - start_simulation;
+			simulation_time +=visualization->getTicksUs() - start_simulation;
 		}
 
 		///////////////////
@@ -412,8 +412,8 @@ int main(int argc, char **argv)
 		///////////////////
 		if (rank == MASTER_RANK)
 		{
-			json_object_set_new( visualization.getJsonMetaRoot(), "energy", json_real( a ) );
-			json_object_set_new( visualization.getJsonMetaRoot(), "speed", json_real( a*a ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "energy", json_real( a ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "speed", json_real( a*a ) );
 		}
 		#ifdef SEND_PARTICLES
 			//every thread fills "his" particles
@@ -431,19 +431,19 @@ int main(int argc, char **argv)
 					json_array_append_new( position, json_real( particles[i][j] ) );
 				}
 			}
-			json_object_set_new( visualization.getJsonMetaRoot(), "reference particles", particle_array );
+			json_object_set_new( visualization->getJsonMetaRoot(), "reference particles", particle_array );
 		#endif
 
 		///////////////////
 		// Visualization //
 		///////////////////
-		int start_drawing = visualization.getTicksUs();
+		int start_drawing = visualization->getTicksUs();
 		#ifdef SEND_PARTICLES
-			json_t* meta = visualization.doVisualization(META_MERGE);
+			json_t* meta = visualization->doVisualization(META_MERGE);
 		#else
-			json_t* meta = visualization.doVisualization(META_MASTER);
+			json_t* meta = visualization->doVisualization(META_MASTER);
 		#endif
-		drawing_time +=visualization.getTicksUs() - start_drawing;
+		drawing_time +=visualization->getTicksUs() - start_drawing;
 
 		///////////////////
 		// Message check //
@@ -470,27 +470,27 @@ int main(int argc, char **argv)
 		//////////////////
 		if (rank == MASTER_RANK)
 		{
-			int end = visualization.getTicksUs();
+			int end = visualization->getTicksUs();
 			int diff = end-start;
 			if (diff >= 1000000)
 			{
-				visualization.merge_time -= visualization.kernel_time + visualization.copy_time;
+				visualization->merge_time -= visualization->kernel_time + visualization->copy_time;
 				printf("FPS: %.1f \n\tSimulation: %.1f ms\n\tDrawing: %.1f ms\n\t\tSorting: %.1f ms\n\t\tMerge: %.1f ms\n\t\tKernel: %.1f ms\n\t\tCopy: %.1f ms\n\t\tVideo: %.1f ms\n\t\tBuffer: %.1f ms\n",
 					(float)count*1000000.0f/(float)diff,
 					(float)simulation_time/1000.0f/(float)count,
 					(float)drawing_time/1000.0f/(float)count,
-					(float)visualization.sorting_time/1000.0f/(float)count,
-					(float)visualization.merge_time/1000.0f/(float)count,
-					(float)visualization.kernel_time/1000.0f/(float)count,
-					(float)visualization.copy_time/1000.0f/(float)count,
-					(float)visualization.video_send_time/1000.0f/(float)count,
-					(float)visualization.buffer_time/1000.0f/(float)count);
-				visualization.sorting_time = 0;
-				visualization.merge_time = 0;
-				visualization.kernel_time = 0;
-				visualization.copy_time = 0;
-				visualization.video_send_time = 0;
-				visualization.buffer_time = 0;
+					(float)visualization->sorting_time/1000.0f/(float)count,
+					(float)visualization->merge_time/1000.0f/(float)count,
+					(float)visualization->kernel_time/1000.0f/(float)count,
+					(float)visualization->copy_time/1000.0f/(float)count,
+					(float)visualization->video_send_time/1000.0f/(float)count,
+					(float)visualization->buffer_time/1000.0f/(float)count);
+				visualization->sorting_time = 0;
+				visualization->merge_time = 0;
+				visualization->kernel_time = 0;
+				visualization->copy_time = 0;
+				visualization->video_send_time = 0;
+				visualization->buffer_time = 0;
 				drawing_time = 0;
 				simulation_time = 0;
 				start = end;
@@ -501,6 +501,8 @@ int main(int argc, char **argv)
 	
 	MPI_Barrier(MPI_COMM_WORLD);
 	printf("%i finished\n",rank);
+	
+	delete( visualization );
 	
 	#if ISAAC_ALPAKA == 0
 		free(hostBuffer1);
