@@ -296,6 +296,8 @@ class IsaacVisualization
             sorting_time(0),
             buffer_time(0),
             interpolation(false),
+            iso_surface(false),
+            step(isaac_float(1)),
             framebuffer_prod(size_t(framebuffer_size.x) * size_t(framebuffer_size.y)),
             sources( sources )
             #if ISAAC_ALPAKA == 1
@@ -446,6 +448,8 @@ class IsaacVisualization
                 isaac_for_each_params( sources, source_2_json_iterator(), json_sources_array );
 
                 json_object_set_new( json_root, "interpolation", json_boolean( interpolation ) );
+                json_object_set_new( json_root, "iso surface", json_boolean( iso_surface ) );
+                json_object_set_new( json_root, "step", json_real( step ) );
                 
                 json_object_set_new( json_root, "dimension", json_integer ( TSimDim::value ) );
                 json_object_set_new( json_root, "width", json_integer ( global_size[0] ) );
@@ -462,7 +466,7 @@ class IsaacVisualization
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
                 functions[i].error_code = 0;
-                //Going from ! to !...
+                //Going from | to |...
                 std::string source = functions[i].source;
                 size_t pos = 0;
                 bool again = true;
@@ -623,6 +627,8 @@ class IsaacVisualization
             send_rotation = false;
             send_transfer = false;
             send_interpolation = false;
+            send_step = false;
+            send_iso_surface = false;
             send_functions = false;
             send_weight = false;
             send_minmax = false;
@@ -656,6 +662,10 @@ class IsaacVisualization
                             send_transfer = true;
                         if ( strcmp( target, "interpolation" ) == 0 )
                             send_interpolation = true;
+                        if ( strcmp( target, "step" ) == 0 )
+                            send_step = true;
+                        if ( strcmp( target, "iso surface" ) == 0 )
+                            send_iso_surface = true;
                         if ( strcmp( target, "functions" ) == 0 )
                             send_functions = true;
                         if ( strcmp( target, "weight" ) == 0 )
@@ -831,6 +841,18 @@ class IsaacVisualization
                 interpolation = json_boolean_value ( js );
                 send_interpolation = true;
             }
+            if ( js = json_object_get(message, "step") )
+            {
+                step = json_number_value ( js );
+                if (step < isaac_float(0.01))
+                    step = isaac_float(0.01);
+                send_step = true;
+            }
+            if ( js = json_object_get(message, "iso surface") )
+            {
+                iso_surface = json_boolean_value ( js );
+                send_iso_surface = true;
+            }
             if (json_array_size( js = json_object_get(message, "functions") ) )
             {
                 json_array_foreach(js, index, value)
@@ -986,7 +1008,6 @@ class IsaacVisualization
             #endif
             IceTUByte* pixels = icetImageGetColorub(result);
             ISAAC_START_TIME_MEASUREMENT( kernel, myself->getTicksUs() )
-            isaac_float step = 1.0f;
             isaac_float4 bg_color =
             {
                 isaac_float(background_color[3]),
@@ -1028,7 +1049,7 @@ class IsaacVisualization
                     myself->framebuffer_size,
                     framebuffer_start,
                     myself->sources,
-                    step,
+                    myself->step,
                     bg_color,
                     myself->transfer_d,
                     myself->source_weight,
@@ -1060,13 +1081,14 @@ class IsaacVisualization
                     myself->framebuffer_size,
                     framebuffer_start,
                     myself->sources,
-                    step,
+                    myself->step,
                     bg_color,
                     myself->transfer_d,
                     myself->source_weight,
                     myself->pointer_array,
                     readback_viewport,
-                    myself->interpolation
+                    myself->interpolation,
+                    myself->iso_surface
                 );
                 ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
@@ -1177,6 +1199,10 @@ class IsaacVisualization
                 }
                 if ( myself->send_interpolation )
                     json_object_set_new( myself->json_root, "interpolation", json_boolean( myself->interpolation ) );
+                if ( myself->send_step )
+                    json_object_set_new( myself->json_root, "step", json_real( myself->step ) );
+                if ( myself->send_iso_surface )
+                    json_object_set_new( myself->json_root, "iso surface", json_boolean( myself->iso_surface ) );
                 if ( myself->send_minmax )
                 {
                     json_object_set_new( myself->json_root, "minmax", matrix = json_array() );
@@ -1310,10 +1336,14 @@ class IsaacVisualization
         bool send_projection;
         bool send_transfer;
         bool send_interpolation;
+        bool send_step;
+        bool send_iso_surface;
         bool send_functions;
         bool send_weight;
         bool send_minmax;
         bool interpolation;
+        bool iso_surface;
+        isaac_float step;
         IceTDouble modelview[16];
         IsaacCommunicator* communicator;
         json_t *json_root;

@@ -43,7 +43,9 @@
 			<div id="url_div" style="display:none;"></div><br/>
 			<div id="functions_div"></div>
 			<div id="weight_div"></div>
-			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation<br/>
+			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation
+			<input type="checkbox" id="iso_surface_checkbox" checked onchange="iso_surface_checkbox_click()"> Iso Surface 
+			<input id="step" size="4"><input type="button" value="Change step" id="step_button" onclick="step_button_click()"><br/>
 			<table border="1"><tr id="transfer_form"></tr></table>
 			<canvas id="transfer" width="412" height="16"></canvas>
 			<form>
@@ -100,6 +102,8 @@ var plugins = new Array();
 var one_window = document.getElementById("one_window_checkbox").checked;
 var wireframe = document.getElementById("wireframe_checkbox").checked;
 var stream = document.getElementById("stream_select").selectedIndex;
+if (stream == 4)
+	document.getElementById("preview_div").style.opacity = '1.0';
 var stream_img = new Image;
 stream_img.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==";
 
@@ -661,6 +665,8 @@ document.getElementById("connect").onclick = function()
 						rotation = obj["rotation"];
 						sources = obj["sources"];
 						document.getElementById("interpolation_checkbox").checked = obj["interpolation"];
+						document.getElementById("step").value = obj["step"];
+						document.getElementById("iso_surface_checkbox").checked = obj["iso surface"];
 						
 						preview.width = obj["framebuffer width"];
 						preview.height = obj["framebuffer height"];
@@ -706,6 +712,10 @@ document.getElementById("connect").onclick = function()
 							distance = obj["distance"];
 						if (obj.hasOwnProperty("interpolation"))
 							document.getElementById("interpolation_checkbox").checked = obj["interpolation"];
+						if (obj.hasOwnProperty("step"))
+							document.getElementById("step").checked = obj["step"];
+						if (obj.hasOwnProperty("iso surface"))
+							document.getElementById("iso_surface_checkbox").checked = obj["iso surface"];
 					}
 					if (obj.hasOwnProperty("functions"))
 					{
@@ -1003,6 +1013,18 @@ function interpolation_checkbox_click()
 {
 	var status = document.getElementById("interpolation_checkbox").checked;
 	sendFeedback( "interpolation", status );
+};
+
+function step_button_click()
+{
+	var status = parseFloat(document.getElementById("step").value);
+	sendFeedback( "step", status );
+};
+
+function iso_surface_checkbox_click()
+{
+	var status = document.getElementById("iso_surface_checkbox").checked;
+	sendFeedback( "iso surface", status );
 };
 
 function stream_select_click()

@@ -322,6 +322,10 @@ errorCode Master::run()
 							json_object_set( insitu->t->group->initData, "distance", js );
 						if ( js = json_object_get(message->json_root, "interpolation") )
 							json_object_set( insitu->t->group->initData, "interpolation", js );
+						if ( js = json_object_get(message->json_root, "iso surface") )
+							json_object_set( insitu->t->group->initData, "iso surface", js );
+						if ( js = json_object_get(message->json_root, "step") )
+							json_object_set( insitu->t->group->initData, "step", js );
 						//Send json data
 						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc=dataClientList.getFront();
 						while(dc)

@@ -199,7 +199,7 @@ void update_data(
 				hostBuffer1[pos][0] = intensity;
 				hostBuffer1[pos][1] = intensity;
 				hostBuffer1[pos][2] = intensity;
-				hostBuffer2[pos] = s*s/2.0f;
+				hostBuffer2[pos] = (2.0f - l)*(2.0f - l) / 4.0f;
 			}
 	cudaMemcpy(deviceBuffer1, hostBuffer1, sizeof(float3_t)*prod, cudaMemcpyHostToDevice);
 	cudaMemcpy(deviceBuffer2, hostBuffer2, sizeof(float)*prod, cudaMemcpyHostToDevice);
