@@ -515,7 +515,7 @@ class IsaacVisualization
             icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
             icetEnable(ICET_ORDERED_COMPOSITE);
 
-            size_t max_size = max(uint32_t(global_size[0]),uint32_t(global_size[1]));
+            max_size = max(uint32_t(global_size[0]),uint32_t(global_size[1]));
             if (TSimDim::value > 2)
                 max_size = max(uint32_t(global_size[2]),uint32_t(max_size));
             isaac_float f_l_width = (isaac_float)local_size[0]/(isaac_float)max_size * 2.0f;
@@ -1032,9 +1032,9 @@ class IsaacVisualization
             //Every rank calculates it's distance to the camera
             IceTDouble point[4] =
             {
-                IceTDouble(position[0]) + (IceTDouble(local_size[0]) - IceTDouble(global_size[0])) / 2.0,
-                IceTDouble(position[1]) + (IceTDouble(local_size[1]) - IceTDouble(global_size[1])) / 2.0,
-                IceTDouble(position[2]) + (IceTDouble(local_size[2]) - IceTDouble(global_size[2])) / 2.0,
+                (IceTDouble(position[0]) + (IceTDouble(local_size[0]) - IceTDouble(global_size[0])) / 2.0) / IceTDouble(max_size/2),
+                (IceTDouble(position[1]) + (IceTDouble(local_size[1]) - IceTDouble(global_size[1])) / 2.0) / IceTDouble(max_size/2),
+                (IceTDouble(position[2]) + (IceTDouble(local_size[2]) - IceTDouble(global_size[2])) / 2.0) / IceTDouble(max_size/2),
                 1.0
             };
             IceTDouble result[4];
@@ -1512,6 +1512,7 @@ class IsaacVisualization
         minmax_array_struct< boost::mpl::size< TSourceList >::type::value > minmax_array;
         const static size_t transfer_size = TTransfer_size;
         functions_struct functions[boost::mpl::size< TSourceList >::type::value];
+        size_t max_size;
 };
 
 #if ISAAC_ALPAKA == 1
