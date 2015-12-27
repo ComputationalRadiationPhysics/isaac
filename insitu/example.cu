@@ -191,10 +191,11 @@ void update_data(
 				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][0] = intensity;
 				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][1] = intensity;
 				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][2] = intensity;
-				alpaka::mem::view::getPtrNative(hostBuffer2)[pos] = s*s/2.0f;
+				alpaka::mem::view::getPtrNative(hostBuffer2)[pos] =  (2.0f - l)*(2.0f - l) / 4.0f;
 			}
-	alpaka::mem::view::copy(stream, deviceBuffer1, hostBuffer1, local_size);
-	alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, local_size);
+	const alpaka::Vec<alpaka::dim::DimInt<1>, size_t> data_size(size_t(local_size[0]) * size_t(local_size[0]) * size_t(local_size[0]));
+	alpaka::mem::view::copy(stream, deviceBuffer1, hostBuffer1, data_size);
+	alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, data_size);
 #else
 				hostBuffer1[pos][0] = intensity;
 				hostBuffer1[pos][1] = intensity;
@@ -271,6 +272,7 @@ int main(int argc, char **argv)
 		//Now we initialize the Isaac Insitu Plugin with the name, the number of the master, the server, it's IP, the count of framebuffer to be created and the size per framebuffer
 		using AccDim = alpaka::dim::DimInt<3>;
 		using SimDim = alpaka::dim::DimInt<3>;
+		using DatDim = alpaka::dim::DimInt<1>;
 		//using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
 		//using Stream  = alpaka::stream::StreamCudaRtSync;
 		using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
@@ -287,6 +289,7 @@ int main(int argc, char **argv)
 
 		const alpaka::Vec<SimDim, size_t> global_size(d[0]*64,d[1]*64,d[2]*64);
 		const alpaka::Vec<SimDim, size_t> local_size(size_t(64),size_t(64),size_t(64));
+		const alpaka::Vec<DatDim, size_t> data_size(size_t(64) * size_t(64) * size_t(64));
 		const alpaka::Vec<SimDim, size_t> position(p[0]*64,p[1]*64,p[2]*64);
 	#else
 		int devCount;
@@ -312,10 +315,10 @@ int main(int argc, char **argv)
 
 	//Init Device memory
 	#if ISAAC_ALPAKA == 1
-		alpaka::mem::buf::Buf<DevHost, float3_t, SimDim, size_t> hostBuffer1   ( alpaka::mem::buf::alloc<float3_t, size_t>(devHost, local_size));
-		alpaka::mem::buf::Buf<DevAcc, float3_t, SimDim, size_t>  deviceBuffer1 ( alpaka::mem::buf::alloc<float3_t, size_t>(devAcc,  local_size));
-		alpaka::mem::buf::Buf<DevHost, float, SimDim, size_t> hostBuffer2   ( alpaka::mem::buf::alloc<float, size_t>(devHost, local_size));
-		alpaka::mem::buf::Buf<DevAcc, float, SimDim, size_t>  deviceBuffer2 ( alpaka::mem::buf::alloc<float, size_t>(devAcc,  local_size));
+		alpaka::mem::buf::Buf<DevHost, float3_t, DatDim, size_t> hostBuffer1   ( alpaka::mem::buf::alloc<float3_t, size_t>(devHost, data_size));
+		alpaka::mem::buf::Buf<DevAcc, float3_t, DatDim, size_t>  deviceBuffer1 ( alpaka::mem::buf::alloc<float3_t, size_t>(devAcc,  data_size));
+		alpaka::mem::buf::Buf<DevHost, float, DatDim, size_t> hostBuffer2   ( alpaka::mem::buf::alloc<float, size_t>(devHost, data_size));
+		alpaka::mem::buf::Buf<DevAcc, float, DatDim, size_t>  deviceBuffer2 ( alpaka::mem::buf::alloc<float, size_t>(devAcc,  data_size));
 	#else
 		float3_t* hostBuffer1 = (float3_t*)malloc(sizeof(float3_t)*prod);
 		float3_t* deviceBuffer1; cudaMalloc((float3_t**)&deviceBuffer1, sizeof(float3_t)*prod);

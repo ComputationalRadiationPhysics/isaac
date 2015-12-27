@@ -156,18 +156,33 @@ class IsaacVisualization
                 typename TSource,
                 typename TArray,
                 typename TLocalSize
+                #if ISAAC_ALPAKA == 1
+                    ,typename TVector
+                    ,typename TDevAcc__
+                #endif
             >
             ISAAC_HOST_INLINE  void operator()(
                 const int I,
                 TSource& source,
                 TArray& pointer_array,
                 TLocalSize& local_size
+                #if ISAAC_ALPAKA == 1
+                    ,TVector& alpaka_vector
+                    ,TDevAcc__& acc
+                #endif
             ) const
             {
                 if (TSource::persistent)
                     pointer_array.pointer[I] = NULL;
                 else
-                    ISAAC_CUDA_CHECK(cudaMalloc((void**)&(pointer_array.pointer[I]), sizeof(isaac_float_dim< TSource::feature_dim >) * local_size[0] * local_size[1] * local_size[2]));
+                {
+                    #if ISAAC_ALPAKA == 1
+                        alpaka_vector.push_back( alpaka::mem::buf::Buf< TDevAcc, isaac_float, TFraDim, size_t> ( alpaka::mem::buf::alloc<isaac_float, size_t>(acc, alpaka::Vec<TFraDim, size_t> ( TSource::feature_dim * local_size[0] * local_size[1] * local_size[2] ) ) ) );
+                        pointer_array.pointer[I] = alpaka::mem::view::getPtrNative( alpaka_vector.back() );                        
+                    #else
+                        ISAAC_CUDA_CHECK(cudaMalloc((void**)&(pointer_array.pointer[I]), sizeof(isaac_float_dim< TSource::feature_dim >) * local_size[0] * local_size[1] * local_size[2]));
+                    #endif
+                }
             }
         };
         
@@ -179,6 +194,9 @@ class IsaacVisualization
                 typename TArray,
                 typename TLocalSize,
                 typename TWeight
+                #if ISAAC_ALPAKA == 1
+                    ,typename TStream__
+                #endif
             >
             ISAAC_HOST_INLINE  void operator()(
                 const int I,
@@ -186,6 +204,9 @@ class IsaacVisualization
                 TArray& pointer_array,
                 TLocalSize& local_size,
                 TWeight& weight
+                #if ISAAC_ALPAKA == 1
+                    ,TStream__& stream
+                #endif
             ) const
             {
                 bool enabled = weight.value[ I ] != isaac_float(0);
@@ -202,10 +223,39 @@ class IsaacVisualization
                         size_t(16),
                         size_t(16),
                     };
-                    dim3 block (block_size.x, block_size.y);
-                    dim3 grid  (grid_size.x, grid_size.y);
                     isaac_int3 local_size_array = { isaac_int(local_size[0]), isaac_int(local_size[1]), isaac_int(local_size[2]) };
-                    updateBufferKernel<<<grid,block>>>( source, pointer_array.pointer[ I ], local_size_array );
+                    #if ISAAC_ALPAKA == 1
+                        if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+                        {
+                            grid_size.x = size_t(local_size[0]);
+                            grid_size.y = size_t(local_size[0]);
+                            block_size.x = size_t(1);
+                            block_size.y = size_t(1);                    
+                        }                
+                        const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+                        const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
+                        const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
+                        auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
+                        updateBufferKernel<TSource> kernel;
+                        auto const instance
+                        (
+                            alpaka::exec::create<TAcc>
+                            (
+                                workdiv,
+                                kernel,
+                                source,
+                                pointer_array.pointer[ I ],
+                                local_size_array
+                            )
+                        );
+                        alpaka::stream::enqueue(stream, instance);                
+                        alpaka::wait::wait(stream);
+                    #else
+                        dim3 block (block_size.x, block_size.y);
+                        dim3 grid  (grid_size.x, grid_size.y);
+                        updateBufferKernel<<<grid,block>>>( source, pointer_array.pointer[ I ], local_size_array );
+                        ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
+                    #endif
                 }
             }
         };
@@ -219,6 +269,12 @@ class IsaacVisualization
                 typename TMinmax,
                 typename TLocalMinmax,
                 typename TLocalSize
+                #if ISAAC_ALPAKA == 1
+                    ,typename TStream__
+                    ,typename THost__
+                    ,typename TFunctionChain
+                    ,typename TParameter
+                #endif
             >
             ISAAC_HOST_INLINE  void operator()(
                 const int I,
@@ -227,6 +283,12 @@ class IsaacVisualization
                 TMinmax& minmax,
                 TLocalMinmax& local_minmax,
                 TLocalSize& local_size
+                #if ISAAC_ALPAKA == 1
+                    ,TStream__& stream
+                    ,THost__& host
+                    ,TFunctionChain& function_chain
+                    ,TParameter& parameter
+                #endif
             ) const
             {
                 isaac_size2 grid_size=
@@ -239,12 +301,46 @@ class IsaacVisualization
                     size_t(16),
                     size_t(16),
                 };
-                dim3 block (block_size.x, block_size.y);
-                dim3 grid  (grid_size.x, grid_size.y);
                 isaac_int3 local_size_array = { isaac_int(local_size[0]), isaac_int(local_size[1]), isaac_int(local_size[2]) };
-                minMaxKernel<<<grid,block>>>( source, I, local_minmax, local_size_array, pointer_array.pointer[ I ]);
                 minmax_struct local_minmax_array_h[ local_size_array.x * local_size_array.y ];
-                ISAAC_CUDA_CHECK(cudaMemcpy( local_minmax_array_h, local_minmax, sizeof(minmax_struct)*local_size_array.x * local_size_array.y, cudaMemcpyDeviceToHost));
+                #if ISAAC_ALPAKA == 1
+                    if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+                    {
+                        grid_size.x = size_t(local_size[0]);
+                        grid_size.y = size_t(local_size[0]);
+                        block_size.x = size_t(1);
+                        block_size.y = size_t(1);                    
+                    }                
+                    const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+                    const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
+                    const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
+                    auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
+                    minMaxKernel<TSource> kernel;
+                    auto const instance
+                    (
+                        alpaka::exec::create<TAcc>
+                        (
+                            workdiv,
+                            kernel,
+                            alpaka::mem::view::getPtrNative(function_chain),
+                            alpaka::mem::view::getPtrNative(parameter),
+                            source,
+                            I,
+                            alpaka::mem::view::getPtrNative(local_minmax),
+                            local_size_array,
+                            pointer_array.pointer[ I ]
+                        )
+                    );
+                    alpaka::stream::enqueue(stream, instance);                
+                    alpaka::wait::wait(stream);
+                    alpaka::mem::buf::BufPlainPtrWrapper<THost, minmax_struct, TFraDim, size_t> minmax_buffer(local_minmax_array_h, host, size_t(local_size_array.x * local_size_array.y));
+                    alpaka::mem::view::copy( stream, minmax_buffer, local_minmax, size_t(local_size_array.x * local_size_array.y));
+                #else
+                    dim3 block (block_size.x, block_size.y);
+                    dim3 grid  (grid_size.x, grid_size.y);
+                    minMaxKernel<<<grid,block>>>( source, I, local_minmax, local_size_array, pointer_array.pointer[ I ]);
+                    ISAAC_CUDA_CHECK(cudaMemcpy( local_minmax_array_h, local_minmax, sizeof(minmax_struct)*local_size_array.x * local_size_array.y, cudaMemcpyDeviceToHost));
+                #endif
                 minmax.min[ I ] =  FLT_MAX;
                 minmax.max[ I ] = -FLT_MAX;
                 for (int i = 0; i < local_size_array.x * local_size_array.y; i++)
@@ -254,7 +350,6 @@ class IsaacVisualization
                     if ( local_minmax_array_h[i].max > minmax.max[ I ])
                         minmax.max[ I ] = local_minmax_array_h[i].max;
                 }
-                ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
             }
         };
         
@@ -305,7 +400,9 @@ class IsaacVisualization
                 ,inverse_d(alpaka::mem::buf::alloc<isaac_float, size_t>(acc, size_t(16)))
                 ,parameter_d(alpaka::mem::buf::alloc<isaac_float4, size_t>(acc, size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value)))
                 ,size_d(alpaka::mem::buf::alloc<isaac_size_struct< TSimDim::value >, size_t>(acc, size_t(1)))
-                ,functor_chain_d(alpaka::mem::buf::alloc<isaac_functor_chain_pointer, size_t>(acc, size_t( ISAAC_FUNCTOR_COMPLEX * 4)))
+                ,functor_chain_d(alpaka::mem::buf::alloc<isaac_functor_chain_pointer_N, size_t>(acc, size_t( ISAAC_FUNCTOR_COMPLEX * 4)))
+                ,functor_chain_choose_d(alpaka::mem::buf::alloc<isaac_functor_chain_pointer_N, size_t>(acc, size_t( boost::mpl::size< TSourceList >::type::value )))
+                ,local_minmax_array_d(alpaka::mem::buf::alloc<minmax_struct, size_t>(acc, size_t( local_size[0] * local_size[1] )))
         {
             #else
         {
@@ -337,24 +434,42 @@ class IsaacVisualization
 
             //Create functor chain pointer lookup table
             #if ISAAC_ALPAKA == 1
-            
+                const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+                const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(1), size_t(1));
+                const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(1), size_t(1));
+                auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
+                fillFunctorChainPointerKernel kernel;
+                auto const instance
+                (
+                    alpaka::exec::create<TAcc>
+                    (
+                        workdiv,
+                        kernel,
+                        alpaka::mem::view::getPtrNative(functor_chain_d)
+                    )
+                );
+                alpaka::stream::enqueue(stream, instance);                
+                alpaka::wait::wait(stream);
             #else
                 dim3 grid(1);
                 dim3 block(1);
                 fillFunctorChainPointerKernel<<<grid,block>>>( functor_chain_d );
                 ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
             #endif
-            
             //Init functions:
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
                 functions[i].source = std::string("idem");
             updateFunctions();
             
             //non persistent buffer memory
-            isaac_for_each_params(sources,allocate_pointer_array_iterator(),pointer_array,local_size);
+            isaac_for_each_params(sources,allocate_pointer_array_iterator(),pointer_array,local_size
+            #if ISAAC_ALPAKA == 1
+                ,pointer_array_alpaka
+                ,acc
+            #endif
+            );
             
             //Transfer func memory:
-
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
                 source_weight.value[i] = isaac_float(1);
@@ -537,29 +652,44 @@ class IsaacVisualization
                     functions[i].bytecode[elem] = 0; //last one idem
                     memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(isaac_float4));
                 }
-                /*printf("Bytecode %i:",i);
-                for (int j = 0; j < ISAAC_MAX_FUNCTORS; j++)
-                    printf(" %i",functions[i].bytecode[j]);
-                printf("\n");
-                printf("Parameter %i:",i);
-                for (int j = 0; j < ISAAC_MAX_FUNCTORS; j++)
-                    printf(" (%.2f,%.2f,%.2f,%.2f)",isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + j].x,isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + j].y,isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + j].z,isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + j].w);
-                printf("\n");*/
             }
+
+            //Calculate functor chain nr per source
+            dest_array_struct< boost::mpl::size< TSourceList >::type::value > dest;
+            isaac_for_each_params( sources, update_functor_chain_iterator(), functions, dest);
             #if ISAAC_ALPAKA == 1
                 alpaka::mem::buf::BufPlainPtrWrapper<THost, isaac_float4, TFraDim, size_t> parameter_buffer(isaac_parameter_h, host, size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value));
-                alpaka::mem::view::copy( stream, parameter_buffer, parameter_d, size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value));
+                alpaka::mem::view::copy( stream, parameter_d, parameter_buffer, size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value));
+                const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+                const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(1), size_t(1));
+                const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(1), size_t(1));
+                auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
+                updateFunctorChainPointerKernel
+                <
+                    boost::mpl::size< TSourceList >::type::value,
+                    dest_array_struct< boost::mpl::size< TSourceList >::type::value >
+                > kernel;
+                auto const instance
+                (
+                    alpaka::exec::create<TAcc>
+                    (
+                        workdiv,
+                        kernel,
+                        alpaka::mem::view::getPtrNative(functor_chain_choose_d),
+                        alpaka::mem::view::getPtrNative(functor_chain_d),
+                        dest
+                    )
+                );
+                alpaka::stream::enqueue(stream, instance);                
+                alpaka::wait::wait(stream);                
             #else
                 ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_parameter_d, isaac_parameter_h, sizeof( isaac_parameter_h )));
-                //Calculate functor chain nr per source
-                dest_array_struct< boost::mpl::size< TSourceList >::type::value > dest;
-                isaac_for_each_params( sources, update_functor_chain_iterator(), functions, dest);
                 dim3 grid(1);
                 dim3 block(1);
                 updateFunctorChainPointerKernel< boost::mpl::size< TSourceList >::type::value > <<<grid,block>>>(functor_chain_choose_d, functor_chain_d, dest);
                 ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                 isaac_functor_chain_pointer_N* constant_ptr;
-                ISAAC_CUDA_CHECK(cudaGetSymbolAddress((void **)&constant_ptr, isaac_function_chaid_d));
+                ISAAC_CUDA_CHECK(cudaGetSymbolAddress((void **)&constant_ptr, isaac_function_chain_d));
                 ISAAC_CUDA_CHECK(cudaMemcpy(constant_ptr, functor_chain_choose_d, boost::mpl::size< TSourceList >::type::value * sizeof( isaac_functor_chain_pointer_N ), cudaMemcpyDeviceToDevice));
             #endif
         }
@@ -617,8 +747,11 @@ class IsaacVisualization
             ISAAC_WAIT_VISUALIZATION
             
             ISAAC_START_TIME_MEASUREMENT( buffer, getTicksUs() )
-            isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size, source_weight );
-            ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
+            isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size, source_weight
+            #if ISAAC_ALPAKA == 1
+                ,stream
+            #endif
+            );
             ISAAC_STOP_TIME_MEASUREMENT( buffer_time, +=, buffer, getTicksUs() )
             
             send_distance = false;
@@ -874,7 +1007,14 @@ class IsaacVisualization
             
             if (send_minmax)
             {
-                isaac_for_each_params( sources, calc_minmax_iterator(), pointer_array, minmax_array, local_minmax_array_d, local_size );
+                isaac_for_each_params( sources, calc_minmax_iterator(), pointer_array, minmax_array, local_minmax_array_d, local_size
+                #if ISAAC_ALPAKA == 1
+                    ,stream
+                    ,host
+                    ,functor_chain_choose_d
+                    ,parameter_d
+                #endif
+                );
                 if (rank == master)
                 {
                     MPI_Reduce( MPI_IN_PLACE, minmax_array.min, boost::mpl::size< TSourceList >::type::value, MPI_FLOAT, MPI_MIN, master, mpi_world);
@@ -1025,7 +1165,6 @@ class IsaacVisualization
                 <
                     TSimDim,
                     TSourceList,
-                    mpl::vector<>,
                     transfer_d_struct< boost::mpl::size< TSourceList >::type::value >,
                     source_weight_struct< boost::mpl::size< TSourceList >::type::value >,
                     pointer_array_struct< boost::mpl::size< TSourceList >::type::value >,
@@ -1038,6 +1177,7 @@ class IsaacVisualization
                     alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t>,
                     alpaka::mem::buf::Buf<TDevAcc, isaac_size_struct< TSimDim::value >, TFraDim, size_t>,
                     alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TFraDim, size_t>,                    
+                    alpaka::mem::buf::Buf<TDevAcc, isaac_functor_chain_pointer_N, TFraDim, size_t>,                    
                     boost::mpl::size< TSourceList >::type::value
                 >
                 ::call(
@@ -1045,6 +1185,7 @@ class IsaacVisualization
                     myself->size_d,
                     myself->parameter_d,
                     myself->stream,
+                    myself->functor_chain_choose_d,
                     myself->framebuffer,
                     myself->framebuffer_size,
                     framebuffer_start,
@@ -1053,9 +1194,10 @@ class IsaacVisualization
                     bg_color,
                     myself->transfer_d,
                     myself->source_weight,
+                    myself->pointer_array,
                     readback_viewport,
                     myself->interpolation,
-                    myself->functions[0].bytecode
+                    myself->iso_surface
                 );
                 alpaka::wait::wait(myself->stream);
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
@@ -1067,7 +1209,6 @@ class IsaacVisualization
                 <
                     TSimDim,
                     TSourceList,
-//                    mpl::vector<>,
                     transfer_d_struct< boost::mpl::size< TSourceList >::type::value >,
                     source_weight_struct< boost::mpl::size< TSourceList >::type::value >,
                     pointer_array_struct< boost::mpl::size< TSourceList >::type::value >,
@@ -1314,7 +1455,9 @@ class IsaacVisualization
             alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t> framebuffer;
             alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t> inverse_d;
             alpaka::mem::buf::Buf<TDevAcc, isaac_size_struct< TSimDim::value >, TFraDim, size_t> size_d;
-            alpaka::mem::buf::Buf<TDevAcc, isaac_functor_chain_pointer >, TFraDim, size_t> functor_chain_d;
+            alpaka::mem::buf::Buf<TDevAcc, isaac_functor_chain_pointer_N, TFraDim, size_t> functor_chain_d;
+            alpaka::mem::buf::Buf<TDevAcc, isaac_functor_chain_pointer_N, TFraDim, size_t> functor_chain_choose_d;
+            alpaka::mem::buf::Buf<TDevAcc, minmax_struct, TFraDim, size_t> local_minmax_array_d;
         #else
             size_t framebuffer_prod;
             TDomainSize global_size;
@@ -1359,6 +1502,7 @@ class IsaacVisualization
         #if ISAAC_ALPAKA == 1
             std::vector< alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> > transfer_d_buf;
             std::vector< alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> > transfer_h_buf;
+            std::vector< alpaka::mem::buf::Buf< TDevAcc, isaac_float, TFraDim, size_t> > pointer_array_alpaka;
             alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TFraDim, size_t> parameter_d;
         #endif
         transfer_d_struct< boost::mpl::size< TSourceList >::type::value > transfer_d;
