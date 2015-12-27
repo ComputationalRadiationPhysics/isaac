@@ -136,7 +136,6 @@ __global__ void fillFunctorChainPointerKernel( isaac_functor_chain_pointer_N* fu
 template <
     isaac_int TInterpolation,
     typename NR,
-    isaac_int TCheck,
     typename TSource,
     typename TPos,
     typename TPointerArray,
@@ -159,21 +158,6 @@ __device__ __forceinline__ isaac_float get_value (
             isaac_int(pos.y),
             isaac_int(pos.z)
         };
-        if (TCheck && !TSource::has_guard)
-        {
-            if (coord.x < 0)
-                coord.x = 0;
-            if (coord.y < 0)
-                coord.y = 0;
-            if (coord.z < 0)
-                coord.z = 0;
-            if ( coord.x >= local_size.value.x )
-                coord.x = local_size.value.x-1;
-            if ( coord.y >= local_size.value.y )
-                coord.y = local_size.value.y-1;
-            if ( coord.z >= local_size.value.z )
-                coord.z = local_size.value.z-1;
-        }
         if (TSource::persistent)
             data = source[coord];
         else
@@ -192,27 +176,12 @@ __device__ __forceinline__ isaac_float get_value (
                     coord.z = isaac_int(z?ceil(pos.z):floor(pos.z));
                     if (!TSource::has_guard)
                     {
-                        if ( coord.x >= local_size.value.x )
+                        if ( isaac_uint(coord.x) >= local_size.value.x )
                             coord.x = isaac_int(x?floor(pos.x):ceil(pos.x));
-                        if ( coord.y >= local_size.value.y )
+                        if ( isaac_uint(coord.y) >= local_size.value.y )
                             coord.y = isaac_int(y?floor(pos.y):ceil(pos.y));
-                        if ( coord.z >= local_size.value.z )
+                        if ( isaac_uint(coord.z) >= local_size.value.z )
                             coord.z = isaac_int(z?floor(pos.z):ceil(pos.z));
-                    }
-                    if (TCheck)
-                    {
-                        if (coord.x < 0)
-                            coord.x = 0;
-                        if (coord.y < 0)
-                            coord.y = 0;
-                        if (coord.z < 0)
-                            coord.z = 0;
-                        if ( coord.x >= local_size.value.x )
-                            coord.x = local_size.value.x-1;
-                        if ( coord.y >= local_size.value.y )
-                            coord.y = local_size.value.y-1;
-                        if ( coord.z >= local_size.value.z )
-                            coord.z = local_size.value.z-1;
                     }
                     if (TSource::persistent)
                         data8[x][y][z] = source[coord];
@@ -252,6 +221,23 @@ __device__ __forceinline__ isaac_float get_value (
             result = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chaid_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), NR::value );
     #endif
     return result;
+}
+
+template < typename TLocalSize >
+__device__ __forceinline__ void check_coord(isaac_float3& coord, TLocalSize local_size)
+{
+    if (coord.x < isaac_float(0))
+        coord.x = isaac_float(0);
+    if (coord.y < isaac_float(0))
+        coord.y = isaac_float(0);
+    if (coord.z < isaac_float(0))
+        coord.z = isaac_float(0);
+    if ( coord.x >= isaac_float(local_size.value.x) )
+        coord.x = isaac_float(local_size.value.x)-isaac_float(1);
+    if ( coord.y >= isaac_float(local_size.value.y) )
+        coord.y = isaac_float(local_size.value.y)-isaac_float(1);
+    if ( coord.z >= isaac_float(local_size.value.z) )
+        coord.z = isaac_float(local_size.value.z)-isaac_float(1);
 }
 
 template <
@@ -298,7 +284,7 @@ struct merge_source_iterator
     {
         if ( mpl::at_c< TFilter, NR::value >::type::value )
         {
-            isaac_float result = get_value< TInterpolation, NR, 0 >( source, pos, pointerArray, local_size );
+            isaac_float result = get_value< TInterpolation, NR >( source, pos, pointerArray, local_size );
             isaac_int lookup_value = isaac_int( round(result * isaac_float( Ttransfer_size ) ) );
             if (lookup_value < 0 )
                 lookup_value = 0;
@@ -311,24 +297,54 @@ struct merge_source_iterator
                 {
                     isaac_float3  left = {-1, 0, 0};
                     left = left + pos;
+                    if (!TSource::has_guard)
+                        check_coord( left, local_size);
                     isaac_float3 right = { 1, 0, 0};
                     right = right + pos;
+                    if (!TSource::has_guard)
+                        check_coord( right, local_size );
+                    isaac_float d1;
+                    if (TInterpolation)
+                        d1 = right.x - left.x;
+                    else
+                        d1 = isaac_int(right.x) - isaac_int(left.x);
+                    
                     isaac_float3    up = { 0,-1, 0};
                     up = up + pos;
+                    if (!TSource::has_guard)
+                        check_coord( up, local_size );
                     isaac_float3  down = { 0, 1, 0};
                     down = down + pos;
+                    if (!TSource::has_guard)
+                        check_coord( down, local_size );
+                    isaac_float d2;
+                    if (TInterpolation)
+                        d2 = down.y - up.y;
+                    else
+                        d2 = isaac_int(down.y) - isaac_int(up.y);
+
                     isaac_float3 front = { 0, 0,-1};
                     front = front + pos;
+                    if (!TSource::has_guard)
+                        check_coord( front, local_size );
                     isaac_float3  back = { 0, 0, 1};
                     back = back + pos;
+                    if (!TSource::has_guard)
+                        check_coord( back, local_size );
+                    isaac_float d3;
+                    if (TInterpolation)
+                        d3 = back.z - front.z;
+                    else
+                        d3 = isaac_int(back.z) - isaac_int(front.z);
+                    
                     isaac_float3 gradient=
                     {
-                        get_value< TInterpolation, NR, 1 >( source, right, pointerArray, local_size ) -
-                        get_value< TInterpolation, NR, 1 >( source,  left, pointerArray, local_size ),
-                        get_value< TInterpolation, NR, 1 >( source,  down, pointerArray, local_size ) -
-                        get_value< TInterpolation, NR, 1 >( source,    up, pointerArray, local_size ),
-                        get_value< TInterpolation, NR, 1 >( source,  back, pointerArray, local_size ) -
-                        get_value< TInterpolation, NR, 1 >( source, front, pointerArray, local_size )
+                        (get_value< TInterpolation, NR >( source, right, pointerArray, local_size ) -
+                        get_value< TInterpolation, NR >( source,  left, pointerArray, local_size )) / d1,
+                        (get_value< TInterpolation, NR >( source,  down, pointerArray, local_size ) -
+                        get_value< TInterpolation, NR >( source,    up, pointerArray, local_size )) / d2,
+                        (get_value< TInterpolation, NR >( source,  back, pointerArray, local_size ) -
+                        get_value< TInterpolation, NR >( source, front, pointerArray, local_size )) / d3
                     };
                     isaac_float l = sqrt(
                         gradient.x * gradient.x +
@@ -494,20 +510,22 @@ template <
 
             //Moving last and first until their points are valid
             isaac_float3 pos = start + step_vec * isaac_float(last);
-            isaac_uint3 coord = { isaac_uint(round(pos.x)), isaac_uint(round(pos.y)), isaac_uint(round(pos.z)) };
-            while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord, >= isaac_size_d[0].local_size.value, || ) 0 ) && first <= last)
+            isaac_int3 coord = { isaac_int(floor(pos.x)), isaac_int(floor(pos.y)), isaac_int(floor(pos.z)) };
+            while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord, >= isaac_size_d[0].local_size.value, || )
+                     ISAAC_FOR_EACH_DIM      (3, coord, < 0 || ) 0 ) && first <= last)
             {
                 last--;
                 pos = start + step_vec * isaac_float(last);
-                coord = { isaac_uint(pos.x), isaac_uint(pos.y), isaac_uint(pos.z) };
+                coord = { isaac_int(floor(pos.x)), isaac_int(floor(pos.y)), isaac_int(floor(pos.z)) };
             }
             pos = start + step_vec * isaac_float(first);
-            coord = { isaac_uint(pos.x), isaac_uint(pos.y), isaac_uint(pos.z) };
-            while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord, >= isaac_size_d[0].local_size.value, || ) 0 ) && first <= last)
+            coord = { isaac_int(floor(pos.x)), isaac_int(floor(pos.y)), isaac_int(floor(pos.z)) };
+            while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord, >= isaac_size_d[0].local_size.value, || )
+                     ISAAC_FOR_EACH_DIM      (3, coord, < 0 || ) 0 ) && first <= last)
             {
                 first++;
                 pos = start + step_vec * isaac_float(first);
-                coord = { isaac_uint(pos.x), isaac_uint(pos.y), isaac_uint(pos.z) };
+                coord = { isaac_int(floor(pos.x)), isaac_int(floor(pos.y)), isaac_int(floor(pos.z)) };
             }
 
             //Starting the main loop
@@ -515,7 +533,7 @@ template <
             isaac_float factor = step / isaac_size_d[0].max_global_size;
             for (isaac_int i = first; i <= last; i++)
             {
-                pos = start + step_vec * isaac_float(i);                
+                pos = start + step_vec * isaac_float(i);
                 isaac_float4 value = {0, 0, 0, 0};
                 isaac_int result = 0;
                 isaac_for_each_with_mpl_params

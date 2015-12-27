@@ -28,6 +28,27 @@
     }                                                                          \
 }
 
+#define ISAAC_FOR_EACH_DIM_4(start,end) \
+    start.x end \
+    start.y end \
+    start.z end \
+    start.w end
+
+#define ISAAC_FOR_EACH_DIM_3(start,end) \
+    start.x end \
+    start.y end \
+    start.z end
+
+#define ISAAC_FOR_EACH_DIM_2(start,end) \
+    start.x end \
+    start.y end
+
+#define ISAAC_FOR_EACH_DIM_1(start,end) \
+    start.x end
+
+#define ISAAC_FOR_EACH_DIM(dim,start,end) \
+    BOOST_PP_CAT( ISAAC_FOR_EACH_DIM_, dim) (start,end)
+
 #define ISAAC_FOR_EACH_DIM_TWICE_4(start,middle,end) \
     start.x middle.x end \
     start.y middle.y end \
