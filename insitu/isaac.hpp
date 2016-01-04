@@ -177,10 +177,10 @@ class IsaacVisualization
                 else
                 {
                     #if ISAAC_ALPAKA == 1
-                        alpaka_vector.push_back( alpaka::mem::buf::Buf< TDevAcc, isaac_float, TFraDim, size_t> ( alpaka::mem::buf::alloc<isaac_float, size_t>(acc, alpaka::Vec<TFraDim, size_t> ( TSource::feature_dim * local_size[0] * local_size[1] * local_size[2] ) ) ) );
+                        alpaka_vector.push_back( alpaka::mem::buf::Buf< TDevAcc, isaac_float, TFraDim, size_t> ( alpaka::mem::buf::alloc<isaac_float, size_t>(acc, alpaka::Vec<TFraDim, size_t> ( TSource::feature_dim * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE) ) ) ) );
                         pointer_array.pointer[I] = alpaka::mem::view::getPtrNative( alpaka_vector.back() );                        
                     #else
-                        ISAAC_CUDA_CHECK(cudaMalloc((void**)&(pointer_array.pointer[I]), sizeof(isaac_float_dim< TSource::feature_dim >) * local_size[0] * local_size[1] * local_size[2]));
+                        ISAAC_CUDA_CHECK(cudaMalloc((void**)&(pointer_array.pointer[I]), sizeof(isaac_float_dim< TSource::feature_dim >) * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE) ) );
                     #endif
                 }
             }
@@ -215,8 +215,8 @@ class IsaacVisualization
                 {
                     isaac_size2 grid_size=
                     {
-                        size_t((local_size[0]+15)/16),
-                        size_t((local_size[1]+15)/16),
+                        size_t((local_size[0] + ISAAC_GUARD_SIZE * 2 + 15)/16),
+                        size_t((local_size[1] + ISAAC_GUARD_SIZE * 2 + 15)/16),
                     };
                     isaac_size2 block_size=
                     {
@@ -227,8 +227,8 @@ class IsaacVisualization
                     #if ISAAC_ALPAKA == 1
                         if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
                         {
-                            grid_size.x = size_t(local_size[0]);
-                            grid_size.y = size_t(local_size[0]);
+                            grid_size.x = size_t(local_size[0] + ISAAC_GUARD_SIZE * 2);
+                            grid_size.y = size_t(local_size[0] + ISAAC_GUARD_SIZE * 2);
                             block_size.x = size_t(1);
                             block_size.y = size_t(1);                    
                         }                

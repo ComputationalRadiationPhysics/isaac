@@ -35,6 +35,9 @@
     #define ISAAC_MAX_SOURCES 16
 #endif
 
+#ifndef ISAAC_GUARD_SIZE
+    #define ISAAC_GUARD_SIZE 2
+#endif
 
 #define ISAAC_MAX_RECEIVE 262144 //256kb
 #define ISAAC_Z_NEAR 1.0f
