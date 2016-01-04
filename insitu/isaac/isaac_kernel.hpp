@@ -197,7 +197,7 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
         if (TSource::persistent)
             data = source[coord];
         else
-            data = ptr[coord.x + coord.y * local_size.value.x + coord.z * local_size.value.x * local_size.value.y];
+            data = ptr[coord.x + ISAAC_GUARD_SIZE + (coord.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
     }
     else
     {
@@ -210,7 +210,7 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
                     coord.x = isaac_int(x?ceil(pos.x):floor(pos.x));
                     coord.y = isaac_int(y?ceil(pos.y):floor(pos.y));
                     coord.z = isaac_int(z?ceil(pos.z):floor(pos.z));
-                    if (!TSource::has_guard)
+                    if (!TSource::has_guard && TSource::persistent)
                     {
                         if ( isaac_uint(coord.x) >= local_size.value.x )
                             coord.x = isaac_int(x?floor(pos.x):ceil(pos.x));
@@ -222,7 +222,7 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
                     if (TSource::persistent)
                         data8[x][y][z] = source[coord];
                     else
-                        data8[x][y][z] = ptr[coord.x + coord.y * local_size.value.x + coord.z * local_size.value.x * local_size.value.y];
+                        data8[x][y][z] = ptr[coord.x + ISAAC_GUARD_SIZE + (coord.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
                 }
         isaac_float_dim < 3 > pos_in_cube =
         {
@@ -348,11 +348,11 @@ struct merge_source_iterator
                 {
                     isaac_float3  left = {-1, 0, 0};
                     left = left + pos;
-                    if (!TSource::has_guard)
+                    if (!TSource::has_guard && TSource::persistent)
                         check_coord( left, local_size);
                     isaac_float3 right = { 1, 0, 0};
                     right = right + pos;
-                    if (!TSource::has_guard)
+                    if (!TSource::has_guard && TSource::persistent)
                         check_coord( right, local_size );
                     isaac_float d1;
                     if (TInterpolation)
@@ -362,11 +362,11 @@ struct merge_source_iterator
                     
                     isaac_float3    up = { 0,-1, 0};
                     up = up + pos;
-                    if (!TSource::has_guard)
+                    if (!TSource::has_guard && TSource::persistent)
                         check_coord( up, local_size );
                     isaac_float3  down = { 0, 1, 0};
                     down = down + pos;
-                    if (!TSource::has_guard)
+                    if (!TSource::has_guard && TSource::persistent)
                         check_coord( down, local_size );
                     isaac_float d2;
                     if (TInterpolation)
@@ -376,11 +376,11 @@ struct merge_source_iterator
 
                     isaac_float3 front = { 0, 0,-1};
                     front = front + pos;
-                    if (!TSource::has_guard)
+                    if (!TSource::has_guard && TSource::persistent)
                         check_coord( front, local_size );
                     isaac_float3  back = { 0, 0, 1};
                     back = back + pos;
-                    if (!TSource::has_guard)
+                    if (!TSource::has_guard && TSource::persistent)
                         check_coord( back, local_size );
                     isaac_float d3;
                     if (TInterpolation)
@@ -1016,25 +1016,56 @@ template
         {
             #if ISAAC_ALPAKA == 1
                 auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-                isaac_int3 coord =
+                isaac_int3 dest =
                 {
                     isaac_int(threadIdx[1]),
                     isaac_int(threadIdx[2]),
                     0
                 };
             #else
-                isaac_int3 coord =
+                isaac_int3 dest =
                 {
                     isaac_int(threadIdx.x + blockIdx.x * blockDim.x),
                     isaac_int(threadIdx.y + blockIdx.y * blockDim.y),
                     0
                 };
             #endif
-            if ( ISAAC_FOR_EACH_DIM_TWICE(2, coord, >= local_size, || ) 0 )
+            isaac_int3 coord = dest;
+            coord.x -= ISAAC_GUARD_SIZE;
+            coord.y -= ISAAC_GUARD_SIZE;
+            if ( ISAAC_FOR_EACH_DIM_TWICE(2, dest, >= local_size, + 2 * ISAAC_GUARD_SIZE || ) 0 )
                 return;
             isaac_float_dim < TSource::feature_dim >* ptr = (isaac_float_dim < TSource::feature_dim >*)(pointer);
-            for (;coord.z < local_size.z; coord.z++)
-                ptr[coord.x + coord.y * local_size.x + coord.z * local_size.x * local_size.y] = source[coord];
+            if (TSource::has_guard)
+            {
+                coord.z = -ISAAC_GUARD_SIZE;
+                for (;dest.z < local_size.z + 2 * ISAAC_GUARD_SIZE; dest.z++)
+                {
+                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source[coord];
+                    coord.z++;
+                }
+            }
+            else
+            {
+                if (coord.x < 0)
+                    coord.x = 0;
+                if (coord.x >= local_size.x)
+                    coord.x = local_size.x-1;
+                if (coord.y < 0)
+                    coord.y = 0;
+                if (coord.y >= local_size.y)
+                    coord.y = local_size.y-1;
+                coord.z = 0;
+                for (; dest.z < ISAAC_GUARD_SIZE; dest.z++)
+                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source[coord];
+                for (;dest.z < local_size.z + ISAAC_GUARD_SIZE - 1; dest.z++)
+                {
+                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source[coord];
+                    coord.z++;
+                }
+                for (;dest.z < local_size.z + 2 * ISAAC_GUARD_SIZE; dest.z++)
+                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source[coord];
+            }
         }
 #if ISAAC_ALPAKA == 1
     };
@@ -1092,7 +1123,7 @@ template
                 else
                 {
                     isaac_float_dim < TSource::feature_dim >* ptr = (isaac_float_dim < TSource::feature_dim >*)(pointer);
-                    data = ptr[coord.x + coord.y * local_size.x + coord.z * local_size.x * local_size.y];
+                    data = ptr[coord.x + ISAAC_GUARD_SIZE + (coord.y + ISAAC_GUARD_SIZE) * (local_size.x + 2 * ISAAC_GUARD_SIZE) + (coord.z + ISAAC_GUARD_SIZE) * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )];
                 };
                 isaac_float value = isaac_float(0);
                 #if ISAAC_ALPAKA == 1
