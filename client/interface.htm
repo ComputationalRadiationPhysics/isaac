@@ -566,6 +566,21 @@ function createWeightFeedback( w, range_name, value_name )
 	};
 }
 
+function createOptimizedFunction( i, minmax )
+{
+	return function()
+	{
+		var add = - minmax["min"];
+		var mul = 1 / (minmax["max"] - minmax["min"]);
+		var function_string = document.getElementById("f_" + i + "_string");
+		if (function_string.value == "idem" || function_string.value == "")
+			functions[i] = "add(" + add.toFixed(5) +") | mul(" + mul.toFixed(5) + ")";
+		else
+			functions[i] = function_string.value + " | add(" + add.toFixed(5) +") | mul(" + mul.toFixed(5) + ")";
+		function_string.value = functions[i];
+	};
+}
+
 document.getElementById("connect").onclick = function()
 {
 	if (socket != null && socket.readyState == 1)
@@ -785,7 +800,21 @@ document.getElementById("connect").onclick = function()
 					if (obj.hasOwnProperty("minmax"))
 					{
 						for (var i in obj["minmax"])
-							document.getElementById("i_" + i + "_string").innerHTML = " [ "+obj["minmax"][i]["min"].toFixed(3)+" , "+obj["minmax"][i]["max"].toFixed(3)+" ]";
+						{
+							var parent = document.getElementById("i_" + i + "_string");
+							while (parent.firstChild) {
+								parent.removeChild(parent.firstChild);
+							}
+							var title = document.createElement("SPAN");
+							title.innerHTML = " [ "+obj["minmax"][i]["min"].toFixed(3)+" , "+obj["minmax"][i]["max"].toFixed(3)+" ]";
+							parent.appendChild(title);
+							var apply = document.createElement("INPUT");
+							apply.type = "button";
+							apply.value = "Optimize function";
+							apply.id = "i_" + i + "_button";
+							apply.onclick = createOptimizedFunction( i, obj["minmax"][i] );
+							parent.appendChild(apply);
+						}
 					}
 					if (obj.hasOwnProperty("weight"))
 					{
