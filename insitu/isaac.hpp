@@ -392,7 +392,7 @@ class IsaacVisualization
             buffer_time(0),
             interpolation(false),
             iso_surface(false),
-            step(isaac_float(1)),
+            step(isaac_float( ISAAC_DEFAULT_STEP )),
             framebuffer_prod(size_t(framebuffer_size.x) * size_t(framebuffer_size.y)),
             sources( sources )
             #if ISAAC_ALPAKA == 1

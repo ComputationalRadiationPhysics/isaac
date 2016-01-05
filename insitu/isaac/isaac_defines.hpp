@@ -39,6 +39,10 @@
     #define ISAAC_GUARD_SIZE 2
 #endif
 
+#ifndef ISAAC_DEFAULT_STEP
+    #define ISAAC_DEFAULT_STEP 0.5
+#endif
+
 #define ISAAC_MAX_RECEIVE 262144 //256kb
 #define ISAAC_Z_NEAR 1.0f
 #define ISAAC_Z_FAR 100.0f
