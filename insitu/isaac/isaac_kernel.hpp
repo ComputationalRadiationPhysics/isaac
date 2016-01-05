@@ -391,11 +391,11 @@ struct merge_source_iterator
                     isaac_float3 gradient=
                     {
                         (get_value< TInterpolation, NR >( source, right, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM ) -
-                        get_value< TInterpolation, NR >( source,  left, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM )) / d1,
+                         get_value< TInterpolation, NR >( source,  left, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM )) / d1,
                         (get_value< TInterpolation, NR >( source,  down, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM ) -
-                        get_value< TInterpolation, NR >( source,    up, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM )) / d2,
+                         get_value< TInterpolation, NR >( source,    up, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM )) / d2,
                         (get_value< TInterpolation, NR >( source,  back, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM ) -
-                        get_value< TInterpolation, NR >( source, front, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM )) / d3
+                         get_value< TInterpolation, NR >( source, front, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM )) / d3
                     };
                     isaac_float l = sqrt(
                         gradient.x * gradient.x +
@@ -408,10 +408,10 @@ struct merge_source_iterator
                     {
                         gradient = gradient / l;
                         isaac_float3 light = step / stepLength;
-                        isaac_float ac =
+                        isaac_float ac = fabs(
                             gradient.x * light.x +
                             gradient.y * light.y +
-                            gradient.z * light.z;
+                            gradient.z * light.z);
                         color.x = value.x * ac + ac * ac * ac * ac;
                         color.y = value.y * ac + ac * ac * ac * ac;
                         color.z = value.z * ac + ac * ac * ac * ac;
