@@ -412,9 +412,9 @@ struct merge_source_iterator
                             gradient.x * light.x +
                             gradient.y * light.y +
                             gradient.z * light.z;
-                        color.x = value.x * (isaac_float(1) - ac) + ac;
-                        color.y = value.y * (isaac_float(1) - ac) + ac;
-                        color.z = value.z * (isaac_float(1) - ac) + ac;
+                        color.x = value.x * ac + ac * ac * ac * ac;
+                        color.y = value.y * ac + ac * ac * ac * ac;
+                        color.z = value.z * ac + ac * ac * ac * ac;
                     }
                     color.w = isaac_float(1);
                     feedback = 1;
