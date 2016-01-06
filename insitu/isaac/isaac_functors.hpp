@@ -241,12 +241,62 @@ struct IsaacFunctorIdem
 const std::string IsaacFunctorIdem::name = "idem";
 const std::string IsaacFunctorIdem::description = "Does nothing. Keeps the feature dimension.";
 
+struct IsaacFunctorSum
+{
+    static const bool uses_parameter = false;
+    static const std::string name;
+    static const std::string description;
+    ISAAC_HOST_DEVICE_INLINE
+    static isaac_float_dim<1> call( isaac_float_dim<4> v, isaac_float4& p)
+    {
+        isaac_float_dim<1> result =
+        {
+            v.value.x +
+            v.value.y +
+            v.value.z +
+            v.value.w
+        };
+        return result;
+    }
+    ISAAC_HOST_DEVICE_INLINE
+    static isaac_float_dim<1> call( isaac_float_dim<3> v, isaac_float4& p)
+    {
+        isaac_float_dim<1> result =
+        {
+            v.value.x +
+            v.value.y +
+            v.value.z
+        };
+        return result;
+    }
+    ISAAC_HOST_DEVICE_INLINE
+    static isaac_float_dim<1> call( isaac_float_dim<2> v, isaac_float4& p)
+    {
+        isaac_float_dim<1> result =
+        {
+            v.value.x +
+            v.value.y
+        };
+        return result;
+    }
+    ISAAC_HOST_DEVICE_INLINE
+    static isaac_float_dim<1> call( isaac_float_dim<1> v, isaac_float4& p)
+    {
+        isaac_float_dim<1> result = { v.value.x };
+        return result;
+    }
+};
+
+const std::string IsaacFunctorSum::name = "sum";
+const std::string IsaacFunctorSum::description = "Calculates the sum of all components. Reduces the feature dimension to 1.";
+
 typedef fus::list <
     IsaacFunctorIdem,
     IsaacFunctorAdd,
     IsaacFunctorMul,
     IsaacFunctorLength,
-    IsaacFunctorPow
+    IsaacFunctorPow,
+    IsaacFunctorSum
 > IsaacFunctorPool;
 
 } //namespace isaac;

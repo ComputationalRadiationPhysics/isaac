@@ -369,8 +369,15 @@ int main(int argc, char **argv)
 	//Setting up the metadata description (only master, but however slaves could then metadata metadata, too, it would be merged)
 	if (rank == MASTER_RANK)
 	{
-		json_object_set_new( visualization->getJsonMetaRoot(), "energy", json_string( "Engery in kJ" ) );
-		json_object_set_new( visualization->getJsonMetaRoot(), "speed", json_string( "Speed in multiplies of the speed of a hare" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "counting variable", json_string( "counting" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "drawing_time", json_string( "drawing_time" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "simulation_time", json_string( "simulation_time" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "sorting_time", json_string( "sorting_time" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "merge_time", json_string( "merge_time" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "kernel_time", json_string( "kernel_time" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "copy_time", json_string( "copy_time" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "video_send_time", json_string( "video_send_time" ) );
+		json_object_set_new( visualization->getJsonMetaRoot(), "buffer_time", json_string( "buffer_time" ) );
 		#ifdef SEND_PARTICLES
 			json_t *particle_array = json_array();
 			json_object_set_new( visualization->getJsonMetaRoot(), "reference particles", particle_array );
@@ -393,6 +400,14 @@ int main(int argc, char **argv)
 	int count = 0;
 	int drawing_time = 0;
 	int simulation_time = 0;
+	int full_drawing_time = 0;
+	int full_simulation_time = 0;
+	int sorting_time = 0;
+	int merge_time = 0;
+	int kernel_time = 0;
+	int copy_time = 0;
+	int video_send_time = 0;
+	int buffer_time = 0;
 	bool pause = false;
 	while (!force_exit)
 	{
@@ -415,8 +430,31 @@ int main(int argc, char **argv)
 		///////////////////
 		if (rank == MASTER_RANK)
 		{
-			json_object_set_new( visualization->getJsonMetaRoot(), "energy", json_real( a ) );
-			json_object_set_new( visualization->getJsonMetaRoot(), "speed", json_real( a*a ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "counting variable", json_real( a ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "drawing_time" , json_integer( drawing_time ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "simulation_time" , json_integer( simulation_time ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "sorting_time" , json_integer( visualization->sorting_time ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "merge_time" , json_integer( visualization->merge_time ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "kernel_time" , json_integer( visualization->kernel_time ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "copy_time" , json_integer( visualization->copy_time ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "video_send_time" , json_integer( visualization->video_send_time ) );
+			json_object_set_new( visualization->getJsonMetaRoot(), "buffer_time" , json_integer( visualization->buffer_time ) );
+			full_drawing_time    += drawing_time;
+			full_simulation_time += simulation_time;
+			sorting_time         += visualization->sorting_time;
+			merge_time           += visualization->merge_time;
+			kernel_time          += visualization->kernel_time;
+			copy_time            += visualization->copy_time;
+			video_send_time      += visualization->video_send_time;
+			buffer_time          += visualization->buffer_time;
+			drawing_time = 0;
+			simulation_time = 0;
+			visualization->sorting_time = 0;
+			visualization->merge_time = 0;
+			visualization->kernel_time = 0;
+			visualization->copy_time = 0;
+			visualization->video_send_time = 0;
+			visualization->buffer_time = 0;
 		}
 		#ifdef SEND_PARTICLES
 			//every thread fills "his" particles
@@ -477,25 +515,25 @@ int main(int argc, char **argv)
 			int diff = end-start;
 			if (diff >= 1000000)
 			{
-				visualization->merge_time -= visualization->kernel_time + visualization->copy_time;
+				merge_time -= kernel_time + copy_time;
 				printf("FPS: %.1f \n\tSimulation: %.1f ms\n\tDrawing: %.1f ms\n\t\tSorting: %.1f ms\n\t\tMerge: %.1f ms\n\t\tKernel: %.1f ms\n\t\tCopy: %.1f ms\n\t\tVideo: %.1f ms\n\t\tBuffer: %.1f ms\n",
 					(float)count*1000000.0f/(float)diff,
-					(float)simulation_time/1000.0f/(float)count,
-					(float)drawing_time/1000.0f/(float)count,
-					(float)visualization->sorting_time/1000.0f/(float)count,
-					(float)visualization->merge_time/1000.0f/(float)count,
-					(float)visualization->kernel_time/1000.0f/(float)count,
-					(float)visualization->copy_time/1000.0f/(float)count,
-					(float)visualization->video_send_time/1000.0f/(float)count,
-					(float)visualization->buffer_time/1000.0f/(float)count);
-				visualization->sorting_time = 0;
-				visualization->merge_time = 0;
-				visualization->kernel_time = 0;
-				visualization->copy_time = 0;
-				visualization->video_send_time = 0;
-				visualization->buffer_time = 0;
-				drawing_time = 0;
-				simulation_time = 0;
+					(float)full_simulation_time/1000.0f/(float)count,
+					(float)full_drawing_time/1000.0f/(float)count,
+					(float)sorting_time/1000.0f/(float)count,
+					(float)merge_time/1000.0f/(float)count,
+					(float)kernel_time/1000.0f/(float)count,
+					(float)copy_time/1000.0f/(float)count,
+					(float)video_send_time/1000.0f/(float)count,
+					(float)buffer_time/1000.0f/(float)count);
+				sorting_time = 0;
+				merge_time = 0;
+				kernel_time = 0;
+				copy_time = 0;
+				video_send_time = 0;
+				buffer_time = 0;
+				full_drawing_time = 0;
+				full_simulation_time = 0;
 				start = end;
 				count = 0;
 			}
