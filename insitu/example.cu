@@ -69,7 +69,7 @@ class TestSource1
 		isaac_int width;
 		isaac_int width_mul_height;
 		ISAAC_NO_HOST_DEVICE_WARNING
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator[] (const isaac_int3 nIndex)
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator[] (const isaac_int3 nIndex) const
 		{
 			isaac_float3 value = ptr[
 				nIndex.x +
@@ -117,7 +117,7 @@ class TestSource2
 		isaac_int width_mul_height;
 		
 		ISAAC_NO_HOST_DEVICE_WARNING		
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator[] (const isaac_int3 nIndex)
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator[] (const isaac_int3 nIndex) const
 		{
 			isaac_float value = ptr[
 				nIndex.x +
@@ -273,10 +273,10 @@ int main(int argc, char **argv)
 		using AccDim = alpaka::dim::DimInt<3>;
 		using SimDim = alpaka::dim::DimInt<3>;
 		using DatDim = alpaka::dim::DimInt<1>;
-		//using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
-		//using Stream  = alpaka::stream::StreamCudaRtSync;
-		using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
-		using Stream  = alpaka::stream::StreamCpuSync;
+		using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
+		using Stream  = alpaka::stream::StreamCudaRtSync;
+		//using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
+		//using Stream  = alpaka::stream::StreamCpuSync;
 		//using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
 		//using Stream  = alpaka::stream::StreamCpuSync;
 				

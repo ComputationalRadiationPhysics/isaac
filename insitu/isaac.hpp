@@ -79,7 +79,7 @@ class IsaacVisualization
                 typename TSource,
                 typename TJsonRoot
             >
-            ISAAC_HOST_INLINE  void operator()( const int I,TSource& s, TJsonRoot& jsonRoot) const
+            ISAAC_HOST_INLINE  void operator()( const int I,const TSource& s, TJsonRoot& jsonRoot) const
             {
                 json_t *content = json_object();
                 json_array_append_new( jsonRoot, content );
@@ -95,7 +95,7 @@ class IsaacVisualization
                 typename TFunctor,
                 typename TJsonRoot
             >
-            ISAAC_HOST_INLINE  void operator()( const int I,TFunctor& f, TJsonRoot& jsonRoot) const
+            ISAAC_HOST_INLINE  void operator()( const int I,const TFunctor& f, TJsonRoot& jsonRoot) const
             {
                 json_t *content = json_object();
                 json_array_append_new( jsonRoot, content );
@@ -114,7 +114,7 @@ class IsaacVisualization
                 typename TValue,
                 typename TFound
             >
-            ISAAC_HOST_INLINE  void operator()( const int I,TFunctor& f, TName& name, TValue& value, TFound& found) const
+            ISAAC_HOST_INLINE  void operator()( const int I,TFunctor& f,const TName& name, TValue& value, TFound& found) const
             {
                 if (!found && name == TFunctor::name)
                 {
@@ -134,8 +134,8 @@ class IsaacVisualization
             >
             ISAAC_HOST_INLINE  void operator()(
                 const int I,
-                TSource& source,
-                TFunctions& functions,
+                const TSource& source,
+                const TFunctions& functions,
                 TDest& dest
             ) const
             {
@@ -163,12 +163,12 @@ class IsaacVisualization
             >
             ISAAC_HOST_INLINE  void operator()(
                 const int I,
-                TSource& source,
+                const TSource& source,
                 TArray& pointer_array,
-                TLocalSize& local_size
+                const TLocalSize& local_size
                 #if ISAAC_ALPAKA == 1
                     ,TVector& alpaka_vector
-                    ,TDevAcc__& acc
+                    ,const TDevAcc__& acc
                 #endif
             ) const
             {
@@ -202,8 +202,8 @@ class IsaacVisualization
                 const int I,
                 TSource& source,
                 TArray& pointer_array,
-                TLocalSize& local_size,
-                TWeight& weight
+                const TLocalSize& local_size,
+                const TWeight& weight
                 #if ISAAC_ALPAKA == 1
                     ,TStream__& stream
                 #endif
@@ -278,16 +278,16 @@ class IsaacVisualization
             >
             ISAAC_HOST_INLINE  void operator()(
                 const int I,
-                TSource& source,
+                const TSource& source,
                 TArray& pointer_array,
                 TMinmax& minmax,
                 TLocalMinmax& local_minmax,
                 TLocalSize& local_size
                 #if ISAAC_ALPAKA == 1
                     ,TStream__& stream
-                    ,THost__& host
-                    ,TFunctionChain& function_chain
-                    ,TParameter& parameter
+                    ,const THost__& host
+                    ,const TFunctionChain& function_chain
+                    ,const TParameter& parameter
                 #endif
             ) const
             {
@@ -359,11 +359,11 @@ class IsaacVisualization
                 TDevAcc acc,
                 TStream stream,
             #endif
-            std::string name,
-            isaac_int master,
-            std::string server_url,
-            isaac_uint server_port,
-            isaac_size2 framebuffer_size,
+            const std::string name,
+            const isaac_int master,
+            const std::string server_url,
+            const isaac_uint server_port,
+            const isaac_size2 framebuffer_size,
             const TDomainSize global_size,
             const TDomainSize local_size,
             const TDomainSize position,
@@ -740,7 +740,7 @@ class IsaacVisualization
             }
             return 0;
         }
-        json_t* doVisualization( IsaacVisualizationMetaEnum metaTargets = META_MASTER )
+        json_t* doVisualization( const IsaacVisualizationMetaEnum metaTargets = META_MASTER )
         {
             //if (rank == master)
             //    printf("-----\n");
@@ -1039,12 +1039,12 @@ class IsaacVisualization
             };
             IceTDouble result[4];
             mulMatrixVector(result,modelview,point);
-            float point_distance = sqrt( result[0]*result[0] + result[1]*result[1] + result[2]*result[2] );
+            float point_distance = result[2];
             //Allgather of the distances
             float receive_buffer[numProc];
             MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, mpi_world);
             //Putting to a std::multimap of {rank, distance}
-            std::multimap<float, isaac_int, std::less< float > > distance_map;
+            std::multimap<float, isaac_int, std::greater< float > > distance_map;
             for (isaac_int i = 0; i < numProc; i++)
                 distance_map.insert( std::pair<float, isaac_int>( receive_buffer[i], i ) );
             //Putting in an array for IceT
@@ -1372,7 +1372,7 @@ class IsaacVisualization
             myself->metaNr++;
             return 0;
         }
-        void setFrustum(isaac_float left,isaac_float right,isaac_float bottom,isaac_float top,isaac_float znear,isaac_float zfar )
+        void setFrustum(const isaac_float left,const isaac_float right,const isaac_float bottom,const isaac_float top,const isaac_float znear,const isaac_float zfar )
         {
             isaac_float  znear2 = znear * isaac_float(2);
             isaac_float  width = right - left;
@@ -1395,7 +1395,7 @@ class IsaacVisualization
             projection[14] = ( -znear2 * zfar ) / -zRange;
             projection[15] = isaac_float( 0);
         }
-        void setPerspective(isaac_float fovyInDegrees,isaac_float aspectRatio,isaac_float __znear,isaac_float zfar )
+        void setPerspective(const isaac_float fovyInDegrees,const isaac_float aspectRatio,const isaac_float __znear,const isaac_float zfar )
         {
             isaac_float znear = __znear;
             isaac_float ymax = znear * tan( fovyInDegrees * M_PI / isaac_float(360) );

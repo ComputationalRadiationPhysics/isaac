@@ -34,6 +34,8 @@ requirement-submodules.
 * Alpaka for the abstraction of the acceleration device
 * IceT for combining the visualization created from the in situ plugin
 * MPI for the communication of IceT
+* Boost (at least 1.5.6) is needed, but only template libraries, so no
+  installation or static linking is needed here
 
 What does work
 --------------
@@ -47,32 +49,22 @@ This does work:
 * Registering to observe such a simulation
 * Unregistering from Observing
 * For observing clients:
-    * Getting MetaData from the master compute node
-    * Getting merged MetaData from all or a part of the compute nodes
-    * Sending MetaData back to the master
-    * Sending MetaData back to all compute nodes
-    * Sending MetaData to the master or all compute nodes _and_ sending
-      the same MetaData to all other observing clients, e.g. to update
-      the view angle
-    * Furthermore in the example HTML5 client the view angle is shown
-      and send to the observed simulation
+    * Getting json meta data from the simulation
+    * Sending json meta data to the simulation
 * For registered simulations
-    * Sending MetaData per frame
+    * Sending json meta data per frame
     * Sending an image per frame
-
-However this does not work yet:
-* Creating an useful (!) image (raycast or slice) from the data on the
-  acceleration device at the compute nodes
-* Streaming a compressed video stream to the client, but for debug
-  purposes an alternative view of the video data from the simulation
-  using SDL is available. To use this activate ISAAC_SDL in cmake.
+* Creating a renderer image (raycast or iso surface) from the data on
+  the acceleration device at the compute nodes
+* Streaming a compressed video stream to the client. The stream can be
+  embedded in the json meta data or alternative RTP Streams can be
+  created.
 * Setting up the visualization parameters like
-    * Maximal chain lengths
-    * The Analyzer chain itself
+    * Maximal functor chain lengths
+    * The functor chain itself
     * Transfer functions
-    * Which interpolation method to use
-    * Which kernel to use
-* Precompiling of all kernelvariants
+    * Whether to use interpolation or not
+* Precompiling of all kernelvariants for more speed
 
 How to use
 ----------
@@ -96,20 +88,24 @@ The Paraneter --help will give you some options like the used ports to
 setup up. The default port for the client is 2459 (the year when the
 Serenity laid keel) and for the insitu connections 2560.
 
-If you build the example you can also start one or multiple instances
+If you build the examples you can also start one or multiple instances
 with
-* `./example`
+* `./example_cuda`
 
 or
-* `mpirun -c COUNT ./example`
+* `./example_alpaka`
+
+or with more than one binary
+* `mpirun -c COUNT ./example_cuda`
 
 If you open the interface.htm in the subfolder client you should be
 able to connect to ISAAC, to see the running example and observe it. For
 existing the example or isaac just press ^C (Ctrl + C).
 
 For using ISAAC in your own simulation first of all your need to include
-the isaac.h from the subfolder insitu. For now it is easist to just
-copy and paste this header library. Keep in mind, that you need
+the isaac.h from the subfolder insitu and. For now it is easist to just
+copy and paste this header library. Make sure, that this file finds the
+folder "isaac" with sub include files. Keep in mind, that you need
 * jansson
 * alpaka
 * IceT and

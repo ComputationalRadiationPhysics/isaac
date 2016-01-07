@@ -38,7 +38,7 @@ namespace isaac
 class IsaacCommunicator
 {
 	public:
-		IsaacCommunicator(std::string url,isaac_uint port) :
+		IsaacCommunicator(const std::string url,const isaac_uint port) :
 			id(0),
 			server_id(0),
 			url(url),
@@ -88,7 +88,7 @@ class IsaacCommunicator
 			pthread_create(&readThread,NULL,run_readAndSetMessages,this);
 			return 0;
 		}
-		isaac_int serverSend(const char* content)
+		isaac_int serverSend(char const * const content)
 		{
 			while (id > server_id + ISAAC_MAX_DIFFERENCE)
 				usleep(1000);
@@ -114,7 +114,7 @@ class IsaacCommunicator
 			{
 			}
 		#endif
-		void serverSendFrame(void* ptr,isaac_uint width,isaac_uint height,isaac_uint depth)
+		void serverSendFrame(void* ptr,const isaac_uint width,const isaac_uint height,const isaac_uint depth)
 		{
 			//First the size
 			uint32_t count = width*height*depth;
