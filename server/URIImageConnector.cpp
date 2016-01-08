@@ -98,8 +98,7 @@ errorCode URIImageConnector::run()
 						cinfo.input_components = 4;
 						cinfo.in_color_space = JCS_EXT_RGBX;
 						jpeg_set_defaults(&cinfo);
-						//50 looks a bit dizzy, but big embedded JPEGs make some browsers close the connection
-						jpeg_set_quality(&cinfo, 50, false);
+						jpeg_set_quality(&cinfo, 90, false);
 						jpeg_start_compress(&cinfo, TRUE);
 						while (cinfo.next_scanline < cinfo.image_height)
 						{
