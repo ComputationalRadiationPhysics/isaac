@@ -64,10 +64,13 @@ errorCode Master::addImageConnector(ImageConnector *imageConnector)
 	d.connector = imageConnector;
 	d.thread = 0;
 	imageConnectorList.push_back(d);
-	json_t* element = json_object();
-	json_object_set_new( element, "name", json_string( imageConnector->getName().c_str() ) );
-	json_object_set_new( element, "id", json_integer( imageConnectorList.size() - 1 ) ); //last element
-	json_array_append_new( masterHelloConnectorList, element );
+	if (imageConnector->showClient)
+	{
+		json_t* element = json_object();
+		json_object_set_new( element, "name", json_string( imageConnector->getName().c_str() ) );
+		json_object_set_new( element, "id", json_integer( imageConnectorList.size() - 1 ) ); //last element
+		json_array_append_new( masterHelloConnectorList, element );
+	}
 	return 0;
 }
 

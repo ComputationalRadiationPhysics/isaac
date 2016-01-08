@@ -15,6 +15,11 @@
 
 #include "ImageConnector.hpp"
 
+ImageConnector::ImageConnector() :
+	showClient(true)
+{
+}
+
 void ImageConnector::setMaster(Master* master)
 {
 	this->master = master;

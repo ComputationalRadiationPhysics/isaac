@@ -26,13 +26,16 @@ class Master;
 class ImageConnector : public Runable, public MessageAble<ImageBufferContainer>
 {
 	public:
+		ImageConnector();
 		//To be overwritten
 		virtual errorCode init(int minport,int maxport) = 0;
 		virtual errorCode run() = 0;
 		virtual std::string getName() = 0;
 
 		//Called from the Master
-		void setMaster(Master* master);		
+		void setMaster(Master* master);	
+		
+		bool showClient;
 	protected:
 		Master* master;
 };
