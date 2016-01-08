@@ -29,5 +29,5 @@ class WebSocketDataConnector : public MetaDataConnector
 		errorCode run();
 		std::string getName();
 	private:
-		struct libwebsocket_context *context;
+		struct lws_context *context;
 };

@@ -46,14 +46,13 @@ std::string WebSocketDataConnector::getName()
 }
 
 static int callback_http(
-		struct libwebsocket_context *context,
-		struct libwebsocket *wsi,
-		enum libwebsocket_callback_reasons reason,
+		struct lws *wsi,
+		enum lws_callback_reasons reason,
 		void *user,
 		void *in,
 		size_t len )
 {
-	Master* master = *((Master**)libwebsocket_context_user(context));
+	Master* master = *((Master**)lws_context_user(lws_get_context(wsi)));
 	switch (reason)
 	{
 		case LWS_CALLBACK_HTTP:
@@ -68,10 +67,10 @@ static int callback_http(
 			char buf[LWS_SEND_BUFFER_PRE_PADDING + 2048 + LWS_SEND_BUFFER_POST_PADDING];
 			char* use = &(buf[LWS_SEND_BUFFER_PRE_PADDING]);
 			sprintf(use,"HTTP/1.1 200 OK\n\n%s",description.c_str());
-			libwebsocket_write(wsi, (unsigned char*) use, strlen(use), LWS_WRITE_HTTP);
+			lws_write(wsi, (unsigned char*) use, strlen(use), LWS_WRITE_HTTP);
 			char name[256];
 			char rip[256];
-			libwebsockets_get_peer_addresses(context,wsi,libwebsocket_get_socket_fd(wsi),name,256,rip,256);
+			lws_get_peer_addresses(wsi,lws_get_socket_fd(wsi),name,256,rip,256);
 			printf("HTTP Connection from %s (%s)!\n",name,rip);
 			return -1;
 		}
@@ -86,9 +85,8 @@ struct per_session_data__isaac {
 
 static int
 callback_isaac(
-		struct libwebsocket_context *context,
-		struct libwebsocket *wsi,
-		enum libwebsocket_callback_reasons reason,
+		struct lws *wsi,
+		enum lws_callback_reasons reason,
 		void *user,
 		void *in,
 		size_t len )
@@ -98,7 +96,7 @@ callback_isaac(
 						  LWS_SEND_BUFFER_POST_PADDING];
 	char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 	struct per_session_data__isaac *pss = (struct per_session_data__isaac *)user;
-	Master* master = *((Master**)libwebsocket_context_user(context));
+	Master* master = *((Master**)lws_context_user(lws_get_context(wsi)));
 	MessageContainer* message;
 	
 	switch (reason) {
@@ -106,7 +104,7 @@ callback_isaac(
 	case LWS_CALLBACK_ESTABLISHED:
 		printf("callback_isaac: LWS_CALLBACK_ESTABLISHED\n");
 		char dummy[32];
-		libwebsockets_get_peer_addresses(context,wsi,libwebsocket_get_socket_fd(wsi),dummy,32,pss->url,32);
+		lws_get_peer_addresses(wsi,lws_get_socket_fd(wsi),dummy,32,pss->url,32);
 		break;
 
 	case LWS_CALLBACK_SERVER_WRITEABLE:
@@ -115,7 +113,7 @@ callback_isaac(
 			char* buffer = json_dumps( message->json_root, 0 );
 			n = strlen(buffer);
 			sprintf(p,"%s",buffer);
-			m = libwebsocket_write(wsi, (unsigned char*)p, n, LWS_WRITE_TEXT);
+			m = lws_write(wsi, (unsigned char*)p, n, LWS_WRITE_TEXT);
 			free(buffer);
 			if (m < n)
 			{
@@ -146,7 +144,7 @@ callback_isaac(
 	{
 		char name[256];
 		char rip[256];
-		libwebsockets_get_peer_addresses(context,wsi,libwebsocket_get_socket_fd(wsi),name,256,rip,256);
+		lws_get_peer_addresses(wsi,lws_get_socket_fd(wsi),name,256,rip,256);
 		printf("ISAAC Connection from %s (%s)!\n",name,rip);
 		pss->client = master->addDataClient();
 		break;
@@ -159,7 +157,7 @@ callback_isaac(
 	return 0;
 }
 
-static struct libwebsocket_protocols protocols[] = {
+static struct lws_protocols protocols[] = {
 	{
 		"http-only",		/* name */
 		callback_http,		/* callback */
@@ -184,14 +182,14 @@ errorCode WebSocketDataConnector::init(int port)
 	memset(&info, 0, sizeof info);
 	info.protocols = protocols;
 	#ifndef LWS_NO_EXTENSIONS
-		info.extensions = libwebsocket_get_internal_extensions();
+		info.extensions = lws_get_internal_extensions();
 	#endif
 	info.user = (void*)(&master);
 	info.port = port;
 	info.gid = -1;
 	info.uid = -1;
 
-	context = libwebsocket_create_context(&info);
+	context = lws_create_context(&info);
 	if (context == NULL) {
 		lwsl_err("libwebsocket init failed\n");
 		return -1;
@@ -205,8 +203,8 @@ errorCode WebSocketDataConnector::run()
 	bool force_exit = false;
 	while (n >= 0 && !force_exit)
 	{
-		n = libwebsocket_service(context, 50);
-		libwebsocket_callback_on_writable_all_protocol(&protocols[1]);
+		n = lws_service(context, 50);
+		lws_callback_on_writable_all_protocol(context,&protocols[1]);
 		while (MessageContainer* message = clientGetMessage())
 		{
 			if (message->type == FORCE_EXIT)
@@ -215,5 +213,5 @@ errorCode WebSocketDataConnector::run()
 		}
 		usleep(1);
 	}
-	libwebsocket_context_destroy(context);
+	lws_context_destroy(context);
 }
