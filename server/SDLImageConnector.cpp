@@ -48,7 +48,6 @@ errorCode SDLImageConnector::run()
 		{
 			if (message->type == IMG_FORCE_EXIT)
 				finish = 1;
-			else
 			if (message->type == GROUP_FINISHED)
 			{
 				if (group == message->group)
@@ -58,7 +57,6 @@ errorCode SDLImageConnector::run()
 					window = SDL_SetVideoMode( 512, 512, 32, SDL_HWSURFACE );
 				}
 			}
-			else
 			if (message->type == UPDATE_BUFFER)
 			{
 				if (group == NULL)
@@ -70,7 +68,13 @@ errorCode SDLImageConnector::run()
 				if (group == message->group) //We show always the very first group
 				{
 					SDL_LockSurface( window );
-					memcpy(window->pixels,message->buffer,message->group->getVideoBufferSize());
+					uint8_t* pixels = (uint8_t*)(window->pixels);
+					for (int i = 0; i < message->group->getVideoBufferSize() / 4; i++)
+					{
+						for (int j = 0; j < 3; j++)
+							pixels[i*4+j] = message->buffer[i*4+2-j];
+						pixels[i*4+3] = message->buffer[i*4+3];
+					}
 					SDL_UnlockSurface( window );
 					SDL_Flip(window);
 				}

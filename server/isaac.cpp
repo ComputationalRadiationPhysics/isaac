@@ -107,13 +107,6 @@ int main(int argc, char **argv)
 		delete webSocketDataConnector;
 	else
 		master.addDataConnector(webSocketDataConnector);
-	#ifdef ISAAC_SDL
-		SDLImageConnector* sDLImageConnector = new SDLImageConnector();
-		if (sDLImageConnector->init(0,0))
-			delete sDLImageConnector;
-		else
-			master.addImageConnector(sDLImageConnector);
-	#endif
 	#ifdef ISAAC_GST
 		RTPImageConnector* rTPImageConnector = new RTPImageConnector(url,false,false);
 		if (rTPImageConnector->init(5000,5099))
@@ -134,6 +127,13 @@ int main(int argc, char **argv)
 			delete uRIImageConnector;
 		else
 			master.addImageConnector(uRIImageConnector);
+	#endif
+	#ifdef ISAAC_SDL
+		SDLImageConnector* sDLImageConnector = new SDLImageConnector();
+		if (sDLImageConnector->init(0,0))
+			delete sDLImageConnector;
+		else
+			master.addImageConnector(sDLImageConnector);
 	#endif
 	if (master.run())
 	{
