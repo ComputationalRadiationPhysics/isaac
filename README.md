@@ -112,10 +112,86 @@ folder "isaac" with sub include files. Keep in mind, that you need
 * MPI
 to use this library. A CMakeFile to check for this is in work.
 
-In the setup code of your simulation you need to create an instance of
-IsaacVisualization:
+ISAAC is a template libary, which compiles supports for your sources
+direct into its render kernel. This has the benefit, that the access of
+your simulation data is high optimized. However you can't add sources
+later, but add as many as you want and deactivate them if not needed.
 
-* `IsaacVisualization* myVisualization = new IsaacVisualization( … );`
+For every source an own class needs to be defined. This class has to
+implement this following things:
+* `static const std::string name` containing the name of the source
+* `static const size_t feature_dim` containing the feature dimension of
+  the source. For a vector field this would be e.g. most probably 3, for
+  a scalar field 1.
+* `static const bool has_guard` determines, whether the source has a
+  guard for access of data outside the later defined local dimensions
+* `static const bool persistent` determines, whether ths source is
+  persistent or needs to be copied after calling the update function.
+* speaking of it. Every source class needs an update function
+  `ISAAC_HOST_INLINE void update(bool enabled)`. The definition has to
+  look exactly like this. This function is called right before the
+  rendering and before update is called for the next source the data
+  will be copied for non persistent sources. `enabled` tells you,
+  whether the source will be drawn at all. It is up to you to not update
+  arrays in that case. Non persistent sources will be accessed at all in
+  that case
+* an overload of the [] operator, which looks like this:
+  ```
+  ISAAC_NO_HOST_DEVICE_WARNING
+  ISAAC_HOST_DEVICE_INLINE isaac_float_dim< feature_dim >
+  operator[] (const isaac_int3 nIndex) const
+  {
+    ...
+  }
+  ```
+  This function has to return the value at the position nIndex in the
+  isaac data format isaac_float_dim<N>, which is an struct like this
+  ```
+  template <int N>
+  struct
+  {
+     isaac_floatN value;
+  };
+  ```
+  where value has the members .x, .y, .z and/or .w depending the feature
+  dimension of your source.
+Everything else in the class is up to you, but keep in mind, it may be
+copied from time to time, so be careful with memory in constructors and
+destructors.
+
+Now you need an `boost::fucsion::list` with all your classes like
+```
+TestSource1 testSource1;
+TestSource2 testSource2;
+
+using SourceList = boost::fusion::list
+<
+    TestSource1,
+    TestSource2
+>;
+
+SourceList sources( testSource1, testSource2 );
+```
+`sources` is needed for the initialization of isaac, which is happening
+now with the creation of an instance of `IsaacVisualization`.
+```
+auto visualization = new IsaacVisualization <
+    SimDim,
+    SourceList,
+    std::vector<size_t>,
+    1024
+> (
+    name,
+    MASTER_RANK,
+    server,
+    port,
+    framebuffer_size,
+    global_size,
+    local_size,
+    position,
+    sources
+);
+```
 
 TODO: Finish this explanation. :P
 
