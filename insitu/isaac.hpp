@@ -394,7 +394,8 @@ class IsaacVisualization
             iso_surface(false),
             step(isaac_float( ISAAC_DEFAULT_STEP )),
             framebuffer_prod(size_t(framebuffer_size.x) * size_t(framebuffer_size.y)),
-            sources( sources )
+            sources( sources ),
+            icet_bounding_box( true )
             #if ISAAC_ALPAKA == 1
                 ,framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_prod))
                 ,inverse_d(alpaka::mem::buf::alloc<isaac_float, size_t>(acc, size_t(16)))
@@ -518,17 +519,7 @@ class IsaacVisualization
             max_size = max(uint32_t(global_size[0]),uint32_t(global_size[1]));
             if (TSimDim::value > 2)
                 max_size = max(uint32_t(global_size[2]),uint32_t(max_size));
-            isaac_float f_l_width = (isaac_float)local_size[0]/(isaac_float)max_size * 2.0f;
-            isaac_float f_l_height = (isaac_float)local_size[1]/(isaac_float)max_size * 2.0f;
-            isaac_float f_l_depth = 0.0f;
-            if (TSimDim::value > 2)
-                f_l_depth = (isaac_float)local_size[2]/(isaac_float)max_size * 2.0f;
-            isaac_float f_x = (isaac_float)position[0]/(isaac_float)max_size * 2.0f - (isaac_float)global_size[0]/(isaac_float)max_size;
-            isaac_float f_y = (isaac_float)position[1]/(isaac_float)max_size * 2.0f - (isaac_float)global_size[1]/(isaac_float)max_size;
-            isaac_float f_z = 0.0f;
-            if (TSimDim::value > 2)
-                f_z = (isaac_float)position[2]/(isaac_float)max_size * isaac_float(2) - (isaac_float)global_size[2]/(isaac_float)max_size;
-            icetBoundingBoxf( f_x, f_x + f_l_width, f_y, f_y + f_l_height, f_z, f_z + f_l_depth);
+            setBounding( icet_bounding_box );
             icetPhysicalRenderSize(framebuffer_size.x, framebuffer_size.y);
             icetDrawCallback( drawCallBack );
 
@@ -692,6 +683,25 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaGetSymbolAddress((void **)&constant_ptr, isaac_function_chain_d));
                 ISAAC_CUDA_CHECK(cudaMemcpy(constant_ptr, functor_chain_choose_d, boost::mpl::size< TSourceList >::type::value * sizeof( isaac_functor_chain_pointer_N ), cudaMemcpyDeviceToDevice));
             #endif
+        }
+        void setBounding(bool flag)
+        {
+            if (flag)
+            {
+                isaac_float f_l_width = (isaac_float)local_size[0]/(isaac_float)max_size * 2.0f;
+                isaac_float f_l_height = (isaac_float)local_size[1]/(isaac_float)max_size * 2.0f;
+                isaac_float f_l_depth = 0.0f;
+                if (TSimDim::value > 2)
+                    f_l_depth = (isaac_float)local_size[2]/(isaac_float)max_size * 2.0f;
+                isaac_float f_x = (isaac_float)position[0]/(isaac_float)max_size * 2.0f - (isaac_float)global_size[0]/(isaac_float)max_size;
+                isaac_float f_y = (isaac_float)position[1]/(isaac_float)max_size * 2.0f - (isaac_float)global_size[1]/(isaac_float)max_size;
+                isaac_float f_z = 0.0f;
+                if (TSimDim::value > 2)
+                    f_z = (isaac_float)position[2]/(isaac_float)max_size * isaac_float(2) - (isaac_float)global_size[2]/(isaac_float)max_size;
+                icetBoundingBoxf( f_x, f_x + f_l_width, f_y, f_y + f_l_height, f_z, f_z + f_l_depth);
+            }
+            else
+                icetBoundingVertices(0,0,0,0,NULL);            
         }
         void updateTransfer()
         {
@@ -999,6 +1009,13 @@ class IsaacVisualization
                     source_weight.value[index] = json_number_value(value);
                 send_weight = true;
             }
+            
+            if (js = json_object_get(message, "bounding box") )
+            {
+                icet_bounding_box = !icet_bounding_box;
+                setBounding( icet_bounding_box );
+            }
+            
             json_t* metadata = json_object_get( message, "metadata" );
             if (metadata)
                 json_incref(metadata);
@@ -1039,12 +1056,12 @@ class IsaacVisualization
             };
             IceTDouble result[4];
             mulMatrixVector(result,modelview,point);
-            float point_distance = result[2];
+            float point_distance = sqrt(result[0] * result[0] + result[1] * result[1] + result[2] * result[2]);
             //Allgather of the distances
             float receive_buffer[numProc];
             MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, mpi_world);
             //Putting to a std::multimap of {rank, distance}
-            std::multimap<float, isaac_int, std::greater< float > > distance_map;
+            std::multimap<float, isaac_int, std::less< float > > distance_map;
             for (isaac_int i = 0; i < numProc; i++)
                 distance_map.insert( std::pair<float, isaac_int>( receive_buffer[i], i ) );
             //Putting in an array for IceT
@@ -1486,6 +1503,7 @@ class IsaacVisualization
         bool send_minmax;
         bool interpolation;
         bool iso_surface;
+        bool icet_bounding_box;
         isaac_float step;
         IceTDouble modelview[16];
         IsaacCommunicator* communicator;

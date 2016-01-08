@@ -46,6 +46,7 @@
 				<input type="button" value="Pause" id="pause">
 				<input type="button" value="Stop observing" id="stop">
 				<input type="button" value="Stop simulation" id="exit">
+				<input type="button" value="Toogle bounding box" id="bounding">
 			</form>
 			<div id="functions_div"></div>
 			<div id="weight_div"></div>
@@ -1029,6 +1030,17 @@ document.getElementById("exit").onclick = function()
 	};
 	socket.send(JSON.stringify(obj));
 	document.getElementById("stop").onclick();
+}
+
+document.getElementById("bounding").onclick = function()
+{
+	var obj =
+	{
+		"type" : "feedback",
+		"observe id" : observe_id,
+		"bounding box" : true
+	};
+	socket.send(JSON.stringify(obj));
 }
 
 function one_window_checkbox_click()
