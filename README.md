@@ -155,11 +155,18 @@ implement this following things:
   ```
   where value has the members .x, .y, .z and/or .w depending the feature
   dimension of your source.
+
 Everything else in the class is up to you, but keep in mind, it may be
 copied from time to time, so be careful with memory in constructors and
 destructors.
 
-Now you need an `boost::fucsion::list` with all your classes like
+For a working example of such classes have a look in insitu/example.cu.
+If you are using CUDA, you can ignore all ISAAC_ALPAKA ifdefs and only
+look at the CUDA else branch. I will continue explaining using the
+CUDA example code. If you are using alpaka you should understand the
+alpaka specific differences yourself.
+
+Now you need a `boost::fusion::list` with all your classes like
 ```
 TestSource1 testSource1;
 TestSource2 testSource2;
@@ -182,7 +189,7 @@ auto visualization = new IsaacVisualization <
     1024
 > (
     name,
-    MASTER_RANK,
+    0,
     server,
     port,
     framebuffer_size,
@@ -192,8 +199,31 @@ auto visualization = new IsaacVisualization <
     sources
 );
 ```
+with the template parameters
+* `SimDim` is an integral type containing the dimension of the
+  simulation, e.g. boost::mpl::int_<3>
+* `SourceList` is the type we defined earlier containing a boost fusion
+  list of source classes
+* `std::vector<size_t>` is the type used for storing the dimension of
+  the global and local volume and the position of the second in the
+  first.
+* `1024` is the size of the transfer function used for every source
+and the contructor parameters
+* `name`: The name of the vizualisation
+* `0`: The rank, which will communicate with the isaac server
+* `server`: the url of the server
+* `port`: the port of the server
+* `framebuffer_size`: A vector containing the width and height of the
+  rendered image
+* `global_size`: The size of the whole volume
+* `local_size`: The size of the local subvolume
+* `position`: The position of the local subvolume in the global volume
+* `sources`: The just created runtime instance of the SourceList.
 
-TODO: Finish this explanation. :P
+After creating the object we can now connect to the isaac server with
+`visualization->init()`. If 0 is returned the connection is established.
+
+TODO: Finish explanation
 
 Licensing
 ---------

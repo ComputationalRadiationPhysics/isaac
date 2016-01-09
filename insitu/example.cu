@@ -13,28 +13,15 @@
  * You should have received a copy of the GNU General Lesser Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
-//#define SEND_PARTICLES
-
 #include <isaac.hpp>
-#include <IceT.h>
-//Against annoying C++11 warning in mpi.h
-#pragma GCC diagnostic push
-#pragma GCC diagnostic error "-Wall"
-#include <IceTMPI.h>
-#pragma GCC diagnostic pop
 
-#define MASTER_RANK 0
-
-//#define SEND_PARTICLES
-
-#ifdef SEND_PARTICLES
-	#define PARTICLES_PER_NODE 8
-#endif
-
-typedef float float3_t[3];
+#include "example_details.hpp"
 
 using namespace isaac;
 
+//////////////////////
+// Example Source 1 //
+//////////////////////
 ISAAC_NO_HOST_DEVICE_WARNING
 #if ISAAC_ALPAKA == 1
 template < typename TDevAcc, typename THost, typename TStream >
@@ -82,6 +69,9 @@ class TestSource1
 		}
 };
 
+//////////////////////
+// Example Source 2 //
+//////////////////////
 ISAAC_NO_HOST_DEVICE_WARNING
 #if ISAAC_ALPAKA == 1
 template < typename TDevAcc, typename THost, typename TStream >
@@ -130,138 +120,59 @@ class TestSource2
 		}
 };
 
+/////////////////////////////////////////////////////
+// External const definitions for the test sources //
+/////////////////////////////////////////////////////
 #if ISAAC_ALPAKA == 1
 	template < typename TDevAcc, typename THost, typename TStream >
 	const std::string TestSource1< TDevAcc, THost, TStream >::name = "Test Source 1";
 	template < typename TDevAcc, typename THost, typename TStream >
 	const std::string TestSource2< TDevAcc, THost, TStream >::name = "Test Source 2";
-#else
+#else //CUDA
 	const std::string TestSource1::name = "Test Source 1";
 	const std::string TestSource2::name = "Test Source 2";
 #endif
 
-
-void recursive_kgv(size_t* d,int number,int test);
-
-template <
-	typename TStream,
-	typename THost1,
-	typename TDev1,
-	typename THost2,
-	typename TDev2,
-	typename TLoc,
-	typename TPos,
-	typename TGlo
->
-void update_data(
-	TStream stream,
-	THost1 hostBuffer1,
-	TDev1 deviceBuffer1,
-	THost2 hostBuffer2,
-	TDev2 deviceBuffer2,
-	size_t prod,
-	float pos,
-	TLoc& local_size,
-	TPos& position,
-	TGlo& global_size)
-{
-	int rank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	srand(0);
-	float s = sin(pos);
-	for (size_t x = 0; x < local_size[0]; x++)
-		for (size_t y = 0; y < local_size[1]; y++)
-			for (size_t z = 0; z < local_size[2]; z++)
-			{
-				float l_pos[3] =
-				{
-					float(int(position[0]) + int(x) - int(global_size[0]) / 2) / float( global_size[0] / 2),
-					float(int(position[1]) + int(y) - int(global_size[1]) / 2) / float( global_size[1] / 2),
-					float(int(position[2]) + int(z) - int(global_size[2]) / 2) / float( global_size[2] / 2)
-				};
-				float l = sqrt( l_pos[0] * l_pos[0] + l_pos[1] * l_pos[1] + l_pos[2] * l_pos[2] );
-				float intensity = 1.0f - l - float(rand() & ((2 << 16) - 1))/float( (2 << 17) - 1 );
-				intensity *= s+1.5f;
-				if (intensity < 0.0f)
-					intensity = 0.0f;
-				if (intensity > 1.0f)
-					intensity = 1.0f;
-				size_t pos = x + y * local_size[0] + z * local_size[0] * local_size[1];
-#if ISAAC_ALPAKA == 1
-				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][0] = intensity;
-				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][1] = intensity;
-				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][2] = intensity;
-				alpaka::mem::view::getPtrNative(hostBuffer2)[pos] =  (2.0f - l)*(2.0f - l) / 4.0f;
-			}
-	const alpaka::Vec<alpaka::dim::DimInt<1>, size_t> data_size(size_t(local_size[0]) * size_t(local_size[0]) * size_t(local_size[0]));
-	alpaka::mem::view::copy(stream, deviceBuffer1, hostBuffer1, data_size);
-	alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, data_size);
-#else
-				hostBuffer1[pos][0] = intensity;
-				hostBuffer1[pos][1] = intensity;
-				hostBuffer1[pos][2] = intensity;
-				hostBuffer2[pos] = (2.0f - l)*(2.0f - l) / 4.0f;
-			}
-	cudaMemcpy(deviceBuffer1, hostBuffer1, sizeof(float3_t)*prod, cudaMemcpyHostToDevice);
-	cudaMemcpy(deviceBuffer2, hostBuffer2, sizeof(float)*prod, cudaMemcpyHostToDevice);
-#endif
-}
-
+//////////////////
+// Main program //
+//////////////////
 int main(int argc, char **argv)
 {
+	//Settings the parameters for the example
 	char __server[] = "localhost";
 	char* server = __server;
+	//If existend first parameter is the server. Default: "localhost"
 	if (argc > 1)
 		server = argv[1];
 	int port = 2460;
+	//If existend second parameter is the port. Default: 2460
 	if (argc > 2)
 		port = atoi(argv[2]);
 
 	//MPI Init
-	int rank,numProc,provided;
-	MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
+	int rank,numProc;
+	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &numProc);
 
 	//Let's calculate the best spatial distribution of the dimensions so that d[0]*d[1]*d[2] = numProc
 	size_t d[3] = {1,1,1};
 	recursive_kgv(d,numProc,2);
-
 	size_t p[3] = { rank % d[0], (rank / d[0]) % d[1],  (rank / d[0] / d[1]) % d[2] };
 	
-	//Let's use this to create some random particles inside my box
-	#ifdef SEND_PARTICLES
-
-		//With this I can calculate my box position and size
-		float box_size[3];
-		for (int i = 0; i < 3; i++)
-			box_size[i] = 1.0f/float(d[i])*2.0f;
-		float box_position[3];
-		for (int i = 0; i < 3; i++)
-			box_position[i] = (float)p[i]*box_size[i]-1.0f;
-
-		srand(rank*time(NULL));
-		float particles[PARTICLES_PER_NODE][3];
-		float forces[PARTICLES_PER_NODE][3];
-		for (int i = 0; i < PARTICLES_PER_NODE; i++)
-			for (int j = 0; j < 3; j++)
-			{
-				particles[i][j] = box_position[j] + (float)rand() / (float)RAND_MAX * box_size[j];
-				forces[i][j] = 0.0f;
-			}
-	#endif
 	//Let's generate some unique name for the simulation and broadcast it
 	int id;
-	if (rank == MASTER_RANK)
+	if (rank == 0)
 	{
 		srand(time(NULL));
 		id = rand() % 1000000;
 	}
-	MPI_Bcast(&id,sizeof(id), MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
+	MPI_Bcast(&id,sizeof(id), MPI_INT, 0, MPI_COMM_WORLD);
 	char name[32];
 	sprintf(name,"Example_%i",id);
 	printf("Using name %s\n",name);
 	
+	//This defines the size of the generated rendering
 	isaac_size2 framebuffer_size =
 	{
 		size_t(1024),
@@ -269,7 +180,9 @@ int main(int argc, char **argv)
 	};
 	
 	#if ISAAC_ALPAKA == 1
-		//Now we initialize the Isaac Insitu Plugin with the name, the number of the master, the server, it's IP, the count of framebuffer to be created and the size per framebuffer
+		////////////////////////////////////
+		// Alpaka specific initialization //
+		////////////////////////////////////
 		using AccDim = alpaka::dim::DimInt<3>;
 		using SimDim = alpaka::dim::DimInt<3>;
 		using DatDim = alpaka::dim::DimInt<1>;
@@ -291,7 +204,10 @@ int main(int argc, char **argv)
 		const alpaka::Vec<SimDim, size_t> local_size(size_t(64),size_t(64),size_t(64));
 		const alpaka::Vec<DatDim, size_t> data_size(size_t(64) * size_t(64) * size_t(64));
 		const alpaka::Vec<SimDim, size_t> position(p[0]*64,p[1]*64,p[2]*64);
-	#else
+	#else //CUDA
+		//////////////////////////////////
+		// Cuda specific initialization //
+		//////////////////////////////////
 		int devCount;
 		cudaGetDeviceCount( &devCount );
 		cudaSetDevice( rank % devCount );
@@ -310,22 +226,27 @@ int main(int argc, char **argv)
 			position.push_back(p[2]*64);
 	#endif
 
-	
+	//The whole size of the rendered sub volumes
 	size_t prod = local_size[0]*local_size[1]*local_size[2];
 
-	//Init Device memory
+	/////////////////
+	// Init memory //
+	/////////////////
 	#if ISAAC_ALPAKA == 1
 		alpaka::mem::buf::Buf<DevHost, float3_t, DatDim, size_t> hostBuffer1   ( alpaka::mem::buf::alloc<float3_t, size_t>(devHost, data_size));
 		alpaka::mem::buf::Buf<DevAcc, float3_t, DatDim, size_t>  deviceBuffer1 ( alpaka::mem::buf::alloc<float3_t, size_t>(devAcc,  data_size));
 		alpaka::mem::buf::Buf<DevHost, float, DatDim, size_t> hostBuffer2   ( alpaka::mem::buf::alloc<float, size_t>(devHost, data_size));
 		alpaka::mem::buf::Buf<DevAcc, float, DatDim, size_t>  deviceBuffer2 ( alpaka::mem::buf::alloc<float, size_t>(devAcc,  data_size));
-	#else
+	#else //CUDA
 		float3_t* hostBuffer1 = (float3_t*)malloc(sizeof(float3_t)*prod);
 		float3_t* deviceBuffer1; cudaMalloc((float3_t**)&deviceBuffer1, sizeof(float3_t)*prod);
 		float* hostBuffer2 = (float*)malloc(sizeof(float)*prod);
 		float* deviceBuffer2; cudaMalloc((float**)&deviceBuffer2, sizeof(float)*prod);
 	#endif
 
+	//////////////////////////
+	// Creating source list //
+	//////////////////////////
 	#if ISAAC_ALPAKA == 1
 		TestSource1 < DevAcc, DevHost, Stream > testSource1 (
 			devAcc,
@@ -348,7 +269,7 @@ int main(int argc, char **argv)
 			TestSource1< DevAcc, DevHost, Stream >,
 			TestSource2< DevAcc, DevHost, Stream >
 		>;
-	#else
+	#else //CUDA
 		TestSource1 testSource1 ( reinterpret_cast<isaac_float3*>(deviceBuffer1), local_size[0], local_size[1] );
 		TestSource2 testSource2 ( reinterpret_cast<isaac_float*>(deviceBuffer2), local_size[0], local_size[1] );
 		using SourceList = boost::fusion::list
@@ -360,14 +281,43 @@ int main(int argc, char **argv)
 	
 	SourceList sources( testSource1, testSource2 );
 	
-	#if ISAAC_ALPAKA == 1
-		auto visualization = new IsaacVisualization<DevHost,Acc,Stream,AccDim,SimDim,SourceList,alpaka::Vec<SimDim, size_t>, 1024 >(devHost,devAcc,stream,name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
-	#else
-		auto visualization = new IsaacVisualization<SimDim,SourceList,std::vector<size_t>,1024>(name,MASTER_RANK,server,port,framebuffer_size,global_size,local_size,position,sources);
-	#endif
+	///////////////////////////////////////
+	// Create isaac visualization object //
+	///////////////////////////////////////
+	auto visualization = new IsaacVisualization <
+		#if ISAAC_ALPAKA == 1
+			DevHost, //Alpaka specific Host Dev Type
+			Acc, //Alpaka specific Accelerator Dev Type
+			Stream, //Alpaka specific Stream Type
+			AccDim, //Alpaka specific Acceleration Dimension Type
+		#endif
+		SimDim, //Dimension of the Simulation. In this case: 3D
+		SourceList, //The boost::fusion list of Source Types
+		#if ISAAC_ALPAKA == 1
+			alpaka::Vec<SimDim, size_t>, //Type of the 3D vectors used later
+		#else //CUDA
+			std::vector<size_t>, //Type of the 3D vectors used later
+		#endif
+		1024 //Size of the transfer functions
+	> (
+		#if ISAAC_ALPAKA == 1
+			devHost, //Alpaka specific host dev instance
+			devAcc, //Alpaka specific accelerator dev instance
+			stream, //Alpaka specific stream instance
+		#endif
+		name, //Name of the visualization shown to the client
+		0, //Master rank, which will opens the connection to the server
+		server, //Address of the server
+		port, //Inner port of the server
+		framebuffer_size, //Size of the rendered image
+		global_size, //Size of the whole volumen including all nodes
+		local_size, //Local size of the subvolume
+		position, //Position of the subvolume in the globale volume
+		sources //instances of the sources to render
+	);
 	
-	//Setting up the metadata description (only master, but however slaves could then metadata metadata, too, it would be merged)
-	if (rank == MASTER_RANK)
+	//Setting up the metadata description (only master, but however slaves could then add metadata, too, it would be merged)
+	if (rank == 0)
 	{
 		json_object_set_new( visualization->getJsonMetaRoot(), "counting variable", json_string( "counting" ) );
 		json_object_set_new( visualization->getJsonMetaRoot(), "drawing_time", json_string( "drawing_time" ) );
@@ -378,13 +328,6 @@ int main(int argc, char **argv)
 		json_object_set_new( visualization->getJsonMetaRoot(), "copy_time", json_string( "copy_time" ) );
 		json_object_set_new( visualization->getJsonMetaRoot(), "video_send_time", json_string( "video_send_time" ) );
 		json_object_set_new( visualization->getJsonMetaRoot(), "buffer_time", json_string( "buffer_time" ) );
-		#ifdef SEND_PARTICLES
-			json_t *particle_array = json_array();
-			json_object_set_new( visualization->getJsonMetaRoot(), "reference particles", particle_array );
-			json_array_append_new( particle_array, json_string( "X" ) );
-			json_array_append_new( particle_array, json_string( "Y" ) );
-			json_array_append_new( particle_array, json_string( "Z" ) );
-		#endif
 	}
 
 	//finish init and sending the meta data scription to the isaac server
@@ -394,6 +337,10 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	
+	
+	////////////////////////////////////////////////
+	// Program flow and time mesaurment variables //
+	////////////////////////////////////////////////
 	float a = 0.0f;
 	volatile int force_exit = 0;
 	int start = visualization->getTicksUs();
@@ -409,11 +356,15 @@ int main(int argc, char **argv)
 	int video_send_time = 0;
 	int buffer_time = 0;
 	bool pause = false;
+	
+	///////////////
+	// Main loop //
+	///////////////
 	while (!force_exit)
 	{
-		////////////////
-		// Simulation //
-		////////////////
+		//////////////////
+		// "Simulation" //
+		//////////////////
 		if (!pause)
 		{
 			a += 0.01f;
@@ -428,7 +379,7 @@ int main(int argc, char **argv)
 		///////////////////
 		// Metadata fill //
 		///////////////////
-		if (rank == MASTER_RANK)
+		if (rank == 0)
 		{
 			json_object_set_new( visualization->getJsonMetaRoot(), "counting variable", json_real( a ) );
 			json_object_set_new( visualization->getJsonMetaRoot(), "drawing_time" , json_integer( drawing_time ) );
@@ -456,34 +407,12 @@ int main(int argc, char **argv)
 			visualization->video_send_time = 0;
 			visualization->buffer_time = 0;
 		}
-		#ifdef SEND_PARTICLES
-			//every thread fills "his" particles
-			json_t *particle_array = json_array();
-			for (int i = 0; i < PARTICLES_PER_NODE; i++)
-			{
-				json_t *position = json_array();
-				json_array_append_new( particle_array, position );
-				//Recalculate force based on distance to box center and add it
-				for (int j = 0; j < 3; j++)
-				{
-					float distance = (box_position[j] + box_size[j] / 2.0f) - particles[i][j];
-					forces[i][j] += distance / 10000.0f;
-					particles[i][j] += forces[i][j];
-					json_array_append_new( position, json_real( particles[i][j] ) );
-				}
-			}
-			json_object_set_new( visualization->getJsonMetaRoot(), "reference particles", particle_array );
-		#endif
 
 		///////////////////
 		// Visualization //
 		///////////////////
 		int start_drawing = visualization->getTicksUs();
-		#ifdef SEND_PARTICLES
-			json_t* meta = visualization->doVisualization(META_MERGE);
-		#else
-			json_t* meta = visualization->doVisualization(META_MASTER);
-		#endif
+		json_t* meta = visualization->doVisualization(META_MASTER);
 		drawing_time +=visualization->getTicksUs() - start_drawing;
 
 		///////////////////
@@ -509,7 +438,7 @@ int main(int argc, char **argv)
 		//////////////////
 		// Debug output //
 		//////////////////
-		if (rank == MASTER_RANK)
+		if (rank == 0)
 		{
 			int end = visualization->getTicksUs();
 			int diff = end-start;
@@ -538,11 +467,13 @@ int main(int argc, char **argv)
 				count = 0;
 			}
 		}
-	}
-	
+	}	
 	MPI_Barrier(MPI_COMM_WORLD);
 	printf("%i finished\n",rank);
-	
+
+	////////////////////
+	// Winter wrap up //
+	////////////////////
 	delete( visualization );
 	
 	#if ISAAC_ALPAKA == 0
@@ -558,39 +489,4 @@ int main(int argc, char **argv)
 
 // Not necessary, just for the example
 
-void mul_to_smallest_d(size_t *d,int nr)
-{
-	if (d[0] < d[1]) // 0 < 1
-	{
-		if (d[2] < d[0])
-			d[2] *= nr; //2 < 0 < 1
-		else
-			d[0] *= nr; //0 < 2 < 1 || 0 < 1 < 2
-	}
-	else // 1 < 0
-	{
-		if (d[2] < d[1])
-			d[2] *= nr; // 2 < 1 < 0
-		else
-			d[1] *= nr; // 1 < 0 < 2 || 1 < 2 < 0
-	}
-}
 
-void recursive_kgv(size_t* d,int number,int test)
-{
-	if (number == 1)
-		return;
-	if (number == test)
-	{
-		mul_to_smallest_d(d,test);
-		return;
-	}
-	if (number % test == 0)
-	{
-		number /= test;
-		recursive_kgv(d,number,test);
-		mul_to_smallest_d(d,test);
-	}
-	else
-		recursive_kgv(d,number,test+1);
-}

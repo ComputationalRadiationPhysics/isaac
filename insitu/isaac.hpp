@@ -30,8 +30,12 @@
 #include <vector>
 #include <memory>
 #include <mpi.h>
+//Against annoying C++11 warning in mpi.h
 #include <IceT.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wall"
 #include <IceTMPI.h>
+#pragma GCC diagnostic pop
 #include <math.h>
 #include <stdio.h>
 #include <assert.h>
