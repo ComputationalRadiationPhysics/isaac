@@ -72,31 +72,25 @@ How to use
 TODO: Writing FindISAAC.cmake or similar.
 
 ISAAC uses CMake. So just do:
-* `mkdir build`
-* `cd build`
-* `cmake ..`
+```
+mkdir build
+cd build
+cmake ..
+```
 
 to create the Makefiles. Missing dependencies and variables will be
-reported. If everything is setup, just call
-* `make`
+reported. If everything is setup, just call `make`.
 
 to build isaac (and the optional example)
-Now you can just start ISAAC with
-* `./isaac`
+Now you can just start ISAAC with `./isaac`
 
 The Paraneter --help will give you some options like the used ports to
 setup up. The default port for the client is 2459 (the year when the
 Serenity laid keel) and for the insitu connections 2560.
 
 If you build the examples you can also start one or multiple instances
-with
-* `./example_cuda`
-
-or
-* `./example_alpaka`
-
-or with more than one binary
-* `mpirun -c COUNT ./example_cuda`
+with `./example_cuda` or `./example_alpaka` or with more than one binary
+with `mpirun -c COUNT ./example_cuda`.
 
 If you open the interface.htm in the subfolder client you should be
 able to connect to ISAAC, to see the running example and observe it. For
@@ -220,10 +214,38 @@ and the contructor parameters
 * `position`: The position of the local subvolume in the global volume
 * `sources`: The just created runtime instance of the SourceList.
 
-After creating the object we can now connect to the isaac server with
+Now it is possible to define and describe some metadata the client shall
+see. It doesn't need to be defined at this point, but every here defined
+datum will be shown in the list of available simulations.
+`visualization->getJsonMetaRoot()` returns an instance of `json_t*`, a
+json root, where you can add more members. See the example and the
+jansson documention for more details.
+
+After defining the metadata we can now connect to the isaac server with
 `visualization->init()`. If 0 is returned the connection is established.
 
-TODO: Finish explanation
+Everytime you want to send a rendered view of your data (e.g. after
+ever time step of your simulation) call
+`visualization->doVisualization(META_MASTER);`
+`META_MASTER` means, that only the master rank (in most cases rank 0)
+will send metadata. If you choose `META_MERGE` the metadata of every
+rank is merged via MPI before. To add meta data just use
+`visualization->getJsonMetaRoot()` again before calling the
+`doVisualization` function. After this function call the returned json
+root from `getJsonMetaRoot` is empty again.
+
+`doVisualization` itself returns a `json_t*` root, too. Every data put
+into "metadata" from the client will be forwarded to _every_ application
+rank. You _have_ to call json_decref to the result of this function!
+Even if you don't want to use the metadata, call it at least this way:
+```
+json_decref( visualization->doVisualization( META_MASTER ) );
+```
+Otherwise you will open a memory leak.
+
+At the end of the simulation just delete the visualization object. The
+connection will close and the simulation will disappear for every client
+of the isaac server.
 
 Licensing
 ---------
