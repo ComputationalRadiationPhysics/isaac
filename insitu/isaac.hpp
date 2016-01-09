@@ -734,6 +734,7 @@ class IsaacVisualization
         }
         json_t* getJsonMetaRoot()
         {
+            ISAAC_WAIT_VISUALIZATION
             return json_meta_root;
         }
         int init()

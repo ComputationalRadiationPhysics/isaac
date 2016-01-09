@@ -98,7 +98,15 @@ class IsaacCommunicator
 			uint32_t l_with_id = l + strlen(id_string) - 1;
 			send(sockfd,&l_with_id,4,0);
 			isaac_int n = send(sockfd,content,l-1,MSG_MORE); //without closing }
-			n += send(sockfd,id_string,strlen(id_string),0);
+			int count = strlen(id_string);
+			int amount = (count+4095)/4096;
+			for (int i = 0; i < amount; i++)
+			{
+				if (i == amount - 1)
+					n += send(sockfd,&id_string[i*4096],count - i * 4096,0);
+				else
+					n += send(sockfd,&id_string[i*4096],4096,MSG_MORE);
+			}
 			id++;
 			return n;
 		}
