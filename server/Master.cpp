@@ -35,6 +35,13 @@ void sighandler(int sig)
 	Master::force_exit = 1;
 }
 
+template <typename Type>
+void* delete_pointer_later(void* ptr)
+{
+	sleep(300); //5 minutes sleeping
+	delete( (Type*)ptr );
+}
+
 Master::Master(std::string name,int inner_port)
 {
 	this->name = name;
@@ -445,7 +452,8 @@ errorCode Master::run()
 						{
 							if (it->t == group)
 							{
-								delete insituConnectorGroupList.remove(it);
+								pthread_t thread;
+								pthread_create(&thread,NULL,delete_pointer_later<InsituConnectorGroup>,insituConnectorGroupList.remove(it));
 								break;
 							}
 							it = it->next;
@@ -531,7 +539,7 @@ errorCode Master::run()
 						imageConnectorList[ stream ].connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED,NULL,group,1,url,ref));
 						//Send request for (transfer) functions
 						char buffer[] = "{\"type\": \"feedback\", \"request\": \"transfer\"} {\"type\": \"feedback\", \"request\": \"functions\"} {\"type\": \"feedback\", \"request\": \"weight\"}";
-						send(group->master->connector->getSockFD(),buffer,strlen(buffer),0);
+						send(group->master->connector->getSockFD(),buffer,strlen(buffer),MSG_NOSIGNAL);
 					}
 				}
 				if (message->type == STOP)
@@ -619,7 +627,7 @@ errorCode Master::run()
 				message->suicide();
 			}
 		}
-		usleep(1);
+		usleep(100);
 	}
 
 

@@ -133,6 +133,11 @@ errorCode InsituConnectorMaster::run()
 						int add = recv(fd_array[i].fd,&(jlcb.buffer[jlcb.count]),expected-jlcb.count,0);
 						if (add > 0)
 							jlcb.count += add;
+						else
+						{
+							jlcb.count = 0;
+							break;
+						}
 					}
 					bool closed = false;
 					if (jlcb.count > 0)
@@ -155,7 +160,15 @@ errorCode InsituConnectorMaster::run()
 								//send, which uid we just got
 								char buffer[32];
 								sprintf(buffer,"{\"done\": %lld}",json_integer_value( json_object_get(content, "uid") ) );
-								send(fd_array[i].fd,buffer,strlen(buffer),0);
+								int r = 0;
+								if ( send(fd_array[i].fd,buffer,strlen(buffer),MSG_NOSIGNAL) <= 0)
+								{
+									MessageContainer* message = new MessageContainer(EXIT_PLUGIN,json_object());
+									json_object_set_new( message->json_root, "type", json_string( "exit" ) );
+									con_array[i]->connector->clientSendMessage(message);
+									closed = true;
+									break;
+								}
 							}
 						}
 					}
