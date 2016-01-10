@@ -627,7 +627,7 @@ errorCode Master::run()
 				message->suicide();
 			}
 		}
-		usleep(1);
+		usleep(100);
 	}
 
 
