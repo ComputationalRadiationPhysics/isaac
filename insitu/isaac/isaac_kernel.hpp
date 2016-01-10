@@ -433,6 +433,27 @@ struct merge_source_iterator
     #undef ISAAC_FUNCTION_CHAIN_PARAM
 };
 
+template <
+    typename TFilter
+>
+struct check_no_source_iterator
+{
+    template
+    <
+        typename NR,
+        typename TSource,
+        typename TResult
+    >
+    ISAAC_HOST_DEVICE_INLINE  void operator()(
+        const NR& nr,
+        const TSource& source,
+        TResult& result
+    ) const
+    {
+        result |= mpl::at_c< TFilter, NR::value >::type::value;
+    }
+};
+
 
 template <
     typename TSimDim,
@@ -488,6 +509,14 @@ template <
             pixel = pixel + framebuffer_start;
             if ( ISAAC_FOR_EACH_DIM_TWICE(2, pixel, >= framebuffer_size, || ) 0 )
                 return;
+                
+            bool at_least_one;
+            isaac_for_each_with_mpl_params( sources, check_no_source_iterator<TFilter>(), at_least_one );
+            if (!at_least_one)
+            {
+                ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], background_color )
+                return;
+            }
             
             isaac_float2 pixel_f =
             {
