@@ -539,7 +539,7 @@ errorCode Master::run()
 						imageConnectorList[ stream ].connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED,NULL,group,1,url,ref));
 						//Send request for (transfer) functions
 						char buffer[] = "{\"type\": \"feedback\", \"request\": \"transfer\"} {\"type\": \"feedback\", \"request\": \"functions\"} {\"type\": \"feedback\", \"request\": \"weight\"}";
-						send(group->master->connector->getSockFD(),buffer,strlen(buffer),0);
+						send(group->master->connector->getSockFD(),buffer,strlen(buffer),MSG_NOSIGNAL);
 					}
 				}
 				if (message->type == STOP)

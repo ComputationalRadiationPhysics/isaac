@@ -133,6 +133,11 @@ errorCode InsituConnectorMaster::run()
 						int add = recv(fd_array[i].fd,&(jlcb.buffer[jlcb.count]),expected-jlcb.count,0);
 						if (add > 0)
 							jlcb.count += add;
+						else
+						{
+							jlcb.count = 0;
+							break;
+						}
 					}
 					bool closed = false;
 					if (jlcb.count > 0)
