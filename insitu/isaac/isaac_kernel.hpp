@@ -538,6 +538,10 @@ template <
                 isaac_inverse_d[ 2] *   end_p.x + isaac_inverse_d[ 6] *   end_p.y +  isaac_inverse_d[10] *   end_p.z + isaac_inverse_d[14] *   end_p.w
             };
             isaac_float max_size = isaac_size_d[0].max_global_size / 2.0f;
+	    isaac_float min_size = min(
+	    	int(isaac_size_d[0].global_size.value.x), min (
+		int(isaac_size_d[0].global_size.value.y),
+		int(isaac_size_d[0].global_size.value.z) ) );
 
             //scale to globale grid size
             start = start * max_size;
@@ -612,7 +616,7 @@ template <
 
             //Starting the main loop
             isaac_float4 color = background_color;
-            isaac_float factor = step / isaac_size_d[0].max_global_size;
+            isaac_float factor = step / /*isaac_size_d[0].max_global_size*/ min_size;
             for (isaac_int i = first; i <= last; i++)
             {
                 pos = start + step_vec * isaac_float(i);

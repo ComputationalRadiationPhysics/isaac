@@ -523,7 +523,7 @@ class IsaacVisualization
             max_size = max(uint32_t(global_size[0]),uint32_t(global_size[1]));
             if (TSimDim::value > 2)
                 max_size = max(uint32_t(global_size[2]),uint32_t(max_size));
-            setBounding( icet_bounding_box );
+            updateBounding( );
             icetPhysicalRenderSize(framebuffer_size.x, framebuffer_size.y);
             icetDrawCallback( drawCallBack );
 
@@ -569,6 +569,33 @@ class IsaacVisualization
                     json_object_set_new( json_root, "depth", json_integer ( global_size[2] ) );
             }
         }
+        void updateBounding()
+        {
+            if (icet_bounding_box)
+            {
+                isaac_float f_l_width = (isaac_float)local_size[0]/(isaac_float)max_size * 2.0f;
+                isaac_float f_l_height = (isaac_float)local_size[1]/(isaac_float)max_size * 2.0f;
+                isaac_float f_l_depth = 0.0f;
+                if (TSimDim::value > 2)
+                    f_l_depth = (isaac_float)local_size[2]/(isaac_float)max_size * 2.0f;
+                isaac_float f_x = (isaac_float)position[0]/(isaac_float)max_size * 2.0f - (isaac_float)global_size[0]/(isaac_float)max_size;
+                isaac_float f_y = (isaac_float)position[1]/(isaac_float)max_size * 2.0f - (isaac_float)global_size[1]/(isaac_float)max_size;
+                isaac_float f_z = 0.0f;
+                if (TSimDim::value > 2)
+                    f_z = (isaac_float)position[2]/(isaac_float)max_size * isaac_float(2) - (isaac_float)global_size[2]/(isaac_float)max_size;
+                icetBoundingBoxf( f_x, f_x + f_l_width, f_y, f_y + f_l_height, f_z, f_z + f_l_depth);
+            }
+            else
+                icetBoundingVertices(0,0,0,0,NULL);
+        }
+	void updatePosition( const TDomainSize position )
+	{
+		this->position = position;
+	}
+	void updateLocalSize( const TDomainSize local_size )
+	{
+		this->local_size = local_size;
+	}
         void updateFunctions()
         {
             IsaacFunctorPool functors;
@@ -687,25 +714,6 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaGetSymbolAddress((void **)&constant_ptr, isaac_function_chain_d));
                 ISAAC_CUDA_CHECK(cudaMemcpy(constant_ptr, functor_chain_choose_d, boost::mpl::size< TSourceList >::type::value * sizeof( isaac_functor_chain_pointer_N ), cudaMemcpyDeviceToDevice));
             #endif
-        }
-        void setBounding(bool flag)
-        {
-            if (flag)
-            {
-                isaac_float f_l_width = (isaac_float)local_size[0]/(isaac_float)max_size * 2.0f;
-                isaac_float f_l_height = (isaac_float)local_size[1]/(isaac_float)max_size * 2.0f;
-                isaac_float f_l_depth = 0.0f;
-                if (TSimDim::value > 2)
-                    f_l_depth = (isaac_float)local_size[2]/(isaac_float)max_size * 2.0f;
-                isaac_float f_x = (isaac_float)position[0]/(isaac_float)max_size * 2.0f - (isaac_float)global_size[0]/(isaac_float)max_size;
-                isaac_float f_y = (isaac_float)position[1]/(isaac_float)max_size * 2.0f - (isaac_float)global_size[1]/(isaac_float)max_size;
-                isaac_float f_z = 0.0f;
-                if (TSimDim::value > 2)
-                    f_z = (isaac_float)position[2]/(isaac_float)max_size * isaac_float(2) - (isaac_float)global_size[2]/(isaac_float)max_size;
-                icetBoundingBoxf( f_x, f_x + f_l_width, f_y, f_y + f_l_height, f_z, f_z + f_l_depth);
-            }
-            else
-                icetBoundingVertices(0,0,0,0,NULL);            
         }
         void updateTransfer()
         {
@@ -1018,7 +1026,7 @@ class IsaacVisualization
             if (js = json_object_get(message, "bounding box") )
             {
                 icet_bounding_box = !icet_bounding_box;
-                setBounding( icet_bounding_box );
+                updateBounding( );
             }
             
             json_t* metadata = json_object_get( message, "metadata" );
