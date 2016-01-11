@@ -51,7 +51,9 @@ if (ISAAC_GST)
 	set(INCLUDE ${INCLUDE} ${GST_APP_INCLUDE_DIRS})
 
 	set(SRCS ${SRCS} ${CMAKE_SOURCE_DIR}/server/RTPImageConnector.cpp)
+	set(SRCS ${SRCS} ${CMAKE_SOURCE_DIR}/server/TwitchImageConnector.cpp)
 	set(HDRS ${HDRS} ${CMAKE_SOURCE_DIR}/server/RTPImageConnector.hpp)
+	set(HDRS ${HDRS} ${CMAKE_SOURCE_DIR}/server/TwitchImageConnector.hpp)
 
 	add_definitions(-DISAAC_GST)
 endif (ISAAC_GST)

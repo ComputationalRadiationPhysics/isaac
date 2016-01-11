@@ -19,6 +19,7 @@ SDLImageConnector::SDLImageConnector()
 {
 	SDL_Init(SDL_INIT_VIDEO);
 	group = NULL;
+	showClient = false;
 }
 
 std::string SDLImageConnector::getName()

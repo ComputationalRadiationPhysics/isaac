@@ -16,45 +16,28 @@
 #pragma once
 
 #include "ImageConnector.hpp"
+#include "RTPImageConnector.hpp"
 #include "Runable.hpp"
 #include <gst/gst.h>
 #include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
-#include <vector>
 
-class RTPImageConnector : public ImageConnector
+class TwitchImageConnector : public ImageConnector
 {
 	public:
-		RTPImageConnector(std::string url,bool zerolatency = false,bool raw = false);
-		~RTPImageConnector();
-		errorCode init(int minport, int maxport);
+		TwitchImageConnector(std::string apikey);
+		errorCode init(int minport,int maxport);
 		errorCode run();
 		std::string getName();
 	private:
-		typedef struct
-		{
-			bool is_used;
-			GstElement *appsrc;
-			GstElement *videoconvert;
-			GstElement *x264enc;
-			GstElement *rtph264pay;
-			GstElement *capsfilter;
-			GstElement *jpegenc;
-			GstElement *rtpjpegpay;
-			GstElement *udpsink;
-			GstElement *pipeline;
-			GstElement *bin;
-			InsituConnectorGroup* group;
-			std::string url;
-			void* ref;
-		} tStream;
-		int minport;
-		int maxport;
-		std::vector<tStream> streams;
-		std::string url;
-		bool zerolatency;
-		bool raw;
+		InsituConnectorGroup* group;
+		std::string apikey;
+		GstElement *appsrc;
+		GstElement *videoconvert;
+		GstElement *capsfilter;
+		GstElement *x264enc;
+		GstElement *flvmux;
+		GstElement *rtmpsink;
+		GstElement *pipeline;
+		GstElement *bin;
 };
-
-void suicideNotify(gpointer data);
-

@@ -23,7 +23,6 @@
 
 URIImageConnector::URIImageConnector()
 {
-	showClient = false;
 }
 
 std::string URIImageConnector::getName()

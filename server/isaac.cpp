@@ -20,6 +20,7 @@
 #endif
 #ifdef ISAAC_GST
 	#include "RTPImageConnector.hpp"
+	#include "TwitchImageConnector.hpp"
 #endif
 #ifdef ISAAC_JPEG
 	#include "URIImageConnector.hpp"
@@ -43,6 +44,9 @@ int main(int argc, char **argv)
 	const char __url[] = "127.0.0.1";
 	const char* name = __name;
 	const char* url = __url;
+	#ifdef ISAAC_GST
+		char* twitch_apikey = NULL;
+	#endif
 	int nr = 1;
 	while (nr < argc)
 	{
@@ -90,6 +94,14 @@ int main(int argc, char **argv)
 			ISAAC_INCREASE_NR_OR_DIE
 			name = argv[nr];
 		}
+		#ifdef ISAAC_GST
+			else
+			if (strcmp(argv[nr],"--twitch") == 0)
+			{
+				ISAAC_INCREASE_NR_OR_DIE
+				twitch_apikey = argv[nr];
+			}
+		#endif
 		else
 		{
 			printf("Don't know argument %s\n",argv[nr]);
@@ -127,6 +139,16 @@ int main(int argc, char **argv)
 			delete uRIImageConnector;
 		else
 			master.addImageConnector(uRIImageConnector);
+	#endif
+	#ifdef ISAAC_GST
+		if (twitch_apikey)
+		{
+			TwitchImageConnector* twitchImageConnector = new TwitchImageConnector( std::string (twitch_apikey) );
+			if (twitchImageConnector->init(0,0))
+				delete twitchImageConnector;
+			else
+				master.addImageConnector(twitchImageConnector);
+		}
 	#endif
 	#ifdef ISAAC_SDL
 		SDLImageConnector* sDLImageConnector = new SDLImageConnector();
