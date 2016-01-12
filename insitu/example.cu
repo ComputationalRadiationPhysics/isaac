@@ -50,7 +50,7 @@ class TestSource1
 		width_mul_height(width * height)
 		{}
 		
-		ISAAC_HOST_INLINE void update(bool enabled) {}
+		ISAAC_HOST_INLINE void update(bool enabled, void* pointer) {}
 		
 		isaac_float3* ptr;
 		isaac_int width;
@@ -100,7 +100,7 @@ class TestSource2
 		width_mul_height(width * height)
 		{ }
 
-		ISAAC_HOST_INLINE void update(bool enabled) {}
+		ISAAC_HOST_INLINE void update(bool enabled, void* pointer) {}
 		
 		isaac_float* ptr;
 		isaac_int width;
@@ -407,15 +407,12 @@ int main(int argc, char **argv)
 			visualization->video_send_time = 0;
 			visualization->buffer_time = 0;
 		}
-		char buffer[32];
-		sprintf(buffer,"%i\n",rank);
-		json_object_set_new( visualization->getJsonMetaRoot(), buffer, json_real( a ) );
 
 		///////////////////
 		// Visualization //
 		///////////////////
 		int start_drawing = visualization->getTicksUs();
-		json_t* meta = visualization->doVisualization(META_MERGE);
+		json_t* meta = visualization->doVisualization(META_MASTER);
 		drawing_time +=visualization->getTicksUs() - start_drawing;
 
 		///////////////////
