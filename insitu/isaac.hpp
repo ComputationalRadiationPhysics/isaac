@@ -1096,6 +1096,28 @@ class IsaacVisualization
             IceTImage image = icetDrawFrame(projection,modelview,background_color);
             ISAAC_STOP_TIME_MEASUREMENT( merge_time, +=, merge, getTicksUs() )
 
+            //Message merging
+            char* buffer = json_dumps( myself->json_root, 0 );
+            strcpy( message_buffer, buffer );
+            free(buffer);
+            if ( metaTargets == META_MERGE )
+            {
+                if (rank == master)
+                {
+                    char receive_buffer[numProc][ISAAC_MAX_RECEIVE];
+                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, receive_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, mpi_world);
+                    for (isaac_int i = 0; i < numProc; i++)
+                    {
+                        if (i == myself->master)
+                            continue;
+                        json_t* js = json_loads(receive_buffer[i], 0, NULL);
+                        mergeJSON( json_root, js );
+                    }
+                }
+                else
+                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, master, mpi_world);
+            }
+
             #ifdef ISAAC_THREADING
                 pthread_create(&visualizationThread,NULL,visualizationFunction,&image);
             #else
@@ -1271,29 +1293,7 @@ class IsaacVisualization
 
         static void* visualizationFunction(void* dummy)
         {
-            char message_buffer[ISAAC_MAX_RECEIVE];
             //Message sending
-            char* buffer = json_dumps( myself->json_root, 0 );
-            strcpy( message_buffer, buffer );
-            free(buffer);
-            if (myself->thr_metaTargets == META_MERGE)
-            {
-                if (myself->rank == myself->master)
-                {
-                    char receive_buffer[myself->numProc][ISAAC_MAX_RECEIVE];
-                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, receive_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, myself->master, myself->mpi_world);
-                    for (isaac_int i = 0; i < myself->numProc; i++)
-                    {
-                        if (i == myself->master)
-                            continue;
-                        json_t* js = json_loads(receive_buffer[i], 0, NULL);
-                        mergeJSON( myself->json_root, js );
-                    }
-                }
-                else
-                    MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, myself->master, myself->mpi_world);
-            }
-
             if (myself->rank == myself->master)
             {
                 json_object_set_new( myself->json_root, "type", json_string( "period" ) );

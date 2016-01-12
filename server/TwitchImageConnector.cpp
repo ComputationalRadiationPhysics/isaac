@@ -96,7 +96,7 @@ errorCode TwitchImageConnector::run()
 						"tune", 0x00000004,
 						"psy-tune", 2,
 						"speed-preset", 1,
-						"bitrate", 200,
+						"bitrate", 400,
 						"threads", 2,
 						"byte-stream", 1,
 						NULL);
