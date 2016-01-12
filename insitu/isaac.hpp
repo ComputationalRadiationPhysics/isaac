@@ -197,7 +197,8 @@ class IsaacVisualization
                 typename TSource,
                 typename TArray,
                 typename TLocalSize,
-                typename TWeight
+                typename TWeight,
+                typename TPointer
                 #if ISAAC_ALPAKA == 1
                     ,typename TStream__
                 #endif
@@ -207,14 +208,15 @@ class IsaacVisualization
                 TSource& source,
                 TArray& pointer_array,
                 const TLocalSize& local_size,
-                const TWeight& weight
+                const TWeight& weight,
+                const TPointer& pointer
                 #if ISAAC_ALPAKA == 1
                     ,TStream__& stream
                 #endif
             ) const
             {
                 bool enabled = weight.value[ I ] != isaac_float(0);
-                source.update( enabled );
+                source.update( enabled, pointer );
                 if (!TSource::persistent && enabled)
                 {
                     isaac_size2 grid_size=
@@ -763,14 +765,14 @@ class IsaacVisualization
             }
             return 0;
         }
-        json_t* doVisualization( const IsaacVisualizationMetaEnum metaTargets = META_MASTER )
+        json_t* doVisualization( const IsaacVisualizationMetaEnum metaTargets = META_MASTER, void* pointer = NULL )
         {
             //if (rank == master)
             //    printf("-----\n");
             ISAAC_WAIT_VISUALIZATION
             
             ISAAC_START_TIME_MEASUREMENT( buffer, getTicksUs() )
-            isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size, source_weight
+            isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size, source_weight, pointer
             #if ISAAC_ALPAKA == 1
                 ,stream
             #endif
