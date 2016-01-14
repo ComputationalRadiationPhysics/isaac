@@ -186,6 +186,10 @@ struct isaac_size_struct
     size_t max_global_size;
     isaac_size_dim < simdim > position;
     isaac_size_dim < simdim > local_size;
+    isaac_size_dim < simdim > global_size_scaled;
+    size_t max_global_size_scaled;
+    isaac_size_dim < simdim > position_scaled;
+    isaac_size_dim < simdim > local_size_scaled;
 };
 
 

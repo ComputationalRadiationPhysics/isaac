@@ -67,7 +67,7 @@ template <
     typename TSourceList,
     typename TDomainSize,
     size_t TTransfer_size,
-    typename TSimulationData
+    typename TScale
 >
 class IsaacVisualization 
 {
@@ -243,7 +243,7 @@ class IsaacVisualization
                         const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
                         const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
                         auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
-                        updateBufferKernel<TSource, TSimulationData> kernel;
+                        updateBufferKernel<TSource, TScale> kernel;
                         auto const instance
                         (
                             alpaka::exec::create<TAcc>
@@ -253,7 +253,7 @@ class IsaacVisualization
                                 source,
                                 pointer_array.pointer[ I ],
                                 local_size_array,
-                                myself->simulationData
+                                myself->scale
                             )
                         );
                         alpaka::stream::enqueue(stream, instance);                
@@ -261,7 +261,7 @@ class IsaacVisualization
                     #else
                         dim3 block (block_size.x, block_size.y);
                         dim3 grid  (grid_size.x, grid_size.y);
-                        updateBufferKernel<<<grid,block>>>( source, pointer_array.pointer[ I ], local_size_array, myself->simulationData );
+                        updateBufferKernel<<<grid,block>>>( source, pointer_array.pointer[ I ], local_size_array, myself->scale );
                         ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                     #endif
                 }
@@ -323,7 +323,7 @@ class IsaacVisualization
                     const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
                     const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
                     auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
-                    minMaxKernel<TSource,TSimulationData> kernel;
+                    minMaxKernel<TSource,TScale> kernel;
                     auto const instance
                     (
                         alpaka::exec::create<TAcc>
@@ -337,7 +337,7 @@ class IsaacVisualization
                             alpaka::mem::view::getPtrNative(local_minmax),
                             local_size_array,
                             pointer_array.pointer[ I ],
-                            myself->simulationData
+                            myself->scale
                         )
                     );
                     alpaka::stream::enqueue(stream, instance);                
@@ -347,7 +347,7 @@ class IsaacVisualization
                 #else
                     dim3 block (block_size.x, block_size.y);
                     dim3 grid  (grid_size.x, grid_size.y);
-                    minMaxKernel<<<grid,block>>>( source, I, local_minmax, local_size_array, pointer_array.pointer[ I ], myself->simulationData);
+                    minMaxKernel<<<grid,block>>>( source, I, local_minmax, local_size_array, pointer_array.pointer[ I ], myself->scale);
                     ISAAC_CUDA_CHECK(cudaMemcpy( local_minmax_array_h, local_minmax, sizeof(minmax_struct)*local_size_array.x * local_size_array.y, cudaMemcpyDeviceToHost));
                 #endif
                 minmax.min[ I ] =  FLT_MAX;
@@ -376,7 +376,8 @@ class IsaacVisualization
             const TDomainSize global_size,
             const TDomainSize local_size,
             const TDomainSize position,
-            TSourceList& sources
+            TSourceList& sources,
+            TScale scale
             ) :
             #if ISAAC_ALPAKA == 1
                 host(host),
@@ -404,6 +405,7 @@ class IsaacVisualization
             step(isaac_float( ISAAC_DEFAULT_STEP )),
             framebuffer_prod(size_t(framebuffer_size.x) * size_t(framebuffer_size.y)),
             sources( sources ),
+            scale( scale ),
             icet_bounding_box( true )
             #if ISAAC_ALPAKA == 1
                 ,framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_prod))
@@ -421,6 +423,14 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaMalloc((isaac_functor_chain_pointer_N**)&functor_chain_choose_d, sizeof(isaac_functor_chain_pointer_N) * boost::mpl::size< TSourceList >::type::value));
                 ISAAC_CUDA_CHECK(cudaMalloc((minmax_struct**)&local_minmax_array_d, sizeof(minmax_struct) * local_size[0] * local_size[1]));
             #endif
+            
+            for (int i = 0; i < 3; i++)
+            {
+                global_size_scaled[i] = isaac_int( (isaac_float)global_size[i] * (isaac_float)scale[i] );
+                 local_size_scaled[i] = isaac_int( (isaac_float) local_size[i] * (isaac_float)scale[i] );
+                   position_scaled[i] = isaac_int( (isaac_float)   position[i] * (isaac_float)scale[i] );
+            }
+            
             //INIT
             MPI_Comm_dup(MPI_COMM_WORLD, &mpi_world);
             myself = this;
@@ -528,6 +538,9 @@ class IsaacVisualization
             max_size = max(uint32_t(global_size[0]),uint32_t(global_size[1]));
             if (TSimDim::value > 2)
                 max_size = max(uint32_t(global_size[2]),uint32_t(max_size));
+            max_size_scaled = max(uint32_t(global_size_scaled[0]),uint32_t(global_size_scaled[1]));
+            if (TSimDim::value > 2)
+                max_size_scaled = max(uint32_t(global_size_scaled[2]),uint32_t(max_size_scaled));
             updateBounding( );
             icetPhysicalRenderSize(framebuffer_size.x, framebuffer_size.y);
             icetDrawCallback( drawCallBack );
@@ -567,36 +580,32 @@ class IsaacVisualization
                 json_object_set_new( json_root, "step", json_real( step ) );
                 
                 json_object_set_new( json_root, "dimension", json_integer ( TSimDim::value ) );
-                json_object_set_new( json_root, "width", json_integer ( global_size[0] ) );
+                json_object_set_new( json_root, "width", json_integer ( global_size_scaled[0] ) );
                 if (TSimDim::value > 1)
-                    json_object_set_new( json_root, "height", json_integer ( global_size[1] ) );
+                    json_object_set_new( json_root, "height", json_integer ( global_size_scaled[1] ) );
                 if (TSimDim::value > 2)
-                    json_object_set_new( json_root, "depth", json_integer ( global_size[2] ) );
+                    json_object_set_new( json_root, "depth", json_integer ( global_size_scaled[2] ) );
             }
         }
         void updateBounding()
         {
             if (icet_bounding_box)
             {
-                isaac_float f_l_width = (isaac_float)local_size[0]/(isaac_float)max_size * 2.0f;
-                isaac_float f_l_height = (isaac_float)local_size[1]/(isaac_float)max_size * 2.0f;
+                isaac_float f_l_width = (isaac_float)local_size_scaled[0]/(isaac_float)max_size_scaled * 2.0f;
+                isaac_float f_l_height = (isaac_float)local_size_scaled[1]/(isaac_float)max_size_scaled * 2.0f;
                 isaac_float f_l_depth = 0.0f;
                 if (TSimDim::value > 2)
-                    f_l_depth = (isaac_float)local_size[2]/(isaac_float)max_size * 2.0f;
-                isaac_float f_x = (isaac_float)position[0]/(isaac_float)max_size * 2.0f - (isaac_float)global_size[0]/(isaac_float)max_size;
-                isaac_float f_y = (isaac_float)position[1]/(isaac_float)max_size * 2.0f - (isaac_float)global_size[1]/(isaac_float)max_size;
+                    f_l_depth = (isaac_float)local_size_scaled[2]/(isaac_float)max_size_scaled * 2.0f;
+                isaac_float f_x = (isaac_float)position_scaled[0]/(isaac_float)max_size_scaled * 2.0f - (isaac_float)global_size_scaled[0]/(isaac_float)max_size_scaled;
+                isaac_float f_y = (isaac_float)position_scaled[1]/(isaac_float)max_size_scaled * 2.0f - (isaac_float)global_size_scaled[1]/(isaac_float)max_size_scaled;
                 isaac_float f_z = 0.0f;
                 if (TSimDim::value > 2)
-                    f_z = (isaac_float)position[2]/(isaac_float)max_size * isaac_float(2) - (isaac_float)global_size[2]/(isaac_float)max_size;
+                    f_z = (isaac_float)position_scaled[2]/(isaac_float)max_size_scaled * isaac_float(2) - (isaac_float)global_size_scaled[2]/(isaac_float)max_size_scaled;
                 icetBoundingBoxf( f_x, f_x + f_l_width, f_y, f_y + f_l_height, f_z, f_z + f_l_depth);
             }
             else
                 icetBoundingVertices(0,0,0,0,NULL);
         }
-    void updateSimulationData(TSimulationData simulationData)
-    {
-        this->simulationData = simulationData;
-    }
 	void updatePosition( const TDomainSize position )
 	{
 		this->position = position;
@@ -1071,9 +1080,9 @@ class IsaacVisualization
             //Every rank calculates it's distance to the camera
             IceTDouble point[4] =
             {
-                (IceTDouble(position[0]) + (IceTDouble(local_size[0]) - IceTDouble(global_size[0])) / 2.0) / IceTDouble(max_size/2),
-                (IceTDouble(position[1]) + (IceTDouble(local_size[1]) - IceTDouble(global_size[1])) / 2.0) / IceTDouble(max_size/2),
-                (IceTDouble(position[2]) + (IceTDouble(local_size[2]) - IceTDouble(global_size[2])) / 2.0) / IceTDouble(max_size/2),
+                (IceTDouble(position_scaled[0]) + (IceTDouble(local_size_scaled[0]) - IceTDouble(global_size_scaled[0])) / 2.0) / IceTDouble(max_size_scaled/2),
+                (IceTDouble(position_scaled[1]) + (IceTDouble(local_size_scaled[1]) - IceTDouble(global_size_scaled[1])) / 2.0) / IceTDouble(max_size_scaled/2),
+                (IceTDouble(position_scaled[2]) + (IceTDouble(local_size_scaled[2]) - IceTDouble(global_size_scaled[2])) / 2.0) / IceTDouble(max_size_scaled/2),
                 1.0
             };
             IceTDouble result[4];
@@ -1166,7 +1175,7 @@ class IsaacVisualization
     private:        
         static IsaacVisualization *myself;
         
-        TSimulationData simulationData;
+        TScale scale;
         
         static void drawCallBack(
             const IceTDouble * projection_matrix,
@@ -1188,6 +1197,7 @@ class IsaacVisualization
             calcInverse(inverse,projection_matrix,modelview_matrix);
             for (int i = 0; i < 16; i++)
                 inverse_h[i] = static_cast<float>(inverse[i]);
+
             size_h[0].global_size.value.x = myself->global_size[0];
             size_h[0].global_size.value.y = myself->global_size[1];
             if (TSimDim::value > 2)
@@ -1201,6 +1211,21 @@ class IsaacVisualization
             if (TSimDim::value > 2)
                 size_h[0].local_size.value.z = myself->local_size[2];
             size_h[0].max_global_size = static_cast<float>(max(max(uint32_t(myself->global_size[0]),uint32_t(myself->global_size[1])),uint32_t(myself->global_size[2])));
+
+            size_h[0].global_size_scaled.value.x = myself->global_size_scaled[0];
+            size_h[0].global_size_scaled.value.y = myself->global_size_scaled[1];
+            if (TSimDim::value > 2)
+                size_h[0].global_size_scaled.value.z = myself->global_size_scaled[2];
+            size_h[0].position.value.x = myself->position[0];
+            size_h[0].position.value.y = myself->position[1];
+            if (TSimDim::value > 2)
+                size_h[0].position.value.z = myself->position[2];
+            size_h[0].local_size_scaled.value.x = myself->local_size_scaled[0];
+            size_h[0].local_size_scaled.value.y = myself->local_size_scaled[1];
+            if (TSimDim::value > 2)
+                size_h[0].local_size_scaled.value.z = myself->local_size_scaled[2];
+            size_h[0].max_global_size_scaled = static_cast<float>(max(max(uint32_t(myself->global_size_scaled[0]),uint32_t(myself->global_size_scaled[1])),uint32_t(myself->global_size_scaled[2])));
+
             
             #if ISAAC_ALPAKA == 1
                 alpaka::mem::view::copy(myself->stream, myself->inverse_d, inverse_h_buf, size_t(16));
@@ -1234,7 +1259,7 @@ class IsaacVisualization
                     mpl::vector<>,
                     alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t>,
                     TTransfer_size,
-                    TSimulationData,
+                    TScale,
                     TAccDim,
                     TAcc,
                     TStream,
@@ -1262,7 +1287,7 @@ class IsaacVisualization
                     readback_viewport,
                     myself->interpolation,
                     myself->iso_surface,
-                    myself->simulationData
+                    myself->scale
                 );
                 alpaka::wait::wait(myself->stream);
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
@@ -1280,7 +1305,7 @@ class IsaacVisualization
                     mpl::vector<>,
                     uint32_t*,
                     TTransfer_size,
-                    TSimulationData,
+                    TScale,
                     boost::mpl::size< TSourceList >::type::value
                 >
                 ::call(
@@ -1296,7 +1321,7 @@ class IsaacVisualization
                     readback_viewport,
                     myself->interpolation,
                     myself->iso_surface,
-                    myself->simulationData
+                    myself->scale
                 );
                 ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
@@ -1494,9 +1519,6 @@ class IsaacVisualization
         isaac_size2 framebuffer_size;
         #if ISAAC_ALPAKA == 1
             alpaka::Vec<TFraDim, size_t> framebuffer_prod;
-            TDomainSize global_size;
-            TDomainSize local_size;
-            TDomainSize position;
             alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t> framebuffer;
             alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t> inverse_d;
             alpaka::mem::buf::Buf<TDevAcc, isaac_size_struct< TSimDim::value >, TFraDim, size_t> size_d;
@@ -1505,14 +1527,17 @@ class IsaacVisualization
             alpaka::mem::buf::Buf<TDevAcc, minmax_struct, TFraDim, size_t> local_minmax_array_d;
         #else
             size_t framebuffer_prod;
-            TDomainSize global_size;
-            TDomainSize local_size;
-            TDomainSize position;        
             isaac_uint* framebuffer;
             isaac_functor_chain_pointer_N* functor_chain_d;
             isaac_functor_chain_pointer_N* functor_chain_choose_d;
             minmax_struct* local_minmax_array_d;
         #endif
+        TDomainSize global_size;
+        TDomainSize local_size;
+        TDomainSize position;
+        TDomainSize global_size_scaled;
+        TDomainSize local_size_scaled;
+        TDomainSize position_scaled;
         MPI_Comm mpi_world;
         IceTDouble projection[16];
         IceTDouble look_at[3];
@@ -1559,14 +1584,15 @@ class IsaacVisualization
         const static size_t transfer_size = TTransfer_size;
         functions_struct functions[boost::mpl::size< TSourceList >::type::value];
         size_t max_size;
+        size_t max_size_scaled;
 };
 
 #if ISAAC_ALPAKA == 1
-    template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size,typename TSimulationData>
-    IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size,TSimulationData>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size,TSimulationData>::myself = NULL;
+    template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size,typename TScale>
+    IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale>::myself = NULL;
 #else
-    template <typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size,typename TSimulationData>
-    IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size,TSimulationData>* IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size,TSimulationData>::myself = NULL;
+    template <typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size,typename TScale>
+    IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale>* IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale>::myself = NULL;
 #endif
 
 } //namespace isaac;
