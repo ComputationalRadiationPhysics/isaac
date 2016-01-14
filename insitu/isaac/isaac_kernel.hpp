@@ -568,12 +568,12 @@ template <
             isaac_float3 vec = end - start;
             isaac_float l_scaled = sqrt( vec.x * vec.x + vec.y * vec.y + vec.z * vec.z );
 
-            start.x = start.x / scale[0];
-            start.y = start.y / scale[1];
-            start.z = start.z / scale[2];
-              end.x =   end.x / scale[0];
-              end.y =   end.y / scale[1];
-              end.z =   end.z / scale[2];
+            start.x = start.x / scale.x;
+            start.y = start.y / scale.y;
+            start.z = start.z / scale.z;
+              end.x =   end.x / scale.x;
+              end.y =   end.y / scale.y;
+              end.z =   end.z / scale.z;
 
             vec = end - start;
             isaac_float l = sqrt( vec.x * vec.x + vec.y * vec.y + vec.z * vec.z );
@@ -1060,8 +1060,7 @@ template
 
 template
 <
-    typename TSource,
-    typename TScale
+    typename TSource
 >
 #if ISAAC_ALPAKA == 1
     struct updateBufferKernel
@@ -1074,8 +1073,7 @@ template
 #endif
             const TSource source,
             void * const pointer,
-            const isaac_int3 local_size,
-            const TScale scale)
+            const isaac_int3 local_size)
 #if ISAAC_ALPAKA == 1
         const
 #endif
@@ -1139,8 +1137,7 @@ template
 
 template
 <
-    typename TSource,
-    typename TScale
+    typename TSource
 >
 #if ISAAC_ALPAKA == 1
     struct minMaxKernel
@@ -1157,8 +1154,7 @@ template
             const int nr,
             minmax_struct * const result,
             const isaac_int3 local_size,
-            void const * const pointer,
-            const TScale scale)
+            void const * const pointer)
 #if ISAAC_ALPAKA == 1
         const
 #endif

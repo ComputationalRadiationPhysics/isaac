@@ -56,7 +56,7 @@ class TestSource1
 		isaac_int width;
 		isaac_int width_mul_height;
 		ISAAC_NO_HOST_DEVICE_WARNING
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator() (const isaac_int3& nIndex, const int& dummy) const
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator[] (const isaac_int3& nIndex) const
 		{
 			isaac_float3 value = ptr[
 				nIndex.x +
@@ -107,7 +107,7 @@ class TestSource2
 		isaac_int width_mul_height;
 		
 		ISAAC_NO_HOST_DEVICE_WARNING		
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator() (const isaac_int3& nIndex, const int& dummy) const
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator[] (const isaac_int3& nIndex) const
 		{
 			isaac_float value = ptr[
 				nIndex.x +
@@ -280,6 +280,11 @@ int main(int argc, char **argv)
 	#endif
 	
 	SourceList sources( testSource1, testSource2 );
+
+	std::vector<float> scaling;
+		scaling.push_back(1);
+		scaling.push_back(1);
+		scaling.push_back(1);
 	
 	///////////////////////////////////////
 	// Create isaac visualization object //
@@ -299,7 +304,7 @@ int main(int argc, char **argv)
 			std::vector<size_t>, //Type of the 3D vectors used later
 		#endif
 		1024, //Size of the transfer functions
-		int //user defined type of data for the source feedback function
+		std::vector<float> //user defined type of scaling
 	> (
 		#if ISAAC_ALPAKA == 1
 			devHost, //Alpaka specific host dev instance
@@ -314,7 +319,8 @@ int main(int argc, char **argv)
 		global_size, //Size of the whole volumen including all nodes
 		local_size, //Local size of the subvolume
 		position, //Position of the subvolume in the globale volume
-		sources //instances of the sources to render
+		sources, //instances of the sources to render
+		scaling
 	);
 	
 	//Setting up the metadata description (only master, but however slaves could then add metadata, too, it would be merged)
