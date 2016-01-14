@@ -924,6 +924,7 @@ struct IsaacFillRectKernelStruct
                     TFilter, \
                     TTransfer_size,
             #define ISAAC_KERNEL_END \
+                    ,TSimulationData \
                 > \
                 kernel; \
                 auto const instance \

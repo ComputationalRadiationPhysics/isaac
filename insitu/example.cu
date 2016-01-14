@@ -56,7 +56,7 @@ class TestSource1
 		isaac_int width;
 		isaac_int width_mul_height;
 		ISAAC_NO_HOST_DEVICE_WARNING
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator[] (const isaac_int3 nIndex) const
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator() (const isaac_int3& nIndex, const int& dummy) const
 		{
 			isaac_float3 value = ptr[
 				nIndex.x +
@@ -107,7 +107,7 @@ class TestSource2
 		isaac_int width_mul_height;
 		
 		ISAAC_NO_HOST_DEVICE_WARNING		
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator[] (const isaac_int3 nIndex) const
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator() (const isaac_int3& nIndex, const int& dummy) const
 		{
 			isaac_float value = ptr[
 				nIndex.x +
@@ -298,7 +298,8 @@ int main(int argc, char **argv)
 		#else //CUDA
 			std::vector<size_t>, //Type of the 3D vectors used later
 		#endif
-		1024 //Size of the transfer functions
+		1024, //Size of the transfer functions
+		int //user defined type of data for the source feedback function
 	> (
 		#if ISAAC_ALPAKA == 1
 			devHost, //Alpaka specific host dev instance

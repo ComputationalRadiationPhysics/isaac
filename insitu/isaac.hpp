@@ -243,7 +243,7 @@ class IsaacVisualization
                         const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
                         const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
                         auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
-                        updateBufferKernel<TSource> kernel;
+                        updateBufferKernel<TSource, TSimulationData> kernel;
                         auto const instance
                         (
                             alpaka::exec::create<TAcc>
