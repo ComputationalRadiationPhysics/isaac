@@ -66,7 +66,8 @@ template <
     typename TSimDim,
     typename TSourceList,
     typename TDomainSize,
-    size_t TTransfer_size
+    size_t TTransfer_size,
+    typename TSimulationData
 >
 class IsaacVisualization 
 {
@@ -251,7 +252,8 @@ class IsaacVisualization
                                 kernel,
                                 source,
                                 pointer_array.pointer[ I ],
-                                local_size_array
+                                local_size_array,
+                                myself->simulationData
                             )
                         );
                         alpaka::stream::enqueue(stream, instance);                
@@ -259,7 +261,7 @@ class IsaacVisualization
                     #else
                         dim3 block (block_size.x, block_size.y);
                         dim3 grid  (grid_size.x, grid_size.y);
-                        updateBufferKernel<<<grid,block>>>( source, pointer_array.pointer[ I ], local_size_array );
+                        updateBufferKernel<<<grid,block>>>( source, pointer_array.pointer[ I ], local_size_array, myself->simulationData );
                         ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                     #endif
                 }
@@ -321,7 +323,7 @@ class IsaacVisualization
                     const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
                     const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
                     auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
-                    minMaxKernel<TSource> kernel;
+                    minMaxKernel<TSource,TSimulationData> kernel;
                     auto const instance
                     (
                         alpaka::exec::create<TAcc>
@@ -334,7 +336,8 @@ class IsaacVisualization
                             I,
                             alpaka::mem::view::getPtrNative(local_minmax),
                             local_size_array,
-                            pointer_array.pointer[ I ]
+                            pointer_array.pointer[ I ],
+                            myself->simulationData
                         )
                     );
                     alpaka::stream::enqueue(stream, instance);                
@@ -344,7 +347,7 @@ class IsaacVisualization
                 #else
                     dim3 block (block_size.x, block_size.y);
                     dim3 grid  (grid_size.x, grid_size.y);
-                    minMaxKernel<<<grid,block>>>( source, I, local_minmax, local_size_array, pointer_array.pointer[ I ]);
+                    minMaxKernel<<<grid,block>>>( source, I, local_minmax, local_size_array, pointer_array.pointer[ I ], myself->simulationData);
                     ISAAC_CUDA_CHECK(cudaMemcpy( local_minmax_array_h, local_minmax, sizeof(minmax_struct)*local_size_array.x * local_size_array.y, cudaMemcpyDeviceToHost));
                 #endif
                 minmax.min[ I ] =  FLT_MAX;
@@ -590,6 +593,10 @@ class IsaacVisualization
             else
                 icetBoundingVertices(0,0,0,0,NULL);
         }
+    void updateSimulationData(TSimulationData simulationData)
+    {
+        this->simulationData = simulationData;
+    }
 	void updatePosition( const TDomainSize position )
 	{
 		this->position = position;
@@ -1159,6 +1166,8 @@ class IsaacVisualization
     private:        
         static IsaacVisualization *myself;
         
+        TSimulationData simulationData;
+        
         static void drawCallBack(
             const IceTDouble * projection_matrix,
             const IceTDouble * modelview_matrix,
@@ -1225,6 +1234,7 @@ class IsaacVisualization
                     mpl::vector<>,
                     alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t>,
                     TTransfer_size,
+                    TSimulationData,
                     TAccDim,
                     TAcc,
                     TStream,
@@ -1251,7 +1261,8 @@ class IsaacVisualization
                     myself->pointer_array,
                     readback_viewport,
                     myself->interpolation,
-                    myself->iso_surface
+                    myself->iso_surface,
+                    myself->simulationData
                 );
                 alpaka::wait::wait(myself->stream);
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
@@ -1269,6 +1280,7 @@ class IsaacVisualization
                     mpl::vector<>,
                     uint32_t*,
                     TTransfer_size,
+                    TSimulationData,
                     boost::mpl::size< TSourceList >::type::value
                 >
                 ::call(
@@ -1283,7 +1295,8 @@ class IsaacVisualization
                     myself->pointer_array,
                     readback_viewport,
                     myself->interpolation,
-                    myself->iso_surface
+                    myself->iso_surface,
+                    myself->simulationData
                 );
                 ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
@@ -1549,11 +1562,11 @@ class IsaacVisualization
 };
 
 #if ISAAC_ALPAKA == 1
-    template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size>
-    IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size>::myself = NULL;
+    template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size,typename TSimulationData>
+    IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size,TSimulationData>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size,TSimulationData>::myself = NULL;
 #else
-    template <typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size>
-    IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size>* IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size>::myself = NULL;
+    template <typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size,typename TSimulationData>
+    IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size,TSimulationData>* IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size,TSimulationData>::myself = NULL;
 #endif
 
 } //namespace isaac;

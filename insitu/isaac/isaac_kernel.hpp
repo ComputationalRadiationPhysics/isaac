@@ -171,13 +171,15 @@ template <
     typename TSource,
     typename TPos,
     typename TPointerArray,
-    typename TLocalSize
+    typename TLocalSize,
+    typename TSimulationData
 >
 ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
     const TSource& source,
     const TPos& pos,
     const TPointerArray& pointerArray,
-    const TLocalSize& local_size
+    const TLocalSize& local_size,
+    const TSimulationData& simulationData
 #if ISAAC_ALPAKA == 1
     ,isaac_float4 const * const isaac_parameter_d
     ,isaac_functor_chain_pointer_N const * const isaac_function_chain_d
@@ -195,7 +197,7 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
             isaac_int(pos.z)
         };
         if (TSource::persistent)
-            data = source[coord];
+            data = source(coord,simulationData);
         else
             data = ptr[coord.x + ISAAC_GUARD_SIZE + (coord.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
     }
@@ -220,7 +222,7 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
                             coord.z = isaac_int(z?floor(pos.z):ceil(pos.z));
                     }
                     if (TSource::persistent)
-                        data8[x][y][z] = source[coord];
+                        data8[x][y][z] = source(coord,simulationData);
                     else
                         data8[x][y][z] = ptr[coord.x + ISAAC_GUARD_SIZE + (coord.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
                 }
@@ -304,7 +306,8 @@ struct merge_source_iterator
         typename TPointerArray,
         typename TFeedback,
         typename TStep,
-        typename TStepLength
+        typename TStepLength,
+        typename TSimulationData
 #if ISAAC_ALPAKA == 1
         ,typename TParameter
 #endif
@@ -320,7 +323,8 @@ struct merge_source_iterator
         const TPointerArray& pointerArray,
         TFeedback& feedback,
         const TStep& step,
-        const TStepLength& stepLength
+        const TStepLength& stepLength,
+        const TSimulationData& simulationData
 #if ISAAC_ALPAKA == 1
         ,const TParameter isaac_parameter_d
         ,isaac_functor_chain_pointer_N const * const isaac_function_chain_d
@@ -335,7 +339,7 @@ struct merge_source_iterator
         
         if ( mpl::at_c< TFilter, NR::value >::type::value )
         {
-            isaac_float result = get_value< TInterpolation, NR >( source, pos, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM );
+            isaac_float result = get_value< TInterpolation, NR >( source, pos, pointerArray, local_size, simulationData ISAAC_FUNCTION_CHAIN_PARAM );
             isaac_int lookup_value = isaac_int( round(result * isaac_float( Ttransfer_size ) ) );
             if (lookup_value < 0 )
                 lookup_value = 0;
@@ -390,12 +394,12 @@ struct merge_source_iterator
                     
                     isaac_float3 gradient=
                     {
-                        (get_value< TInterpolation, NR >( source, right, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM ) -
-                         get_value< TInterpolation, NR >( source,  left, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM )) / d1,
-                        (get_value< TInterpolation, NR >( source,  down, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM ) -
-                         get_value< TInterpolation, NR >( source,    up, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM )) / d2,
-                        (get_value< TInterpolation, NR >( source,  back, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM ) -
-                         get_value< TInterpolation, NR >( source, front, pointerArray, local_size ISAAC_FUNCTION_CHAIN_PARAM )) / d3
+                        (get_value< TInterpolation, NR >( source, right, pointerArray, local_size, simulationData ISAAC_FUNCTION_CHAIN_PARAM ) -
+                         get_value< TInterpolation, NR >( source,  left, pointerArray, local_size, simulationData ISAAC_FUNCTION_CHAIN_PARAM )) / d1,
+                        (get_value< TInterpolation, NR >( source,  down, pointerArray, local_size, simulationData ISAAC_FUNCTION_CHAIN_PARAM ) -
+                         get_value< TInterpolation, NR >( source,    up, pointerArray, local_size, simulationData ISAAC_FUNCTION_CHAIN_PARAM )) / d2,
+                        (get_value< TInterpolation, NR >( source,  back, pointerArray, local_size, simulationData ISAAC_FUNCTION_CHAIN_PARAM ) -
+                         get_value< TInterpolation, NR >( source, front, pointerArray, local_size, simulationData ISAAC_FUNCTION_CHAIN_PARAM )) / d3
                     };
                     isaac_float l = sqrt(
                         gradient.x * gradient.x +
@@ -464,7 +468,8 @@ template <
     typename TFilter,
     size_t Ttransfer_size,
     isaac_int TInterpolation,
-    isaac_int TIsoSurface
+    isaac_int TIsoSurface,
+    typename TSimulationData
 >
 #if ISAAC_ALPAKA == 1
     struct isaacFillRectKernel
@@ -487,7 +492,8 @@ template <
             const isaac_float4 background_color,
             const TTransferArray transferArray,
             const TSourceWeight sourceWeight,
-            const TPointerArray pointerArray)
+            const TPointerArray pointerArray,
+            const TSimulationData simulationData)
 #if ISAAC_ALPAKA == 1
         const
 #endif
@@ -640,7 +646,8 @@ template <
                     pointerArray,
                     result,
                     step_vec,
-                    step
+                    step,
+                    simulationData
 #if ISAAC_ALPAKA == 1
                     ,isaac_parameter_d
                     ,isaac_function_chain_d
@@ -687,6 +694,7 @@ template <
     typename TFilter,
     typename TFramebuffer,
     size_t TTransfer_size,
+    typename TSimulationData,
 #if ISAAC_ALPAKA == 1
     typename TAccDim,
     typename TAcc,
@@ -719,7 +727,8 @@ struct IsaacFillRectKernelStruct
         const TPointerArray& pointerArray,
         IceTInt const * const readback_viewport,
         const isaac_int interpolation,
-        const isaac_int iso_surface
+        const isaac_int iso_surface,
+        const TSimulationData& simulationData
     )
     {
         if (sourceWeight.value[ mpl::size< TSourceList >::type::value - N] == isaac_float(0) )
@@ -733,6 +742,7 @@ struct IsaacFillRectKernelStruct
                 typename mpl::push_back< TFilter, mpl::false_ >::type,
                 TFramebuffer,
                 TTransfer_size,
+                TSimulationData,
 #if ISAAC_ALPAKA == 1
                 TAccDim,
                 TAcc,
@@ -763,7 +773,8 @@ struct IsaacFillRectKernelStruct
                 pointerArray,
                 readback_viewport,
                 interpolation,
-                iso_surface
+                iso_surface,
+                simulationData
             );
     else
             IsaacFillRectKernelStruct
@@ -776,6 +787,7 @@ struct IsaacFillRectKernelStruct
                 typename mpl::push_back< TFilter, mpl::true_ >::type,
                 TFramebuffer,
                 TTransfer_size,
+                TSimulationData,
 #if ISAAC_ALPAKA == 1
                 TAccDim,
                 TAcc,
@@ -806,7 +818,8 @@ struct IsaacFillRectKernelStruct
                 pointerArray,
                 readback_viewport,
                 interpolation,
-                iso_surface
+                iso_surface,
+                simulationData
             );
     }
 };
@@ -819,7 +832,8 @@ template <
     typename TPointerArray,
     typename TFilter,
     typename TFramebuffer,
-    size_t TTransfer_size
+    size_t TTransfer_size,
+    typename TSimulationData
 #if ISAAC_ALPAKA == 1
     ,typename TAccDim
     ,typename TAcc
@@ -840,6 +854,7 @@ struct IsaacFillRectKernelStruct
     TFilter,
     TFramebuffer,
     TTransfer_size,
+    TSimulationData,
 #if ISAAC_ALPAKA == 1
     TAccDim,
     TAcc,
@@ -871,7 +886,8 @@ struct IsaacFillRectKernelStruct
         const TPointerArray& pointerArray,
         IceTInt const * const readback_viewport,
         const isaac_int interpolation,
-        const isaac_int iso_surface
+        const isaac_int iso_surface,
+        const TSimulationData& simulationData
     )
     {
         isaac_size2 grid_size=
@@ -928,7 +944,8 @@ struct IsaacFillRectKernelStruct
                         background_color, \
                         transferArray, \
                         sourceWeight, \
-                        pointerArray \
+                        pointerArray, \
+                        simulationData \
                     ) \
                 ); \
                 alpaka::stream::enqueue(stream, instance); \
@@ -958,7 +975,8 @@ struct IsaacFillRectKernelStruct
                     background_color, \
                     transferArray, \
                     sourceWeight, \
-                    pointerArray \
+                    pointerArray, \
+                    simulationData \
                 );            
             
         #endif
@@ -1029,7 +1047,8 @@ template
 
 template
 <
-    typename TSource
+    typename TSource,
+    typename TSimulationData
 >
 #if ISAAC_ALPAKA == 1
     struct updateBufferKernel
@@ -1042,7 +1061,8 @@ template
 #endif
             const TSource source,
             void * const pointer,
-            const isaac_int3 local_size)
+            const isaac_int3 local_size,
+            const TSimulationData simulationData)
 #if ISAAC_ALPAKA == 1
         const
 #endif
@@ -1074,7 +1094,7 @@ template
                 coord.z = -ISAAC_GUARD_SIZE;
                 for (;dest.z < local_size.z + 2 * ISAAC_GUARD_SIZE; dest.z++)
                 {
-                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source[coord];
+                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source(coord,simulationData);
                     coord.z++;
                 }
             }
@@ -1090,14 +1110,14 @@ template
                     coord.y = local_size.y-1;
                 coord.z = 0;
                 for (; dest.z < ISAAC_GUARD_SIZE; dest.z++)
-                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source[coord];
+                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source(coord,simulationData);
                 for (;dest.z < local_size.z + ISAAC_GUARD_SIZE - 1; dest.z++)
                 {
-                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source[coord];
+                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source(coord,simulationData);
                     coord.z++;
                 }
                 for (;dest.z < local_size.z + 2 * ISAAC_GUARD_SIZE; dest.z++)
-                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source[coord];
+                    ptr[dest.x + dest.y * (local_size.x + 2 * ISAAC_GUARD_SIZE) + dest.z * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )] = source(coord,simulationData);
             }
         }
 #if ISAAC_ALPAKA == 1
@@ -1106,7 +1126,8 @@ template
 
 template
 <
-    typename TSource
+    typename TSource,
+    typename TSimulationData
 >
 #if ISAAC_ALPAKA == 1
     struct minMaxKernel
@@ -1123,7 +1144,8 @@ template
             const int nr,
             minmax_struct * const result,
             const isaac_int3 local_size,
-            void const * const pointer)
+            void const * const pointer,
+            const TSimulationData simulationData)
 #if ISAAC_ALPAKA == 1
         const
 #endif
@@ -1152,7 +1174,7 @@ template
             {
                 isaac_float_dim < TSource::feature_dim > data;
                 if (TSource::persistent)
-                    data = source[coord];
+                    data = source(coord,simulationData);
                 else
                 {
                     isaac_float_dim < TSource::feature_dim >* ptr = (isaac_float_dim < TSource::feature_dim >*)(pointer);
