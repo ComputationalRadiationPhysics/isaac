@@ -447,7 +447,7 @@ class IsaacVisualization
             look_at[1] = 0.0f;
             look_at[2] = 0.0f;
             ISAAC_SET_IDENTITY(3,rotation)
-            distance = -5.0f;
+            distance = -4.5f;
             updateModelview();
 
             //Create functor chain pointer lookup table
@@ -604,14 +604,18 @@ class IsaacVisualization
             else
                 icetBoundingVertices(0,0,0,0,NULL);
         }
-	void updatePosition( const TDomainSize position )
-	{
-		this->position = position;
-	}
-	void updateLocalSize( const TDomainSize local_size )
-	{
-		this->local_size = local_size;
-	}
+        void updatePosition( const TDomainSize position )
+        {
+            this->position = position;
+            for (int i = 0; i < 3; i++)
+                position_scaled[i] = isaac_int( (isaac_float) position[i] * (isaac_float)scale[i] );
+        }
+        void updateLocalSize( const TDomainSize local_size )
+        {
+            this->local_size = local_size;
+            for (int i = 0; i < 3; i++)
+                local_size_scaled[i] = isaac_int( (isaac_float) local_size[i] * (isaac_float)scale[i] );
+        }
         void updateFunctions()
         {
             IsaacFunctorPool functors;
