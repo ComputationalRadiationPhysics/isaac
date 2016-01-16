@@ -336,6 +336,8 @@ errorCode Master::run()
 							json_object_set( insitu->t->group->initData, "iso surface", js );
 						if ( js = json_object_get(message->json_root, "step") )
 							json_object_set( insitu->t->group->initData, "step", js );
+						if ( js = json_object_get(message->json_root, "background color") )
+							json_object_set( insitu->t->group->initData, "background color", js );
 						//Send json data
 						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc=dataClientList.getFront();
 						while(dc)

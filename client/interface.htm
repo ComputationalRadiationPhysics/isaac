@@ -47,6 +47,8 @@
 				<input type="button" value="Stop observing" id="stop">
 				<input type="button" value="Stop simulation" id="exit">
 				<input type="button" value="Toogle bounding box" id="bounding">
+				Background color: <input id="background_color" class="jscolor" value="000000" size="6">
+				<input type="button" value="Change" id="background_change">
 			</form>
 			<div id="functions_div"></div>
 			<div id="weight_div"></div>
@@ -1039,6 +1041,21 @@ document.getElementById("bounding").onclick = function()
 		"type" : "feedback",
 		"observe id" : observe_id,
 		"bounding box" : true
+	};
+	socket.send(JSON.stringify(obj));
+}
+
+document.getElementById("background_change").onclick = function()
+{
+	var background_color = new Array(3);
+	background_color[0] = document.getElementById("background_color").jscolor.rgb[0]/255;
+	background_color[1] = document.getElementById("background_color").jscolor.rgb[1]/255;
+	background_color[2] = document.getElementById("background_color").jscolor.rgb[2]/255;
+	var obj =
+	{
+		"type" : "feedback",
+		"observe id" : observe_id,
+		"background color" : background_color
 	};
 	socket.send(JSON.stringify(obj));
 }

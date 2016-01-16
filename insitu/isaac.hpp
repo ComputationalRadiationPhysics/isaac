@@ -429,6 +429,11 @@ class IsaacVisualization
                    position_scaled.push_back( isaac_int( (isaac_float)   position[i] * (isaac_float)scale[i] ) );
             }
             
+            background_color[0] = 0;
+            background_color[1] = 0;
+            background_color[2] = 0;
+            background_color[3] = 1;
+            
             //INIT
             MPI_Comm_dup(MPI_COMM_WORLD, &mpi_world);
             myself = this;
@@ -808,6 +813,7 @@ class IsaacVisualization
             send_functions = false;
             send_weight = false;
             send_minmax = false;
+            send_background_color = false;
 
             //Handle messages
             json_t* message;
@@ -846,6 +852,8 @@ class IsaacVisualization
                             send_functions = true;
                         if ( strcmp( target, "weight" ) == 0 )
                             send_weight = true;
+                        if ( strcmp( target, "background color" ) == 0 )
+                            send_background_color = true;
                     }
                     //Search for scene changes
                     if (json_array_size( js = json_object_get(last, "rotation absolute") ) == 9)
@@ -1042,11 +1050,22 @@ class IsaacVisualization
                     source_weight.value[index] = json_number_value(value);
                 send_weight = true;
             }
-            
             if (js = json_object_get(message, "bounding box") )
             {
                 icet_bounding_box = !icet_bounding_box;
                 updateBounding( );
+            }
+            if (json_array_size( js = json_object_get(message, "background color") ) == 3 )
+            {
+                json_array_foreach(js, index, value)
+                    background_color[index] = json_number_value( value );
+                if (background_color[0] == 0.0f &&
+                    background_color[1] == 0.0f && 
+                    background_color[2] == 0.0f )
+                    icetDisable(ICET_CORRECT_COLORED_BACKGROUND);
+                else
+                    icetEnable(ICET_CORRECT_COLORED_BACKGROUND);
+                send_background_color = true;
             }
             
             json_t* metadata = json_object_get( message, "metadata" );
@@ -1111,7 +1130,6 @@ class IsaacVisualization
             ISAAC_STOP_TIME_MEASUREMENT( sorting_time, +=, sorting, getTicksUs() )
 
             //Drawing
-            IceTFloat background_color[4] = {0.0f,0.0f,0.0f,1.0f};
             ISAAC_START_TIME_MEASUREMENT( merge, getTicksUs() )
             IceTImage image = icetDrawFrame(projection,modelview,background_color);
             ISAAC_STOP_TIME_MEASUREMENT( merge_time, +=, merge, getTicksUs() )
@@ -1562,6 +1580,7 @@ class IsaacVisualization
         bool send_functions;
         bool send_weight;
         bool send_minmax;
+        bool send_background_color;
         bool interpolation;
         bool iso_surface;
         bool icet_bounding_box;
@@ -1593,6 +1612,7 @@ class IsaacVisualization
         functions_struct functions[boost::mpl::size< TSourceList >::type::value];
         size_t max_size;
         size_t max_size_scaled;
+        IceTFloat background_color[4];
 };
 
 #if ISAAC_ALPAKA == 1
