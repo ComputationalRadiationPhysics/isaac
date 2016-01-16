@@ -1451,6 +1451,12 @@ class IsaacVisualization
                         json_object_set_new(v, "max", json_real( myself->minmax_array.max[i] ) );
                     }
                 }
+                if ( myself->send_background_color )
+                {
+                    json_object_set_new( myself->json_root, "background color", matrix = json_array() );
+                    for (size_t i = 0; i < 3; i++)
+                        json_array_append_new( matrix, json_real( myself->background_color[i] ) );
+                }
                 char* buffer = json_dumps( myself->json_root, 0 );
                 myself->communicator->serverSend(buffer);
                 free(buffer);

@@ -954,6 +954,13 @@ document.getElementById("connect").onclick = function()
 						}
 						updateTransfer();
 					}
+					if (obj.hasOwnProperty("background color"))
+					{
+						document.getElementById("background_color").jscolor.fromRGB(
+							obj["background color"][0] * 255,
+							obj["background color"][1] * 255,
+							obj["background color"][2] * 255 );
+					}
 					redraw();
 				}
 				if (obj["type"] == "exit")
