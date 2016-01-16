@@ -578,8 +578,6 @@ template <
             vec = end - start;
             isaac_float l = sqrt( vec.x * vec.x + vec.y * vec.y + vec.z * vec.z );
             
-            step *= l/l_scaled;
-            
             isaac_float3 step_vec = vec / l * step;
             isaac_float3 count_start =  - start / step_vec;
             isaac_float3 local_size_f =
@@ -634,7 +632,7 @@ template <
                 int(isaac_size_d[0].global_size.value.x), min (
                 int(isaac_size_d[0].global_size.value.y),
                 int(isaac_size_d[0].global_size.value.z) ) );
-            isaac_float factor = step / /*isaac_size_d[0].max_global_size*/ min_size * isaac_float(2);
+            isaac_float factor = step / /*isaac_size_d[0].max_global_size*/ min_size * isaac_float(2) * l/l_scaled;;
             for (isaac_int i = first; i <= last; i++)
             {
                 pos = start + step_vec * isaac_float(i);
