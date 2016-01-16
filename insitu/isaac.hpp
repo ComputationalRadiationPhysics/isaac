@@ -436,7 +436,6 @@ class IsaacVisualization
             
             //INIT
             MPI_Comm_dup(MPI_COMM_WORLD, &mpi_world);
-            myself = this;
             MPI_Comm_rank(mpi_world, &rank);
             MPI_Comm_size(mpi_world, &numProc);
             if (rank == master)
@@ -793,6 +792,8 @@ class IsaacVisualization
             //if (rank == master)
             //    printf("-----\n");
             ISAAC_WAIT_VISUALIZATION
+
+            myself = this;
             
             ISAAC_START_TIME_MEASUREMENT( buffer, getTicksUs() )
             isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size, source_weight, pointer
@@ -1135,7 +1136,7 @@ class IsaacVisualization
             ISAAC_STOP_TIME_MEASUREMENT( merge_time, +=, merge, getTicksUs() )
 
             //Message merging
-            char* buffer = json_dumps( myself->json_root, 0 );
+            char* buffer = json_dumps( json_root, 0 );
             strcpy( message_buffer, buffer );
             free(buffer);
             if ( metaTargets == META_MERGE )
@@ -1146,7 +1147,7 @@ class IsaacVisualization
                     MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, receive_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, mpi_world);
                     for (isaac_int i = 0; i < numProc; i++)
                     {
-                        if (i == myself->master)
+                        if (i == master)
                             continue;
                         json_t* js = json_loads(receive_buffer[i], 0, NULL);
                         mergeJSON( json_root, js );
@@ -1155,7 +1156,7 @@ class IsaacVisualization
                 else
                     MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, master, mpi_world);
             }
-
+            
             #ifdef ISAAC_THREADING
                 pthread_create(&visualizationThread,NULL,visualizationFunction,&image);
             #else
