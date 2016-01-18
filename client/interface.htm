@@ -109,6 +109,7 @@ if (stream == 4)
 	document.getElementById("preview_div").style.opacity = '1.0';
 var stream_img = new Image;
 stream_img.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==";
+var wireframe_color = '#ffffff';
 
 var functions = new Array();
 var weight = new Array();
@@ -294,12 +295,8 @@ function redraw()
 	if (one_window && !stream_is_raw( stream ))
 	{
 		if (stream == 4)
-		{
 			p_ctx.globalAlpha=0.5;
-			p_ctx.strokeStyle = '#ffffff';
-		}
-		else
-			p_ctx.strokeStyle = '#ffffff';
+		p_ctx.strokeStyle = wireframe_color;
 	}
 	else
 		p_ctx.strokeStyle = '#000000';
@@ -598,6 +595,12 @@ function updateMetaDataTable(metadata)
 			cell = row.insertCell(-1);
 		cell.innerHTML += metadata[element];
 	}
+}
+
+function RGB2HTML(red, green, blue)
+{
+	var decColor =0x1000000+ blue + 0x100 * green + 0x10000 *red ;
+	return '#'+decColor.toString(16).substr(1);
 }
 
 document.getElementById("connect").onclick = function()
@@ -956,10 +959,15 @@ document.getElementById("connect").onclick = function()
 					}
 					if (obj.hasOwnProperty("background color"))
 					{
-						document.getElementById("background_color").jscolor.fromRGB(
+						var background_color = document.getElementById("background_color");
+						background_color.jscolor.fromRGB(
 							obj["background color"][0] * 255,
 							obj["background color"][1] * 255,
 							obj["background color"][2] * 255 );
+						wireframe_color = RGB2HTML(
+							255 - parseInt(background_color.jscolor.rgb[0]),
+							255 - parseInt(background_color.jscolor.rgb[1]),
+							255 - parseInt(background_color.jscolor.rgb[2]));
 					}
 					redraw();
 				}
