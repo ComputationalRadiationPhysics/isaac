@@ -787,7 +787,7 @@ class IsaacVisualization
             }
             return 0;
         }
-        json_t* doVisualization( const IsaacVisualizationMetaEnum metaTargets = META_MASTER, void* pointer = NULL )
+        json_t* doVisualization( const IsaacVisualizationMetaEnum metaTargets = META_MASTER, void* pointer = NULL, bool redraw = true)
         {
             //if (rank == master)
             //    printf("-----\n");
@@ -962,6 +962,7 @@ class IsaacVisualization
                 }
                 if (add_modelview)
                 {
+                    redraw = true;
                     updateModelview();
                     json_t *matrix;
                     json_object_set_new( message, "modelview", matrix = json_array() );
@@ -994,15 +995,20 @@ class IsaacVisualization
             //Scene set?
             if (json_array_size( js = json_object_get(message, "projection") ) == 16)
             {
+                redraw = true;
                 send_projection = true;
                 json_array_foreach(js, index, value)
                     projection[index] = json_number_value( value );
             }
             if (rank!= master && json_array_size( js = json_object_get(message, "modelview") ) == 16)
+            {
+                redraw = true;
                 json_array_foreach(js, index, value)
                     modelview[index] = json_number_value( value );
+            }
             if (json_array_size( js = json_object_get(message, "transfer points") ) )
             {
+                redraw = true;
                 json_array_foreach(js, index, value)
                 {
                     transfer_h.description[index].clear();
@@ -1023,11 +1029,13 @@ class IsaacVisualization
             }
             if ( js = json_object_get(message, "interpolation") )
             {
+                redraw = true;
                 interpolation = json_boolean_value ( js );
                 send_interpolation = true;
             }
             if ( js = json_object_get(message, "step") )
             {
+                redraw = true;
                 step = json_number_value ( js );
                 if (step < isaac_float(0.01))
                     step = isaac_float(0.01);
@@ -1035,11 +1043,13 @@ class IsaacVisualization
             }
             if ( js = json_object_get(message, "iso surface") )
             {
+                redraw = true;
                 iso_surface = json_boolean_value ( js );
                 send_iso_surface = true;
             }
             if (json_array_size( js = json_object_get(message, "functions") ) )
             {
+                redraw = true;
                 json_array_foreach(js, index, value)
                     functions[index].source = std::string(json_string_value(value));
                 updateFunctions();
@@ -1047,17 +1057,20 @@ class IsaacVisualization
             }
             if (json_array_size( js = json_object_get(message, "weight") ) )
             {
+                redraw = true;
                 json_array_foreach(js, index, value)
                     source_weight.value[index] = json_number_value(value);
                 send_weight = true;
             }
             if (js = json_object_get(message, "bounding box") )
             {
+                redraw = true;
                 icet_bounding_box = !icet_bounding_box;
                 updateBounding( );
             }
             if (json_array_size( js = json_object_get(message, "background color") ) == 3 )
             {
+                redraw = true;
                 json_array_foreach(js, index, value)
                     background_color[index] = json_number_value( value );
                 if (background_color[0] == 0.0f &&
@@ -1096,44 +1109,51 @@ class IsaacVisualization
                     MPI_Reduce( minmax_array.max, NULL, boost::mpl::size< TSourceList >::type::value, MPI_FLOAT, MPI_MAX, master, mpi_world);
                 }
             }
-
-            //Calc order
-            ISAAC_START_TIME_MEASUREMENT( sorting, getTicksUs() )
-            //Every rank calculates it's distance to the camera
-            IceTDouble point[4] =
+            
+            IceTImage image = { NULL };
+            
+            if (redraw)
             {
-                (IceTDouble(position_scaled[0]) + (IceTDouble(local_size_scaled[0]) - IceTDouble(global_size_scaled[0])) / 2.0) / IceTDouble(max_size_scaled/2),
-                (IceTDouble(position_scaled[1]) + (IceTDouble(local_size_scaled[1]) - IceTDouble(global_size_scaled[1])) / 2.0) / IceTDouble(max_size_scaled/2),
-                (IceTDouble(position_scaled[2]) + (IceTDouble(local_size_scaled[2]) - IceTDouble(global_size_scaled[2])) / 2.0) / IceTDouble(max_size_scaled/2),
-                1.0
-            };
-            IceTDouble result[4];
-            mulMatrixVector(result,modelview,point);
-            float point_distance = sqrt(result[0] * result[0] + result[1] * result[1] + result[2] * result[2]);
-            //Allgather of the distances
-            float receive_buffer[numProc];
-            MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, mpi_world);
-            //Putting to a std::multimap of {rank, distance}
-            std::multimap<float, isaac_int, std::less< float > > distance_map;
-            for (isaac_int i = 0; i < numProc; i++)
-                distance_map.insert( std::pair<float, isaac_int>( receive_buffer[i], i ) );
-            //Putting in an array for IceT
-            IceTInt icet_order_array[numProc];
-            {
-                isaac_int i = 0;
-                for (auto it = distance_map.begin(); it != distance_map.end(); it++)
+                //Calc order
+                ISAAC_START_TIME_MEASUREMENT( sorting, getTicksUs() )
+                //Every rank calculates it's distance to the camera
+                IceTDouble point[4] =
                 {
-                    icet_order_array[i] = it->second;
-                    i++;
+                    (IceTDouble(position_scaled[0]) + (IceTDouble(local_size_scaled[0]) - IceTDouble(global_size_scaled[0])) / 2.0) / IceTDouble(max_size_scaled/2),
+                    (IceTDouble(position_scaled[1]) + (IceTDouble(local_size_scaled[1]) - IceTDouble(global_size_scaled[1])) / 2.0) / IceTDouble(max_size_scaled/2),
+                    (IceTDouble(position_scaled[2]) + (IceTDouble(local_size_scaled[2]) - IceTDouble(global_size_scaled[2])) / 2.0) / IceTDouble(max_size_scaled/2),
+                    1.0
+                };
+                IceTDouble result[4];
+                mulMatrixVector(result,modelview,point);
+                float point_distance = sqrt(result[0] * result[0] + result[1] * result[1] + result[2] * result[2]);
+                //Allgather of the distances
+                float receive_buffer[numProc];
+                MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, mpi_world);
+                //Putting to a std::multimap of {rank, distance}
+                std::multimap<float, isaac_int, std::less< float > > distance_map;
+                for (isaac_int i = 0; i < numProc; i++)
+                    distance_map.insert( std::pair<float, isaac_int>( receive_buffer[i], i ) );
+                //Putting in an array for IceT
+                IceTInt icet_order_array[numProc];
+                {
+                    isaac_int i = 0;
+                    for (auto it = distance_map.begin(); it != distance_map.end(); it++)
+                    {
+                        icet_order_array[i] = it->second;
+                        i++;
+                    }
                 }
-            }
-            icetCompositeOrder( icet_order_array );
-            ISAAC_STOP_TIME_MEASUREMENT( sorting_time, +=, sorting, getTicksUs() )
+                icetCompositeOrder( icet_order_array );
+                ISAAC_STOP_TIME_MEASUREMENT( sorting_time, +=, sorting, getTicksUs() )
 
-            //Drawing
-            ISAAC_START_TIME_MEASUREMENT( merge, getTicksUs() )
-            IceTImage image = icetDrawFrame(projection,modelview,background_color);
-            ISAAC_STOP_TIME_MEASUREMENT( merge_time, +=, merge, getTicksUs() )
+                //Drawing
+                ISAAC_START_TIME_MEASUREMENT( merge, getTicksUs() )
+                image = icetDrawFrame(projection,modelview,background_color);
+                ISAAC_STOP_TIME_MEASUREMENT( merge_time, +=, merge, getTicksUs() )
+            }
+            else
+                usleep(10000);
 
             //Message merging
             char* buffer = json_dumps( json_root, 0 );
@@ -1158,9 +1178,9 @@ class IsaacVisualization
             }
             
             #ifdef ISAAC_THREADING
-                pthread_create(&visualizationThread,NULL,visualizationFunction,&image);
+                pthread_create(&visualizationThread,NULL,visualizationFunction,image.opaque_internals);
             #else
-                visualizationFunction(&image);
+                visualizationFunction(image.opaque_internals);
             #endif
             return metadata;
         }
@@ -1194,10 +1214,6 @@ class IsaacVisualization
         uint64_t sorting_time;
         uint64_t buffer_time;
     private:        
-        static IsaacVisualization *myself;
-        
-        TScale scale;
-        
         static void drawCallBack(
             const IceTDouble * projection_matrix,
             const IceTDouble * modelview_matrix,
@@ -1467,11 +1483,14 @@ class IsaacVisualization
             myself->recreateJSON();
             
             //Sending video
-            IceTImage* image = (IceTImage*)dummy;
-            ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
-            if (myself->communicator)
-                myself->communicator->serverSendFrame(icetImageGetColorui(*image),myself->framebuffer_size.x,myself->framebuffer_size.y,4);
-            ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
+            if (dummy)
+            {
+                IceTImage image = { dummy };
+                ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
+                if (myself->communicator)
+                    myself->communicator->serverSendFrame(icetImageGetColorui(image),myself->framebuffer_size.x,myself->framebuffer_size.y,4);
+                ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
+            }
             myself->metaNr++;
             return 0;
         }
@@ -1620,6 +1639,8 @@ class IsaacVisualization
         size_t max_size;
         size_t max_size_scaled;
         IceTFloat background_color[4];
+        static IsaacVisualization *myself;
+        TScale scale;        
 };
 
 #if ISAAC_ALPAKA == 1

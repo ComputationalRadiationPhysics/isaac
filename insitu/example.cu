@@ -428,7 +428,7 @@ int main(int argc, char **argv)
 			// Visualization //
 			///////////////////
 			int start_drawing = visualization->getTicksUs();
-			json_t* meta = visualization->doVisualization(META_MASTER);
+			json_t* meta = visualization->doVisualization(META_MASTER,NULL,!pause);
 			drawing_time +=visualization->getTicksUs() - start_drawing;
 
 			///////////////////
