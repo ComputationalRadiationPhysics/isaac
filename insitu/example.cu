@@ -453,7 +453,6 @@ int main(int argc, char **argv)
 					//Feedback for other clients than the changing one
 					if (rank == 0)
 						json_object_set_new( visualization->getJsonMetaRoot(), "interval", json_integer( interval ) );
-					printf("%i\n",interval);
 				}
 				json_decref( meta );
 			}
