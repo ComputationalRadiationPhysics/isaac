@@ -363,7 +363,12 @@ int main(int argc, char **argv)
 	int video_send_time = 0;
 	int buffer_time = 0;
 	bool pause = false;
-	
+	//How often should the visualization be updated?
+	int interval = 1;
+	int step = 0;
+	if (rank == 0)
+		json_object_set_new( visualization->getJsonMetaRoot(), "interval", json_integer( interval ) );
+
 	///////////////
 	// Main loop //
 	///////////////
@@ -382,96 +387,110 @@ int main(int argc, char **argv)
 			update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
 			simulation_time +=visualization->getTicksUs() - start_simulation;
 		}
-
-		///////////////////
-		// Metadata fill //
-		///////////////////
-		if (rank == 0)
+		
+		step++;
+		if (step >= interval)
 		{
-			json_object_set_new( visualization->getJsonMetaRoot(), "counting variable", json_real( a ) );
-			json_object_set_new( visualization->getJsonMetaRoot(), "drawing_time" , json_integer( drawing_time ) );
-			json_object_set_new( visualization->getJsonMetaRoot(), "simulation_time" , json_integer( simulation_time ) );
-			json_object_set_new( visualization->getJsonMetaRoot(), "sorting_time" , json_integer( visualization->sorting_time ) );
-			json_object_set_new( visualization->getJsonMetaRoot(), "merge_time" , json_integer( visualization->merge_time ) );
-			json_object_set_new( visualization->getJsonMetaRoot(), "kernel_time" , json_integer( visualization->kernel_time ) );
-			json_object_set_new( visualization->getJsonMetaRoot(), "copy_time" , json_integer( visualization->copy_time ) );
-			json_object_set_new( visualization->getJsonMetaRoot(), "video_send_time" , json_integer( visualization->video_send_time ) );
-			json_object_set_new( visualization->getJsonMetaRoot(), "buffer_time" , json_integer( visualization->buffer_time ) );
-			full_drawing_time    += drawing_time;
-			full_simulation_time += simulation_time;
-			sorting_time         += visualization->sorting_time;
-			merge_time           += visualization->merge_time;
-			kernel_time          += visualization->kernel_time;
-			copy_time            += visualization->copy_time;
-			video_send_time      += visualization->video_send_time;
-			buffer_time          += visualization->buffer_time;
-			drawing_time = 0;
-			simulation_time = 0;
-			visualization->sorting_time = 0;
-			visualization->merge_time = 0;
-			visualization->kernel_time = 0;
-			visualization->copy_time = 0;
-			visualization->video_send_time = 0;
-			visualization->buffer_time = 0;
-		}
-
-		///////////////////
-		// Visualization //
-		///////////////////
-		int start_drawing = visualization->getTicksUs();
-		json_t* meta = visualization->doVisualization(META_MASTER);
-		drawing_time +=visualization->getTicksUs() - start_drawing;
-
-		///////////////////
-		// Message check //
-		///////////////////
-		if (meta)
-		{
-			//Let's print it to stdout
-			char* buffer = json_dumps( meta, 0 );
-			printf("META (%i): %s\n",rank,buffer);
-			free(buffer);
-			//And let's also check for an exit message
-			if ( json_integer_value( json_object_get(meta, "exit") ) )
-				force_exit = 1;
-			if ( json_boolean_value( json_object_get(meta, "pause") ) )
-				pause = !pause;
-			//Deref the jansson json root! Otherwise we would get a memory leak
-			json_decref( meta );
-		}
-		usleep(100);
-		count++;
-
-		//////////////////
-		// Debug output //
-		//////////////////
-		if (rank == 0)
-		{
-			int end = visualization->getTicksUs();
-			int diff = end-start;
-			if (diff >= 1000000)
+			step = 0;
+			///////////////////
+			// Metadata fill //
+			///////////////////
+			if (rank == 0)
 			{
-				merge_time -= kernel_time + copy_time;
-				printf("FPS: %.1f \n\tSimulation: %.1f ms\n\tDrawing: %.1f ms\n\t\tSorting: %.1f ms\n\t\tMerge: %.1f ms\n\t\tKernel: %.1f ms\n\t\tCopy: %.1f ms\n\t\tVideo: %.1f ms\n\t\tBuffer: %.1f ms\n",
-					(float)count*1000000.0f/(float)diff,
-					(float)full_simulation_time/1000.0f/(float)count,
-					(float)full_drawing_time/1000.0f/(float)count,
-					(float)sorting_time/1000.0f/(float)count,
-					(float)merge_time/1000.0f/(float)count,
-					(float)kernel_time/1000.0f/(float)count,
-					(float)copy_time/1000.0f/(float)count,
-					(float)video_send_time/1000.0f/(float)count,
-					(float)buffer_time/1000.0f/(float)count);
-				sorting_time = 0;
-				merge_time = 0;
-				kernel_time = 0;
-				copy_time = 0;
-				video_send_time = 0;
-				buffer_time = 0;
-				full_drawing_time = 0;
-				full_simulation_time = 0;
-				start = end;
-				count = 0;
+				json_object_set_new( visualization->getJsonMetaRoot(), "counting variable", json_real( a ) );
+				json_object_set_new( visualization->getJsonMetaRoot(), "drawing_time" , json_integer( drawing_time ) );
+				json_object_set_new( visualization->getJsonMetaRoot(), "simulation_time" , json_integer( simulation_time ) );
+				json_object_set_new( visualization->getJsonMetaRoot(), "sorting_time" , json_integer( visualization->sorting_time ) );
+				json_object_set_new( visualization->getJsonMetaRoot(), "merge_time" , json_integer( visualization->merge_time ) );
+				json_object_set_new( visualization->getJsonMetaRoot(), "kernel_time" , json_integer( visualization->kernel_time ) );
+				json_object_set_new( visualization->getJsonMetaRoot(), "copy_time" , json_integer( visualization->copy_time ) );
+				json_object_set_new( visualization->getJsonMetaRoot(), "video_send_time" , json_integer( visualization->video_send_time ) );
+				json_object_set_new( visualization->getJsonMetaRoot(), "buffer_time" , json_integer( visualization->buffer_time ) );
+				full_drawing_time    += drawing_time;
+				full_simulation_time += simulation_time;
+				sorting_time         += visualization->sorting_time;
+				merge_time           += visualization->merge_time;
+				kernel_time          += visualization->kernel_time;
+				copy_time            += visualization->copy_time;
+				video_send_time      += visualization->video_send_time;
+				buffer_time          += visualization->buffer_time;
+				drawing_time = 0;
+				simulation_time = 0;
+				visualization->sorting_time = 0;
+				visualization->merge_time = 0;
+				visualization->kernel_time = 0;
+				visualization->copy_time = 0;
+				visualization->video_send_time = 0;
+				visualization->buffer_time = 0;
+			}
+
+			///////////////////
+			// Visualization //
+			///////////////////
+			int start_drawing = visualization->getTicksUs();
+			json_t* meta = visualization->doVisualization(META_MASTER);
+			drawing_time +=visualization->getTicksUs() - start_drawing;
+
+			///////////////////
+			// Message check //
+			///////////////////
+			if (meta)
+			{
+				//Let's print it to stdout
+				char* buffer = json_dumps( meta, 0 );
+				printf("META (%i): %s\n",rank,buffer);
+				free(buffer);
+				//And let's also check for an exit message
+				if ( json_integer_value( json_object_get(meta, "exit") ) )
+					force_exit = 1;
+				if ( json_boolean_value( json_object_get(meta, "pause") ) )
+					pause = !pause;
+				//Deref the jansson json root! Otherwise we would get a memory leak
+				json_t* js;
+				if ( js = json_object_get(meta, "interval") )
+				{
+					interval = max( int(1), int( json_integer_value ( js ) ) );
+					//Feedback for other clients than the changing one
+					if (rank == 0)
+						json_object_set_new( visualization->getJsonMetaRoot(), "interval", json_integer( interval ) );
+					printf("%i\n",interval);
+				}
+				json_decref( meta );
+			}
+			usleep(100);
+			count++;
+
+			//////////////////
+			// Debug output //
+			//////////////////
+			if (rank == 0)
+			{
+				int end = visualization->getTicksUs();
+				int diff = end-start;
+				if (diff >= 1000000)
+				{
+					merge_time -= kernel_time + copy_time;
+					printf("FPS: %.1f \n\tSimulation: %.1f ms\n\tDrawing: %.1f ms\n\t\tSorting: %.1f ms\n\t\tMerge: %.1f ms\n\t\tKernel: %.1f ms\n\t\tCopy: %.1f ms\n\t\tVideo: %.1f ms\n\t\tBuffer: %.1f ms\n",
+						(float)count*1000000.0f/(float)diff,
+						(float)full_simulation_time/1000.0f/(float)count,
+						(float)full_drawing_time/1000.0f/(float)count,
+						(float)sorting_time/1000.0f/(float)count,
+						(float)merge_time/1000.0f/(float)count,
+						(float)kernel_time/1000.0f/(float)count,
+						(float)copy_time/1000.0f/(float)count,
+						(float)video_send_time/1000.0f/(float)count,
+						(float)buffer_time/1000.0f/(float)count);
+					sorting_time = 0;
+					merge_time = 0;
+					kernel_time = 0;
+					copy_time = 0;
+					video_send_time = 0;
+					buffer_time = 0;
+					full_drawing_time = 0;
+					full_simulation_time = 0;
+					start = end;
+					count = 0;
+				}
 			}
 		}
 	}	

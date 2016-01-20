@@ -48,7 +48,10 @@
 				<input type="button" value="Stop simulation" id="exit">
 				<input type="button" value="Toogle bounding box" id="bounding">
 				Background color: <input id="background_color" class="jscolor" value="000000" size="6">
-				<input type="button" value="Change" id="background_change">
+				<input type="button" value="Apply" id="background_change">
+				Interval: <input type="range" value="1" min="1" max="32" id="interval_range">
+				<span id="interval_span">1</span>
+				<input type="button" value="Set" id="interval_change">
 			</form>
 			<div id="functions_div"></div>
 			<div id="weight_div"></div>
@@ -552,6 +555,26 @@ function pad(num, size) {
     return s;
 }
 
+document.getElementById("interval_range").oninput = function()
+{
+	var interval_range = document.getElementById("interval_range");
+	var interval_span = document.getElementById("interval_span");
+	interval_span.innerHTML = interval_range.value;
+};
+
+document.getElementById("interval_change").onclick = function()
+{
+	var obj =
+	{
+		"type" : "feedback",
+		"observe id" : observe_id,
+		"metadata" :
+		{
+			"interval" : parseInt(document.getElementById("interval_range").value)
+		}
+	};
+	socket.send(JSON.stringify(obj));};
+
 function createWeightFeedback( w, range_name, value_name )
 {
 	return function()
@@ -730,6 +753,14 @@ document.getElementById("connect").onclick = function()
 				{
 					if (obj.hasOwnProperty("metadata"))
 					{
+						if (obj["metadata"].hasOwnProperty("interval"))
+						{
+							var interval_range = document.getElementById("interval_range");
+							var interval_span = document.getElementById("interval_span");
+							interval_range.value = obj["metadata"]["interval"];
+							interval_span.innerHTML = obj["metadata"]["interval"];
+							delete obj["metadata"]["interval"];
+						}
 						updateMetaDataTable( obj["metadata"] );
 						if (obj["metadata"].hasOwnProperty("reference particles"))
 							particles = obj["metadata"]["reference particles"];
