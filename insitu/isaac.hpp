@@ -794,15 +794,7 @@ class IsaacVisualization
             ISAAC_WAIT_VISUALIZATION
 
             myself = this;
-            
-            ISAAC_START_TIME_MEASUREMENT( buffer, getTicksUs() )
-            isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size, source_weight, pointer
-            #if ISAAC_ALPAKA == 1
-                ,stream
-            #endif
-            );
-            ISAAC_STOP_TIME_MEASUREMENT( buffer_time, +=, buffer, getTicksUs() )
-            
+
             send_distance = false;
             send_look_at = false;
             send_projection = false;
@@ -1114,6 +1106,14 @@ class IsaacVisualization
             
             if (redraw)
             {
+                ISAAC_START_TIME_MEASUREMENT( buffer, getTicksUs() )
+                isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size, source_weight, pointer
+                #if ISAAC_ALPAKA == 1
+                    ,stream
+                #endif
+                );
+                ISAAC_STOP_TIME_MEASUREMENT( buffer_time, +=, buffer, getTicksUs() )
+
                 //Calc order
                 ISAAC_START_TIME_MEASUREMENT( sorting, getTicksUs() )
                 //Every rank calculates it's distance to the camera
