@@ -689,6 +689,20 @@ template <
                         break;
                 }
             }
+            #if ISAAC_SHOWBORDER == 1
+                if (color.w <= isaac_float(0.99))
+                {
+                    isaac_float oma = isaac_float(1) - color.w;
+                    isaac_float4 color_add =
+                    {
+                        0,
+                        0,
+                        0,
+                        oma * factor * isaac_float(10)
+                    };
+                    color = color + color_add;
+                }
+            #endif
             ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], color )
         }
 #if ISAAC_ALPAKA == 1
