@@ -789,6 +789,16 @@ class IsaacVisualization
         }
         json_t* doVisualization( const IsaacVisualizationMetaEnum metaTargets = META_MASTER, void* pointer = NULL, bool redraw = true)
         {
+            if (redraw)
+            {
+                ISAAC_START_TIME_MEASUREMENT( buffer, getTicksUs() )
+                isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size, source_weight, pointer
+                #if ISAAC_ALPAKA == 1
+                    ,stream
+                #endif
+                );
+                ISAAC_STOP_TIME_MEASUREMENT( buffer_time, +=, buffer, getTicksUs() )
+            }
             //if (rank == master)
             //    printf("-----\n");
             ISAAC_WAIT_VISUALIZATION
@@ -1106,14 +1116,6 @@ class IsaacVisualization
             
             if (redraw)
             {
-                ISAAC_START_TIME_MEASUREMENT( buffer, getTicksUs() )
-                isaac_for_each_params( sources, update_pointer_array_iterator(), pointer_array, local_size, source_weight, pointer
-                #if ISAAC_ALPAKA == 1
-                    ,stream
-                #endif
-                );
-                ISAAC_STOP_TIME_MEASUREMENT( buffer_time, +=, buffer, getTicksUs() )
-
                 //Calc order
                 ISAAC_START_TIME_MEASUREMENT( sorting, getTicksUs() )
                 //Every rank calculates it's distance to the camera
