@@ -625,7 +625,7 @@ errorCode Master::run()
 							json_t* root = json_object();
 							json_object_set_new( root, "type", json_string ("period video") );
 							json_object_set_new( root, "payload", json_string ( (char*)(message->buffer) ) );
-							dc->t->masterSendMessage(new MessageContainer(PERIOD_VIDEO,root));
+							dc->t->masterSendMessage(new MessageContainer(PERIOD_VIDEO,root,false,true));
 						}
 						dc = dc->next;
 					}

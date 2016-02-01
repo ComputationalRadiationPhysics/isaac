@@ -97,7 +97,6 @@ callback_isaac(
 	char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 	struct per_session_data__isaac *pss = (struct per_session_data__isaac *)user;
 	Master* master = *((Master**)lws_context_user(lws_get_context(wsi)));
-	MessageContainer* message;
 	
 	switch (reason) {
 
@@ -108,20 +107,29 @@ callback_isaac(
 		break;
 
 	case LWS_CALLBACK_SERVER_WRITEABLE:
-		if (pss->client && (message = pss->client->clientGetMessage())) //New message from master sama!
+		if (pss->client)
 		{
-			char* buffer = json_dumps( message->json_root, 0 );
-			n = strlen(buffer);
-			sprintf(p,"%s",buffer);
-			m = lws_write(wsi, (unsigned char*)p, n, LWS_WRITE_TEXT);
-			free(buffer);
-			if (m < n)
+			MessageContainer* next_message = pss->client->clientGetMessage();
+			MessageContainer* message;
+			while (message = next_message) //New message from master sama!
 			{
-				lwsl_err("ERROR %d writing to socket\n", n);
-				pss->client->clientSendMessage(new MessageContainer(CLOSED));
-				return -1;
+				next_message = pss->client->clientGetMessage();
+				if (!next_message || !message->drop_able) //Deleting dropable messages
+				{
+					char* buffer = json_dumps( message->json_root, 0 );
+					n = strlen(buffer);
+					sprintf(p,"%s",buffer);
+					m = lws_write(wsi, (unsigned char*)p, n, LWS_WRITE_TEXT);
+					free(buffer);
+					if (m < n)
+					{
+						lwsl_err("ERROR %d writing to socket\n", n);
+						pss->client->clientSendMessage(new MessageContainer(CLOSED));
+						return -1;
+					}
+				}
+				delete message;
 			}
-			delete message;
 		}
 		break;
 	//case LWS_CALLBACK_CLOSED:
@@ -203,7 +211,7 @@ errorCode WebSocketDataConnector::run()
 	bool force_exit = false;
 	while (n >= 0 && !force_exit)
 	{
-		n = lws_service(context, 50);
+		n = lws_service(context, 0);
 		lws_callback_on_writable_all_protocol(context,&protocols[1]);
 		while (MessageContainer* message = clientGetMessage())
 		{
@@ -211,7 +219,7 @@ errorCode WebSocketDataConnector::run()
 				force_exit = true;
 			delete message;
 		}
-		usleep(1);
+		usleep(100);
 	}
 	lws_context_destroy(context);
 }
