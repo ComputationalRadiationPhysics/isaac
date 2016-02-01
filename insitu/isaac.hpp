@@ -986,10 +986,12 @@ class IsaacVisualization
             size_t index;
             json_t *value;
 
-            //search for minmax requests
+            //search for requests for all ranks
             if ( js = json_object_get(message, "request") )
             {
                 const char* target = json_string_value( js );
+                if ( strcmp( target, "redraw" ) == 0 )
+                    redraw = true;
                 if ( strcmp( target, "minmax" ) == 0 )
                     send_minmax = true;
             }
