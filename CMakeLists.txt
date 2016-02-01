@@ -117,9 +117,14 @@ if (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${Boost_INCLUDE_DIR})
 	add_definitions(-DBOOST_ALL_NO_LIB)
 
-	option(ISAAC_THREADING "Do the video and metadata transmission transport in background. May be buggy if not used with MPI_threading intialisation!" OFF)
+	option(ISAAC_THREADING "Do the video and metadata transmission transport in background. May be buggy, but seems to work fine!" OFF)
 	if (ISAAC_THREADING)
 		add_definitions(-DISAAC_THREADING)
+	endif ()
+	
+	option(ISAAC_SHOWBORDER "Debug and presentation mode, in which the sub volume borders are shown in black" OFF)
+	if (ISAAC_SHOWBORDER)
+		add_definitions(-DISAAC_SHOWBORDER)
 	endif ()
 	
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${CMAKE_SOURCE_DIR}/insitu)
