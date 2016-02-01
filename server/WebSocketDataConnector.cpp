@@ -128,6 +128,8 @@ callback_isaac(
 						return -1;
 					}
 				}
+				else
+					printf("WebSocketDataConnector: Dropped one dropable package!\n");
 				delete message;
 			}
 		}
