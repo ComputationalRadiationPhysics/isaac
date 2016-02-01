@@ -69,7 +69,10 @@ errorCode URIImageConnector::run()
 				{
 					auto next_it = std::next(it);
 					if (it->second == message->group)
+					{
 						streams.erase(it);
+						printf("URIImageConnector: Closed Stream\n");
+					}
 					it = next_it;
 				}
 			}
