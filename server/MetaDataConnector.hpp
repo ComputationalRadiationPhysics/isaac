@@ -35,7 +35,7 @@ class MetaDataConnector : public Runable, public MessageAble<MessageContainer>
 		virtual std::string getName() = 0;
 
 		//Called from the Master
-		void setMaster(Master* master);		
+		void setMaster(Master* master);
 	protected:
 		Master* master;
 };

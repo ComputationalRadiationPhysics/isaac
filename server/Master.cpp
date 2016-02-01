@@ -539,8 +539,12 @@ errorCode Master::run()
 						json_object_set_new( root, "type", json_string( "update" ) );
 						dc->t->masterSendMessage(new MessageContainer(UPDATE,root));
 						imageConnectorList[ stream ].connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED,NULL,group,1,url,ref));
-						//Send request for (transfer) functions
-						char buffer[] = "{\"type\": \"feedback\", \"request\": \"transfer\"} {\"type\": \"feedback\", \"request\": \"functions\"} {\"type\": \"feedback\", \"request\": \"weight\"}";
+						//Send request for (transfer) functions and most recent frame
+						char buffer[] =
+							"{\"type\": \"feedback\", \"request\": \"transfer\"} "
+							"{\"type\": \"feedback\", \"request\": \"functions\"} "
+							"{\"type\": \"feedback\", \"request\": \"weight\"} "
+							"{\"type\": \"feedback\", \"request\": \"redraw\"}";
 						send(group->master->connector->getSockFD(),buffer,strlen(buffer),MSG_NOSIGNAL);
 					}
 				}

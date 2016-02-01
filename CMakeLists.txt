@@ -70,7 +70,7 @@ if (ISAAC_JPEG)
 	add_definitions(-DISAAC_JPEG)
 endif (ISAAC_JPEG)
 
-add_definitions(-std=c++11)
+add_definitions(-std=c++11 -march=native -mtune=native)
 
 add_executable(isaac ${HDRS} ${SRCS})
 

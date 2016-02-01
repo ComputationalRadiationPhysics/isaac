@@ -186,10 +186,10 @@ int main(int argc, char **argv)
 		using AccDim = alpaka::dim::DimInt<3>;
 		using SimDim = alpaka::dim::DimInt<3>;
 		using DatDim = alpaka::dim::DimInt<1>;
-		using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
-		using Stream  = alpaka::stream::StreamCudaRtSync;
-		//using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
-		//using Stream  = alpaka::stream::StreamCpuSync;
+		//using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
+		//using Stream  = alpaka::stream::StreamCudaRtSync;
+		using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
+		using Stream  = alpaka::stream::StreamCpuSync;
 		//using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
 		//using Stream  = alpaka::stream::StreamCpuSync;
 				
