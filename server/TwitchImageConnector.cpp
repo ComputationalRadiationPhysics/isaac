@@ -18,9 +18,10 @@
 #include <pthread.h>
 #include <inttypes.h>
 
-TwitchImageConnector::TwitchImageConnector(std::string apikey) :
+TwitchImageConnector::TwitchImageConnector(std::string apikey, std::string base_url) :
 	group(NULL),
-	apikey(apikey)
+	apikey(apikey),
+	base_url(base_url)
 {
 	showClient = false;
 }
@@ -103,7 +104,7 @@ errorCode TwitchImageConnector::run()
 					TWI_LOAD_ELEMENT_OR_DIE(flvmux)
 					TWI_LOAD_ELEMENT_OR_DIE(rtmpsink)
 					char location[512];
-					sprintf(location,"rtmp://live-fra.twitch.tv/app/%s",apikey.c_str());
+					sprintf(location,"rtmp://%s/app/%s",base_url.c_str(),apikey.c_str());
 					g_object_set(G_OBJECT(rtmpsink),
 						"location", location, NULL);
 					pipeline = gst_pipeline_new( NULL );

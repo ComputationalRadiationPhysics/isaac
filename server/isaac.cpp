@@ -46,6 +46,7 @@ int main(int argc, char **argv)
 	const char* url = __url;
 	#ifdef ISAAC_GST
 		char* twitch_apikey = NULL;
+		char* twitch_url = NULL;
 	#endif
 	int nr = 1;
 	while (nr < argc)
@@ -101,6 +102,12 @@ int main(int argc, char **argv)
 				ISAAC_INCREASE_NR_OR_DIE
 				twitch_apikey = argv[nr];
 			}
+			else
+			if (strcmp(argv[nr],"--twitch_url") == 0)
+			{
+				ISAAC_INCREASE_NR_OR_DIE
+				twitch_url = argv[nr];
+			}
 		#endif
 		else
 		{
@@ -143,7 +150,11 @@ int main(int argc, char **argv)
 	#ifdef ISAAC_GST
 		if (twitch_apikey)
 		{
-			TwitchImageConnector* twitchImageConnector = new TwitchImageConnector( std::string (twitch_apikey) );
+			TwitchImageConnector* twitchImageConnector;
+			if (twitch_url)
+				twitchImageConnector = new TwitchImageConnector( std::string(twitch_apikey), std::string(twitch_url) );
+			else
+				twitchImageConnector = new TwitchImageConnector( std::string(twitch_apikey) );
 			if (twitchImageConnector->init(0,0))
 				delete twitchImageConnector;
 			else

@@ -25,13 +25,14 @@
 class TwitchImageConnector : public ImageConnector
 {
 	public:
-		TwitchImageConnector(std::string apikey);
+		TwitchImageConnector(std::string apikey, std::string base_url = std::string("live-fra.twitch.tv") );
 		errorCode init(int minport,int maxport);
 		errorCode run();
 		std::string getName();
 	private:
 		InsituConnectorGroup* group;
 		std::string apikey;
+		std::string base_url;
 		GstElement *appsrc;
 		GstElement *videoconvert;
 		GstElement *capsfilter;

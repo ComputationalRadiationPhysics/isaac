@@ -412,10 +412,10 @@ struct merge_source_iterator
                     {
                         gradient = gradient / l;
                         isaac_float3 light = step / stepLength;
-                        isaac_float ac = fabs(
+                        isaac_float ac =
                             gradient.x * light.x +
                             gradient.y * light.y +
-                            gradient.z * light.z);
+                            gradient.z * light.z ;
                         color.x = value.x * ac + ac * ac * ac * ac;
                         color.y = value.y * ac + ac * ac * ac * ac;
                         color.z = value.z * ac + ac * ac * ac * ac;
@@ -516,7 +516,7 @@ template <
             if ( ISAAC_FOR_EACH_DIM_TWICE(2, pixel, >= framebuffer_size, || ) 0 )
                 return;
 
-            bool at_least_one;
+            bool at_least_one = true;
             isaac_for_each_with_mpl_params( sources, check_no_source_iterator<TFilter>(), at_least_one );
             if (!at_least_one)
             {
@@ -632,7 +632,7 @@ template <
                 int(isaac_size_d[0].global_size.value.x), min (
                 int(isaac_size_d[0].global_size.value.y),
                 int(isaac_size_d[0].global_size.value.z) ) );
-            isaac_float factor = step / /*isaac_size_d[0].max_global_size*/ min_size * isaac_float(2) * l/l_scaled;;
+            isaac_float factor = step / /*isaac_size_d[0].max_global_size*/ min_size * isaac_float(2) * l/l_scaled;
             for (isaac_int i = first; i <= last; i++)
             {
                 pos = start + step_vec * isaac_float(i);
@@ -914,15 +914,15 @@ struct IsaacFillRectKernelStruct
         const TScale& scale
     )
     {
-        isaac_size2 grid_size=
-        {
-            size_t((readback_viewport[2]+15)/16),
-            size_t((readback_viewport[3]+15)/16)
-        };
         isaac_size2 block_size=
         {
-            size_t(16),
+            size_t(8),
             size_t(16)
+        };
+        isaac_size2 grid_size=
+        {
+            size_t((readback_viewport[2]+block_size.x-1)/block_size.x),
+            size_t((readback_viewport[3]+block_size.y-1)/block_size.y)
         };
         #if ISAAC_ALPAKA == 1
             if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
