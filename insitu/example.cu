@@ -19,6 +19,10 @@
 
 using namespace isaac;
 
+#define VOLUME_X 64
+#define VOLUME_Y 64
+#define VOLUME_Z 64
+
 //////////////////////
 // Example Source 1 //
 //////////////////////
@@ -200,10 +204,10 @@ int main(int argc, char **argv)
 		DevHost devHost (alpaka::dev::cpu::getDev());
 		Stream  stream  (devAcc);
 
-		const alpaka::Vec<SimDim, size_t> global_size(d[0]*64,d[1]*64,d[2]*64);
-		const alpaka::Vec<SimDim, size_t> local_size(size_t(64),size_t(64),size_t(64));
-		const alpaka::Vec<DatDim, size_t> data_size(size_t(64) * size_t(64) * size_t(64));
-		const alpaka::Vec<SimDim, size_t> position(p[0]*64,p[1]*64,p[2]*64);
+		const alpaka::Vec<SimDim, size_t> global_size(d[0]*VOLUME_X,d[1]*VOLUME_Y,d[2]*VOLUME_Z);
+		const alpaka::Vec<SimDim, size_t> local_size(size_t(VOLUME_X),size_t(VOLUME_Y),size_t(VOLUME_Z));
+		const alpaka::Vec<DatDim, size_t> data_size(size_t(VOLUME_X) * size_t(VOLUME_Y) * size_t(VOLUME_Z));
+		const alpaka::Vec<SimDim, size_t> position(p[0]*VOLUME_X,p[1]*VOLUME_Y,p[2]*VOLUME_Z);
 	#else //CUDA
 		//////////////////////////////////
 		// Cuda specific initialization //
@@ -213,17 +217,17 @@ int main(int argc, char **argv)
 		cudaSetDevice( rank % devCount );
 		typedef boost::mpl::int_<3> SimDim;
 		std::vector<size_t> global_size;
-			global_size.push_back(d[0]*64);
-			global_size.push_back(d[1]*64);
-			global_size.push_back(d[2]*64);
+			global_size.push_back(d[0]*VOLUME_X);
+			global_size.push_back(d[1]*VOLUME_Y);
+			global_size.push_back(d[2]*VOLUME_Z);
 		std::vector<size_t> local_size;
-			local_size.push_back(64);
-			local_size.push_back(64);
-			local_size.push_back(64);
+			local_size.push_back(VOLUME_X);
+			local_size.push_back(VOLUME_Y);
+			local_size.push_back(VOLUME_Z);
 		std::vector<size_t> position;
-			position.push_back(p[0]*64);
-			position.push_back(p[1]*64);
-			position.push_back(p[2]*64);
+			position.push_back(p[0]*VOLUME_X);
+			position.push_back(p[1]*VOLUME_Y);
+			position.push_back(p[2]*VOLUME_Z);
 	#endif
 
 	//The whole size of the rendered sub volumes
