@@ -890,8 +890,8 @@ class IsaacVisualization
                         IceTDouble y = json_number_value( json_array_get( js, 1 ) );
                         IceTDouble z = json_number_value( json_array_get( js, 2 ) );
                         IceTDouble rad = json_number_value( json_array_get( js, 3 ) );
-                        IceTDouble s = sin( rad * M_PI / 360.0);
-                        IceTDouble c = cos( rad * M_PI / 360.0);
+                        IceTDouble s = sin( rad * M_PI / 180.0);
+                        IceTDouble c = cos( rad * M_PI / 180.0);
                         IceTDouble l = sqrt( x * x + y * y + z * z);
                         if ( l != 0.0 )
                         {
