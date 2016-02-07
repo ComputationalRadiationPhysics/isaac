@@ -53,6 +53,7 @@ class TestSource1
 		ISAAC_HOST_INLINE void update(bool enabled, void* pointer) {}
 		
 		isaac_float3* ptr;
+		
 		ISAAC_NO_HOST_DEVICE_WARNING
 		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator[] (const isaac_int3& nIndex) const
 		{
@@ -97,8 +98,6 @@ class TestSource2
 		ISAAC_HOST_INLINE void update(bool enabled, void* pointer) {}
 		
 		isaac_float* ptr;
-		isaac_int width;
-		isaac_int width_mul_height;
 		
 		ISAAC_NO_HOST_DEVICE_WARNING		
 		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator[] (const isaac_int3& nIndex) const
