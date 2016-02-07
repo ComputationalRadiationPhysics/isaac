@@ -516,12 +516,12 @@ class IsaacVisualization
             icetDestroyMPICommunicator(icetComm);
             icetResetTiles();
             icetAddTile(0, 0, framebuffer_size.x, framebuffer_size.y, master);
-            icetStrategy(ICET_STRATEGY_DIRECT);
-            //icetStrategy(ICET_STRATEGY_SEQUENTIAL);
+            //icetStrategy(ICET_STRATEGY_DIRECT);
+            icetStrategy(ICET_STRATEGY_SEQUENTIAL);
             //icetStrategy(ICET_STRATEGY_REDUCE);
 
-            icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC );
-            //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_BSWAP );
+            //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC );
+            icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_BSWAP );
             //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_RADIXK );
             //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_TREE );
 
