@@ -822,6 +822,7 @@ class IsaacVisualization
             json_t* message;
             char message_buffer[ISAAC_MAX_RECEIVE] = "{}";
             //Master merges all messages and broadcasts it.
+
             if (rank == master)
             {
                 message = json_object();
@@ -974,11 +975,16 @@ class IsaacVisualization
                 strncpy( message_buffer, buffer, ISAAC_MAX_RECEIVE-1);
                 message_buffer[ ISAAC_MAX_RECEIVE-1 ] = 0;
                 free(buffer);
-                MPI_Bcast( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, mpi_world);
+                int l = strlen( message_buffer );
+                MPI_Bcast( &l, 1, MPI_INT, master, mpi_world);
+                MPI_Bcast( message_buffer, l, MPI_CHAR, master, mpi_world);
             }
             else //The others just get the message
             {
-                MPI_Bcast( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, mpi_world);
+                int l;
+                MPI_Bcast( &l, 1, MPI_INT, master, mpi_world);
+                MPI_Bcast( message_buffer, l, MPI_CHAR, master, mpi_world);
+                message_buffer[l] = 0;
                 message = json_loads(message_buffer, 0, NULL);
             }
 
