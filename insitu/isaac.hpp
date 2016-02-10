@@ -1181,6 +1181,7 @@ class IsaacVisualization
                             continue;
                         json_t* js = json_loads(receive_buffer[i], 0, NULL);
                         mergeJSON( json_root, js );
+                        json_decref( js );
                     }
                 }
                 else
