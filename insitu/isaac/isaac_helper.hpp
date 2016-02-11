@@ -27,13 +27,12 @@ void mergeJSON(json_t* result,json_t* candidate)
 	//metadata merge, old values stay, arrays are merged
 	json_t* m_candidate = json_object_get(candidate, "metadata");
 	json_t* m_result = json_object_get(result, "metadata");
-	void *temp,*temp2;
 	if (m_candidate && m_result)
 	{
-		json_object_foreach_safe( m_candidate, temp, c_key, c_value )
+		json_object_foreach( m_candidate, c_key, c_value )
 		{
 			bool found_array = false;
-			json_object_foreach_safe( m_result, temp2, r_key, r_value )
+			json_object_foreach( m_result, r_key, r_value )
 			{
 				if (strcmp(r_key,c_key) == 0)
 				{
@@ -50,10 +49,10 @@ void mergeJSON(json_t* result,json_t* candidate)
 		}
 	}            
 	//general merge, new values stay
-	json_object_foreach_safe( candidate, temp, c_key, c_value )
+	json_object_foreach( candidate, c_key, c_value )
 	{
 		bool found_meta = false;
-		json_object_foreach_safe( result, temp2, r_key, r_value )
+		json_object_foreach( result, r_key, r_value )
 		{
 			if (strcmp(r_key,c_key) == 0 && strcmp(r_key,"metadata") == 0)
 			{
