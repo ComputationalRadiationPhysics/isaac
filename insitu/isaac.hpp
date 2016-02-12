@@ -516,12 +516,12 @@ class IsaacVisualization
             icetDestroyMPICommunicator(icetComm);
             icetResetTiles();
             icetAddTile(0, 0, framebuffer_size.x, framebuffer_size.y, master);
-            icetStrategy(ICET_STRATEGY_DIRECT);
-            //icetStrategy(ICET_STRATEGY_SEQUENTIAL);
+            //icetStrategy(ICET_STRATEGY_DIRECT);
+            icetStrategy(ICET_STRATEGY_SEQUENTIAL);
             //icetStrategy(ICET_STRATEGY_REDUCE);
 
-            icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC );
-            //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_BSWAP );
+            //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC );
+            icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_BSWAP );
             //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_RADIXK );
             //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_TREE );
 
@@ -822,6 +822,7 @@ class IsaacVisualization
             json_t* message;
             char message_buffer[ISAAC_MAX_RECEIVE] = "{}";
             //Master merges all messages and broadcasts it.
+
             if (rank == master)
             {
                 message = json_object();
@@ -890,8 +891,8 @@ class IsaacVisualization
                         IceTDouble y = json_number_value( json_array_get( js, 1 ) );
                         IceTDouble z = json_number_value( json_array_get( js, 2 ) );
                         IceTDouble rad = json_number_value( json_array_get( js, 3 ) );
-                        IceTDouble s = sin( rad * M_PI / 360.0);
-                        IceTDouble c = cos( rad * M_PI / 360.0);
+                        IceTDouble s = sin( rad * M_PI / 180.0);
+                        IceTDouble c = cos( rad * M_PI / 180.0);
                         IceTDouble l = sqrt( x * x + y * y + z * z);
                         if ( l != 0.0 )
                         {
@@ -974,11 +975,16 @@ class IsaacVisualization
                 strncpy( message_buffer, buffer, ISAAC_MAX_RECEIVE-1);
                 message_buffer[ ISAAC_MAX_RECEIVE-1 ] = 0;
                 free(buffer);
-                MPI_Bcast( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, mpi_world);
+                int l = strlen( message_buffer );
+                MPI_Bcast( &l, 1, MPI_INT, master, mpi_world);
+                MPI_Bcast( message_buffer, l, MPI_CHAR, master, mpi_world);
             }
             else //The others just get the message
             {
-                MPI_Bcast( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, master, mpi_world);
+                int l;
+                MPI_Bcast( &l, 1, MPI_INT, master, mpi_world);
+                MPI_Bcast( message_buffer, l, MPI_CHAR, master, mpi_world);
+                message_buffer[l] = 0;
                 message = json_loads(message_buffer, 0, NULL);
             }
 
@@ -1175,6 +1181,7 @@ class IsaacVisualization
                             continue;
                         json_t* js = json_loads(receive_buffer[i], 0, NULL);
                         mergeJSON( json_root, js );
+                        json_decref( js );
                     }
                 }
                 else
@@ -1644,7 +1651,7 @@ class IsaacVisualization
         size_t max_size_scaled;
         IceTFloat background_color[4];
         static IsaacVisualization *myself;
-        TScale scale;        
+        TScale scale;
 };
 
 #if ISAAC_ALPAKA == 1

@@ -193,8 +193,8 @@ function mulMatrix4(matrix,p)
 function rotateMatrix( x, y, z, rad )
 {
 	//Rotation matrix:
-	var s = Math.sin( rad * Math.PI / 360.0);
-	var c = Math.cos( rad * Math.PI / 360.0);
+	var s = Math.sin( rad * Math.PI / 180.0);
+	var c = Math.cos( rad * Math.PI / 180.0);
 	var l = Math.sqrt( x * x + y * y + z * z);
 	if ( l == 0 )
 		return;
@@ -374,7 +374,7 @@ function mouseMoveHandler(e)
 		{
 			dx /= l;
 			dy /= -l;
-			var add = rotateMatrix(dy,dx,0,l);
+			var add = rotateMatrix(dy,dx,0,l/2);
 			var result = new Array(9);
 			for (x = 0; x < 3; x++)
 				for (y = 0; y < 3; y++)
@@ -383,7 +383,7 @@ function mouseMoveHandler(e)
 								  + add[y+2*3] * rotation[2+x*3];
 			rotation = result;
 			//sendFeedback("rotation relative",add);
-			sendFeedback("rotation axis",[dy, dx, 0, l]);
+			sendFeedback("rotation axis",[dy, dx, 0, l/2]);
 		}
 	}
 	if (mousedown[2] || mousedown[1])
