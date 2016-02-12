@@ -149,6 +149,7 @@ errorCode InsituConnectorMaster::run()
 							MessageType type = message->type;
 							if (type == REGISTER)
 								json_object_set_new( message->json_root, "id", json_integer( con_array[i]->connector->getID() ) );
+							int uid = json_integer_value( json_object_get(content, "uid") );
 							con_array[i]->connector->clientSendMessage(message);
 							if (type == EXIT_PLUGIN)
 							{
@@ -159,9 +160,9 @@ errorCode InsituConnectorMaster::run()
 							{
 								//send, which uid we just got
 								char buffer[32];
-								sprintf(buffer,"{\"done\": %lld}",json_integer_value( json_object_get(content, "uid") ) );
-								int r = 0;
-								if ( send(fd_array[i].fd,buffer,strlen(buffer),MSG_NOSIGNAL) <= 0)
+								sprintf(buffer,"{\"done\": %lld}", uid );
+								int l = strlen(buffer);
+								if ( send(fd_array[i].fd,buffer,l,MSG_NOSIGNAL) < l )
 								{
 									MessageContainer* message = new MessageContainer(EXIT_PLUGIN,json_object());
 									json_object_set_new( message->json_root, "type", json_string( "exit" ) );
