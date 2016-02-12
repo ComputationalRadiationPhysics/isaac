@@ -1650,7 +1650,7 @@ class IsaacVisualization
         size_t max_size_scaled;
         IceTFloat background_color[4];
         static IsaacVisualization *myself;
-        TScale scale;        
+        TScale scale;
 };
 
 #if ISAAC_ALPAKA == 1
