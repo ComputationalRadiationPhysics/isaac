@@ -17,6 +17,8 @@
 
 #include "example_details.hpp"
 
+#include <algorithm>
+
 using namespace isaac;
 
 #define VOLUME_X 64
@@ -190,7 +192,7 @@ int main(int argc, char **argv)
 		using DevHost = alpaka::dev::DevCpu;
 		
 		DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(rank % alpaka::dev::DevMan<Acc>::getDevCount()));
-		DevHost devHost (alpaka::dev::cpu::getDev());
+		DevHost devHost (alpaka::dev::DevManCpu::getDevByIdx(0u));
 		Stream  stream  (devAcc);
 
 		const alpaka::Vec<SimDim, size_t> global_size(d[0]*VOLUME_X,d[1]*VOLUME_Y,d[2]*VOLUME_Z);
@@ -438,7 +440,7 @@ int main(int argc, char **argv)
 				json_t* js;
 				if ( js = json_object_get(meta, "interval") )
 				{
-					interval = max( int(1), int( json_integer_value ( js ) ) );
+					interval = std::max( int(1), int( json_integer_value ( js ) ) );
 					//Feedback for other clients than the changing one
 					if (rank == 0)
 						json_object_set_new( visualization->getJsonMetaRoot(), "interval", json_integer( interval ) );

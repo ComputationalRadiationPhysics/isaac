@@ -15,7 +15,10 @@
 
 #pragma once
 
+
 #include "isaac_types.hpp"
+
+#include <algorithm>
 
 #define ISAAC_CUDA_CHECK(call)                                                 \
 {                                                                              \
@@ -81,10 +84,10 @@
 #define ISAAC_SET_COLOR( dest, color ) \
     { \
         isaac_uint4 result; \
-        result.x = min( isaac_uint( min( isaac_float(1), color.x ) * 255.0f ), 255); \
-        result.y = min( isaac_uint( min( isaac_float(1), color.y ) * 255.0f ), 255); \
-        result.z = min( isaac_uint( min( isaac_float(1), color.z ) * 255.0f ), 255); \
-        result.w = min( isaac_uint( min( isaac_float(1), color.w ) * 255.0f ), 255); \
+        result.x = std::min( isaac_uint( std::min( isaac_float(1), color.x ) * 255.0f ), static_cast<isaac_uint>(255)); \
+        result.y = std::min( isaac_uint( std::min( isaac_float(1), color.y ) * 255.0f ), static_cast<isaac_uint>(255)); \
+        result.z = std::min( isaac_uint( std::min( isaac_float(1), color.z ) * 255.0f ), static_cast<isaac_uint>(255)); \
+        result.w = std::min( isaac_uint( std::min( isaac_float(1), color.w ) * 255.0f ), static_cast<isaac_uint>(255)); \
         dest = (result.w << 24) | (result.z << 16) | (result.y << 8) | (result.x << 0); \
     }
 

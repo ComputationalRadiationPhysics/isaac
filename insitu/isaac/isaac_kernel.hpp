@@ -27,6 +27,8 @@
 #include <boost/fusion/include/push_back.hpp>
 #include <boost/mpl/size.hpp>
 
+#include <algorithm>
+
 #include <float.h>
 
 #pragma GCC diagnostic push
@@ -594,8 +596,8 @@ template <
             ISAAC_SWITCH_IF_SMALLER( count_end.z, count_start.z )
             
             //calc intersection of all three super planes and save in [count_start.x ; count_end.x]
-            count_start.x = max( max( count_start.x, count_start.y ), count_start.z );
-              count_end.x = min( min(   count_end.x,   count_end.y ),   count_end.z );
+            count_start.x = std::max( std::max( count_start.x, count_start.y ), count_start.z );
+              count_end.x = std::min( std::min(   count_end.x,   count_end.y ),   count_end.z );
             if ( count_start.x > count_end.x)
             {
                 ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], background_color )
@@ -628,8 +630,8 @@ template <
 
             //Starting the main loop
             isaac_float4 color = background_color;
-            isaac_float min_size = min(
-                int(isaac_size_d[0].global_size.value.x), min (
+            isaac_float min_size = std::min(
+                int(isaac_size_d[0].global_size.value.x), std::min (
                 int(isaac_size_d[0].global_size.value.y),
                 int(isaac_size_d[0].global_size.value.z) ) );
             isaac_float factor = step / /*isaac_size_d[0].max_global_size*/ min_size * isaac_float(2) * l/l_scaled;
@@ -924,14 +926,18 @@ struct IsaacFillRectKernelStruct
             size_t((readback_viewport[2]+block_size.x-1)/block_size.x),
             size_t((readback_viewport[3]+block_size.y-1)/block_size.y)
         };
+
         #if ISAAC_ALPAKA == 1
+            #if (defined(ALPAKA_ACC_GPU_CUDA_ENABLED) && defined(__CUDACC__))
             if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+            #endif                
             {
                 grid_size.x = size_t(readback_viewport[2]);
                 grid_size.y = size_t(readback_viewport[3]);
                 block_size.x = size_t(1);
                 block_size.y = size_t(1);                    
             }
+
             const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
             const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
             const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
