@@ -55,7 +55,7 @@ class TestSource1
 		isaac_float3* ptr;
 		
 		ISAAC_NO_HOST_DEVICE_WARNING
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<3> operator[] (const isaac_int3& nIndex) const
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim< feature_dim > operator[] (const isaac_int3& nIndex) const
 		{
 			isaac_float3 value = ptr[
 				nIndex.x +
@@ -100,7 +100,7 @@ class TestSource2
 		isaac_float* ptr;
 		
 		ISAAC_NO_HOST_DEVICE_WARNING		
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim<1> operator[] (const isaac_int3& nIndex) const
+		ISAAC_HOST_DEVICE_INLINE isaac_float_dim< feature_dim > operator[] (const isaac_int3& nIndex) const
 		{
 			isaac_float value = ptr[
 				nIndex.x +
