@@ -1136,6 +1136,7 @@ class IsaacVisualization
             }
             if (js = json_object_get(message, "clipping add") )
             {
+                redraw = true;
                 send_clipping = true;
                 json_t* position = json_object_get(js, "position");
                 json_t* normal   = json_object_get(js, "normal");
@@ -1150,11 +1151,13 @@ class IsaacVisualization
             }
             if (js = json_object_get(message, "clipping remove") )
             {
+                redraw = true;
                 send_clipping = true;
                 removeClipping( json_integer_value( js ) );
             }            
             if (js = json_object_get(message, "clipping edit") )
             {
+                redraw = true;
                 send_clipping = true;
                 json_t* nr       = json_object_get(js, "nr");
                 json_t* position = json_object_get(js, "position");
@@ -1168,7 +1171,8 @@ class IsaacVisualization
                     json_number_value( json_array_get( normal, 1 ) ),
                     json_number_value( json_array_get( normal, 2 ) )
                 );
-            }            
+            }
+
             json_t* metadata = json_object_get( message, "metadata" );
             if (metadata)
                 json_incref(metadata);
