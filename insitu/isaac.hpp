@@ -593,21 +593,24 @@ class IsaacVisualization
         {
             if (nr >= ISAAC_MAX_CLIPPING)
                 return false;
-            nx = nx * scale[0];
-            ny = ny * scale[1];
-            nz = nz * scale[2];
-            isaac_float l = sqrt(nx*nx+ny*ny+nz*nz);
+            isaac_float nx_s = nx * scale[0];
+            isaac_float ny_s = ny * scale[1];
+            isaac_float nz_s = nz * scale[2];
+            isaac_float l = sqrt(nx_s*nx_s+ny_s*ny_s+nz_s*nz_s);
             if (l == 0.0f)
                 return false;
-            nx /= l;
-            ny /= l;
-            nz /= l;
+            nx_s /= l;
+            ny_s /= l;
+            nz_s /= l;
             clipping.elem[ nr ].position.x = px;
             clipping.elem[ nr ].position.y = py;
             clipping.elem[ nr ].position.z = pz;
-            clipping.elem[ nr ].normal.x = nx;
-            clipping.elem[ nr ].normal.y = ny;
-            clipping.elem[ nr ].normal.z = nz;
+            clipping.elem[ nr ].normal.x = nx_s;
+            clipping.elem[ nr ].normal.y = ny_s;
+            clipping.elem[ nr ].normal.z = nz_s;
+            clipping_saved_normals[ nr ].x = nx;
+            clipping_saved_normals[ nr ].y = ny;
+            clipping_saved_normals[ nr ].z = nz;
             return true;
         }
         void addClipping(isaac_float px,isaac_float py,isaac_float pz,isaac_float nx,isaac_float ny,isaac_float nz)
@@ -621,7 +624,10 @@ class IsaacVisualization
                 return;
             clipping.count--;
             for (isaac_uint i = nr; i < clipping.count; i++)
+            {
                 clipping.elem[i] = clipping.elem[i+1];
+                clipping_saved_normals[i] = clipping_saved_normals[i+1];
+            }
         }
         void updateBounding()
         {
@@ -1572,9 +1578,9 @@ class IsaacVisualization
                         json_array_append_new( inner, json_real( myself->clipping.elem[i].position.z ) );
                                 inner = json_array();
                         json_object_set_new(f, "normal", inner );
-                        json_array_append_new( inner, json_real( myself->clipping.elem[i].normal.x ) );
-                        json_array_append_new( inner, json_real( myself->clipping.elem[i].normal.y ) );
-                        json_array_append_new( inner, json_real( myself->clipping.elem[i].normal.z ) );
+                        json_array_append_new( inner, json_real( myself->clipping_saved_normals[i].x ) );
+                        json_array_append_new( inner, json_real( myself->clipping_saved_normals[i].y ) );
+                        json_array_append_new( inner, json_real( myself->clipping_saved_normals[i].z ) );
                     }
                 }
                 char* buffer = json_dumps( myself->json_root, 0 );
@@ -1746,6 +1752,7 @@ class IsaacVisualization
         static IsaacVisualization *myself;
         TScale scale;
         clipping_struct clipping;
+        isaac_float3 clipping_saved_normals[ISAAC_MAX_CLIPPING];
 };
 
 #if ISAAC_ALPAKA == 1
