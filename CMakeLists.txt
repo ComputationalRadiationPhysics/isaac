@@ -122,6 +122,11 @@ if (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
 		add_definitions(-DISAAC_THREADING)
 	endif ()
 	
+	option(ISAAC_NO_SIMULATION "No update of the fake simulation" OFF)
+	if (ISAAC_NO_SIMULATION)
+		add_definitions(-DISAAC_NO_SIMULATION)
+	endif ()
+	
 	option(ISAAC_SHOWBORDER "Debug and presentation mode, in which the sub volume borders are shown in black" OFF)
 	if (ISAAC_SHOWBORDER)
 		add_definitions(-DISAAC_SHOWBORDER)

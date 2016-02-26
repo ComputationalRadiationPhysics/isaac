@@ -149,7 +149,7 @@ errorCode InsituConnectorMaster::run()
 							MessageType type = message->type;
 							if (type == REGISTER)
 								json_object_set_new( message->json_root, "id", json_integer( con_array[i]->connector->getID() ) );
-							int uid = json_integer_value( json_object_get(content, "uid") );
+							long long uid = json_integer_value( json_object_get(content, "uid") );
 							con_array[i]->connector->clientSendMessage(message);
 							if (type == EXIT_PLUGIN)
 							{

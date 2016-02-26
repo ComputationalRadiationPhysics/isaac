@@ -217,6 +217,7 @@ int main(int argc, char **argv)
 			position.push_back(p[0]*VOLUME_X);
 			position.push_back(p[1]*VOLUME_Y);
 			position.push_back(p[2]*VOLUME_Z);
+		int stream = 0;
 	#endif
 
 	//The whole size of the rendered sub volumes
@@ -361,6 +362,9 @@ int main(int argc, char **argv)
 	///////////////
 	// Main loop //
 	///////////////
+	#if ISAAC_NO_SIMULATION == 1
+		update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
+	#endif
 	while (!force_exit)
 	{
 		//////////////////
@@ -370,13 +374,11 @@ int main(int argc, char **argv)
 		{
 			a += 0.01f;
 			int start_simulation = visualization->getTicksUs();
-			#if ISAAC_ALPAKA == 0
-				int stream = 0;
-			#endif
-			update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
+			#if ISAAC_NO_SIMULATION == 0
+				update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
+			#endif	
 			simulation_time +=visualization->getTicksUs() - start_simulation;
 		}
-		
 		step++;
 		if (step >= interval)
 		{
