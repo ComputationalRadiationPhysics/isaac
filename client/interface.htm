@@ -58,6 +58,14 @@
 			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation
 			<input type="checkbox" id="iso_surface_checkbox" checked onchange="iso_surface_checkbox_click()"> Iso Surface 
 			<input id="step" size="4"><input type="button" value="Change step" id="step_button" onclick="step_button_click()"><br/>
+			<div id="clipping_add_div">
+				<b>Clipping planes:</b><br/>
+				<span> Position: </span><input type="text"   value="0" size="4" id="clip_px"><input type="text"   value="0" size="4" id="clip_py"><input type="text"   value="0" size="4" id="clip_pz">
+				<span> Normal: </span>  <input type="text"   value="0" size="4" id="clip_nx"><input type="text"   value="0" size="4" id="clip_ny"><input type="text"   value="1" size="4" id="clip_nz"> 
+				                      <input type="button" value="X"          id="clip_bx"><input type="button" value="Y"          id="clip_by"><input type="button" value="Z"          id="clip_bz">
+				                      <input type="button" value="Add"        id="clip_add">
+			</div>
+			<div id="clipping_list_div"></div>
 			<table border="1"><tr id="transfer_form"></tr></table>
 			<canvas id="transfer" width="412" height="16"></canvas>
 		</div>
@@ -573,7 +581,71 @@ document.getElementById("interval_change").onclick = function()
 			"interval" : parseInt(document.getElementById("interval_range").value)
 		}
 	};
-	socket.send(JSON.stringify(obj));};
+	socket.send(JSON.stringify(obj));
+};
+
+document.getElementById("clip_add").onclick = function()
+{
+	var obj =
+	{
+		"type" : "feedback",
+		"observe id" : observe_id,
+		"clipping add" :
+		{
+			"position" : [ parseFloat(document.getElementById("clip_px").value), parseFloat(document.getElementById("clip_py").value), parseFloat(document.getElementById("clip_pz").value) ],
+			"normal"   : [ parseFloat(document.getElementById("clip_nx").value), parseFloat(document.getElementById("clip_ny").value), parseFloat(document.getElementById("clip_nz").value) ]
+		}
+	};
+	socket.send(JSON.stringify(obj));
+};
+
+document.getElementById("clip_bx").onclick = function()
+{
+	document.getElementById("clip_nx").value = "1";
+	document.getElementById("clip_ny").value = "0";
+	document.getElementById("clip_nz").value = "0";
+};
+
+document.getElementById("clip_by").onclick = function()
+{
+	document.getElementById("clip_nx").value = "0";
+	document.getElementById("clip_ny").value = "1";
+	document.getElementById("clip_nz").value = "0";
+};
+
+document.getElementById("clip_bz").onclick = function()
+{
+	document.getElementById("clip_nx").value = "0";
+	document.getElementById("clip_ny").value = "0";
+	document.getElementById("clip_nz").value = "1";
+};
+
+function createRemoveClippingFeedback( c )
+{
+	return function()
+	{
+		sendFeedback( "clipping remove", parseInt(c) );
+	};
+}
+
+function createEditClippingFeedback( c )
+{
+	return function()
+	{
+		var obj =
+		{
+			"type" : "feedback",
+			"observe id" : observe_id,
+			"clipping edit" :
+			{
+				"nr"       : parseInt(c),
+				"position" : [ parseFloat(document.getElementById("clip_" + c + "_px").value), parseFloat(document.getElementById("clip_" + c + "_py").value), parseFloat(document.getElementById("clip_" + c + "_pz").value) ],
+				"normal"   : [ parseFloat(document.getElementById("clip_" + c + "_nx").value), parseFloat(document.getElementById("clip_" + c + "_ny").value), parseFloat(document.getElementById("clip_" + c + "_nz").value) ]
+			}
+		};
+		socket.send(JSON.stringify(obj));
+	};
+};
 
 function createWeightFeedback( w, range_name, value_name )
 {
@@ -987,6 +1059,90 @@ document.getElementById("connect").onclick = function()
 							transfer_form.appendChild(node);
 						}
 						updateTransfer();
+					}
+					if (obj.hasOwnProperty("clipping"))
+					{
+						clipping = obj["clipping"];
+						var clipping_div = document.getElementById("clipping_list_div");
+						while (clipping_div.firstChild) {
+							clipping_div.removeChild(clipping_div.firstChild);
+						}
+						for (var c in clipping)
+						{
+							var node = document.createElement("DIV");
+							
+							var span = document.createElement("SPAN");
+							span.innerHTML = " Position: ";
+							node.appendChild(span);
+							
+							var input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].position[0];
+							input.size = 4;
+							input.id = "clip_" + c + "_px";
+							node.appendChild(input);
+							
+							input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].position[1];
+							input.size = 4;
+							input.id = "clip_" + c + "_py";
+							node.appendChild(input);
+
+							input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].position[2];
+							input.size = 4;
+							input.id = "clip_" + c + "_pz";
+							node.appendChild(input);
+
+							span = document.createElement("SPAN");
+							span.innerHTML = " Normal: ";
+							node.appendChild(span);
+							
+							input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].normal[0];
+							input.size = 4;
+							input.id = "clip_" + c + "_nx";
+							node.appendChild(input);
+							
+							input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].normal[1];
+							input.size = 4;
+							input.id = "clip_" + c + "_ny";
+							node.appendChild(input);
+
+							input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].normal[2];
+							input.size = 4;
+							input.id = "clip_" + c + "_nz";
+							node.appendChild(input);
+
+							span = document.createElement("SPAN");
+							span.innerHTML = " ";
+							node.appendChild(span);
+
+							input = document.createElement("INPUT");
+							input.type = "button";
+							input.value = "Edit";
+							input.onclick = createEditClippingFeedback( c );
+							node.appendChild(input);
+
+							span = document.createElement("SPAN");
+							span.innerHTML = " ";
+							node.appendChild(span);
+
+							input = document.createElement("INPUT");
+							input.type = "button";
+							input.value = "Remove";
+							input.onclick = createRemoveClippingFeedback( c );
+							node.appendChild(input);
+
+							clipping_div.appendChild(node);
+						}
 					}
 					if (obj.hasOwnProperty("background color"))
 					{

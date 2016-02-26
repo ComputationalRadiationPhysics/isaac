@@ -493,7 +493,8 @@ template <
             const TTransferArray transferArray,
             const TSourceWeight sourceWeight,
             const TPointerArray pointerArray,
-            const TScale scale)
+            const TScale scale,
+            clipping_struct clipping)
 #if ISAAC_ALPAKA == 1
         const
 #endif
@@ -548,6 +549,8 @@ template <
             //scale to globale grid size
             start = start * max_size;
               end =   end * max_size;
+            for (isaac_int i = 0; i < clipping.count; i++)
+                clipping.elem[i].position = clipping.elem[i].position * max_size;
 
             //move to local (scaled) grid
             isaac_int3 move =
@@ -564,6 +567,8 @@ template <
             };
             start = start + move_f;
               end =   end + move_f;
+            for (isaac_int i = 0; i < clipping.count; i++)
+                clipping.elem[i].position = clipping.elem[i].position + move_f;
 
             isaac_float3 vec = end - start;
             isaac_float l_scaled = sqrt( vec.x * vec.x + vec.y * vec.y + vec.z * vec.z );
@@ -574,6 +579,12 @@ template <
               end.x =   end.x / scale.x;
               end.y =   end.y / scale.y;
               end.z =   end.z / scale.z;
+            for (isaac_int i = 0; i < clipping.count; i++)
+            {
+                clipping.elem[i].position.x = clipping.elem[i].position.x / scale.x;
+                clipping.elem[i].position.y = clipping.elem[i].position.y / scale.y;
+                clipping.elem[i].position.z = clipping.elem[i].position.z / scale.z;
+            }
 
             vec = end - start;
             isaac_float l = sqrt( vec.x * vec.x + vec.y * vec.y + vec.z * vec.z );
@@ -624,6 +635,41 @@ template <
                 first++;
                 pos = start + step_vec * isaac_float(first);
                 coord = { isaac_int(floor(pos.x)), isaac_int(floor(pos.y)), isaac_int(floor(pos.z)) };
+            }
+            
+            //Extra clipping
+            for (isaac_int i = 0; i < clipping.count; i++)
+            {
+                isaac_float d = step_vec.x * clipping.elem[i].normal.x
+                              + step_vec.y * clipping.elem[i].normal.y
+                              + step_vec.z * clipping.elem[i].normal.z;
+                isaac_float intersection_step = (
+                                              + clipping.elem[i].position.x * clipping.elem[i].normal.x
+                                              + clipping.elem[i].position.y * clipping.elem[i].normal.y
+                                              + clipping.elem[i].position.z * clipping.elem[i].normal.z
+                                              -                     start.x * clipping.elem[i].normal.x
+                                              -                     start.y * clipping.elem[i].normal.y
+                                              -                     start.z * clipping.elem[i].normal.z ) / d;
+                if (d < 0)
+                {
+                    if ( last < intersection_step )
+                    {
+                        ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], background_color )
+                        return;
+                    }
+                    if ( first < intersection_step )
+                        first = ceil( intersection_step );
+                }
+                else
+                {
+                    if ( first > intersection_step )
+                    {
+                        ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], background_color )
+                        return;
+                    }
+                    if ( last > intersection_step )
+                        last = floor( intersection_step );
+                }
             }
 
             //Starting the main loop
@@ -752,7 +798,8 @@ struct IsaacFillRectKernelStruct
         IceTInt const * const readback_viewport,
         const isaac_int interpolation,
         const isaac_int iso_surface,
-        const TScale& scale
+        const TScale& scale,
+        const clipping_struct& clipping
     )
     {
         if (sourceWeight.value[ mpl::size< TSourceList >::type::value - N] == isaac_float(0) )
@@ -798,7 +845,8 @@ struct IsaacFillRectKernelStruct
                 readback_viewport,
                 interpolation,
                 iso_surface,
-                scale
+                scale,
+                clipping
             );
     else
             IsaacFillRectKernelStruct
@@ -843,7 +891,8 @@ struct IsaacFillRectKernelStruct
                 readback_viewport,
                 interpolation,
                 iso_surface,
-                scale
+                scale,
+                clipping
             );
     }
 };
@@ -911,7 +960,8 @@ struct IsaacFillRectKernelStruct
         IceTInt const * const readback_viewport,
         const isaac_int interpolation,
         const isaac_int iso_surface,
-        const TScale& scale
+        const TScale& scale,
+        const clipping_struct& clipping
     )
     {
         isaac_size2 block_size=
@@ -970,7 +1020,8 @@ struct IsaacFillRectKernelStruct
                         transferArray, \
                         sourceWeight, \
                         pointerArray, \
-                        scale \
+                        scale, \
+                        clipping \
                     ) \
                 ); \
                 alpaka::stream::enqueue(stream, instance); \
@@ -1001,7 +1052,8 @@ struct IsaacFillRectKernelStruct
                     transferArray, \
                     sourceWeight, \
                     pointerArray, \
-                    scale \
+                    scale, \
+                    clipping \
                 );            
             
         #endif

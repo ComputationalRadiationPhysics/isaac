@@ -41,6 +41,10 @@
     #define ISAAC_DEFAULT_STEP 0.5
 #endif
 
+#ifndef ISAAC_MAX_CLIPPING
+    #define ISAAC_MAX_CLIPPING 16
+#endif
+
 #define ISAAC_MAX_RECEIVE 262144 //256kb
 #define ISAAC_Z_NEAR 1.0f
 #define ISAAC_Z_FAR 100.0f

@@ -544,6 +544,7 @@ errorCode Master::run()
 							"{\"type\": \"feedback\", \"request\": \"transfer\"} "
 							"{\"type\": \"feedback\", \"request\": \"functions\"} "
 							"{\"type\": \"feedback\", \"request\": \"weight\"} "
+							"{\"type\": \"feedback\", \"request\": \"clipping\"} "
 							"{\"type\": \"feedback\", \"request\": \"redraw\"}";
 						send(group->master->connector->getSockFD(),buffer,strlen(buffer),MSG_NOSIGNAL);
 					}

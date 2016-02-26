@@ -238,6 +238,17 @@ struct minmax_array_struct
     isaac_float max[ N ];
 };
 
+struct clipping_struct
+{
+    isaac_uint count;
+    struct
+    {
+        isaac_float3 position;
+        isaac_float3 normal;
+    } elem[ ISAAC_MAX_CLIPPING ];
+};
+
+
 
 typedef enum
 {

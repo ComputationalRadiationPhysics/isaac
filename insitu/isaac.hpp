@@ -404,7 +404,8 @@ class IsaacVisualization
             framebuffer_prod(size_t(framebuffer_size.x) * size_t(framebuffer_size.y)),
             sources( sources ),
             scale( scale ),
-            icet_bounding_box( true )
+            icet_bounding_box( true ),
+            clipping( {0} )
             #if ISAAC_ALPAKA == 1
                 ,framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_prod))
                 ,inverse_d(alpaka::mem::buf::alloc<isaac_float, size_t>(acc, size_t(16)))
@@ -421,7 +422,6 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaMalloc((isaac_functor_chain_pointer_N**)&functor_chain_choose_d, sizeof(isaac_functor_chain_pointer_N) * boost::mpl::size< TSourceList >::type::value));
                 ISAAC_CUDA_CHECK(cudaMalloc((minmax_struct**)&local_minmax_array_d, sizeof(minmax_struct) * local_size[0] * local_size[1]));
             #endif
-            
             for (int i = 0; i < 3; i++)
             {
                 global_size_scaled.push_back( isaac_int( (isaac_float)global_size[i] * (isaac_float)scale[i] ) );
@@ -588,6 +588,40 @@ class IsaacVisualization
                 if (TSimDim::value > 2)
                     json_object_set_new( json_root, "depth", json_integer ( global_size_scaled[2] ) );
             }
+        }
+        bool editClipping(isaac_uint nr,isaac_float px,isaac_float py,isaac_float pz,isaac_float nx,isaac_float ny,isaac_float nz)
+        {
+            if (nr >= ISAAC_MAX_CLIPPING)
+                return false;
+            nx = nx * scale[0];
+            ny = ny * scale[1];
+            nz = nz * scale[2];
+            isaac_float l = sqrt(nx*nx+ny*ny+nz*nz);
+            if (l == 0.0f)
+                return false;
+            nx /= l;
+            ny /= l;
+            nz /= l;
+            clipping.elem[ nr ].position.x = px;
+            clipping.elem[ nr ].position.y = py;
+            clipping.elem[ nr ].position.z = pz;
+            clipping.elem[ nr ].normal.x = nx;
+            clipping.elem[ nr ].normal.y = ny;
+            clipping.elem[ nr ].normal.z = nz;
+            return true;
+        }
+        void addClipping(isaac_float px,isaac_float py,isaac_float pz,isaac_float nx,isaac_float ny,isaac_float nz)
+        {
+            if ( editClipping( clipping.count, px, py, pz, nx, ny, nz ) )
+                clipping.count++;
+        }
+        void removeClipping(isaac_uint nr)
+        {
+            if (nr >= clipping.count)
+                return;
+            clipping.count--;
+            for (isaac_uint i = nr; i < clipping.count; i++)
+                clipping.elem[i] = clipping.elem[i+1];
         }
         void updateBounding()
         {
@@ -817,6 +851,7 @@ class IsaacVisualization
             send_weight = false;
             send_minmax = false;
             send_background_color = false;
+            send_clipping = false;
 
             //Handle messages
             json_t* message;
@@ -858,6 +893,8 @@ class IsaacVisualization
                             send_weight = true;
                         if ( strcmp( target, "background color" ) == 0 )
                             send_background_color = true;
+                        if ( strcmp( target, "clipping" ) == 0 )
+                            send_clipping = true;
                     }
                     //Search for scene changes
                     if (json_array_size( js = json_object_get(last, "rotation absolute") ) == 9)
@@ -1091,7 +1128,41 @@ class IsaacVisualization
                     icetEnable(ICET_CORRECT_COLORED_BACKGROUND);
                 send_background_color = true;
             }
-            
+            if (js = json_object_get(message, "clipping add") )
+            {
+                send_clipping = true;
+                json_t* position = json_object_get(js, "position");
+                json_t* normal   = json_object_get(js, "normal");
+                addClipping(
+                    json_number_value( json_array_get( position, 0 ) ),
+                    json_number_value( json_array_get( position, 1 ) ),
+                    json_number_value( json_array_get( position, 2 ) ),
+                    json_number_value( json_array_get( normal, 0 ) ),
+                    json_number_value( json_array_get( normal, 1 ) ),
+                    json_number_value( json_array_get( normal, 2 ) )
+                );
+            }
+            if (js = json_object_get(message, "clipping remove") )
+            {
+                send_clipping = true;
+                removeClipping( json_integer_value( js ) );
+            }            
+            if (js = json_object_get(message, "clipping edit") )
+            {
+                send_clipping = true;
+                json_t* nr       = json_object_get(js, "nr");
+                json_t* position = json_object_get(js, "position");
+                json_t* normal   = json_object_get(js, "normal");
+                editClipping(
+                    json_integer_value( nr ),
+                    json_number_value( json_array_get( position, 0 ) ),
+                    json_number_value( json_array_get( position, 1 ) ),
+                    json_number_value( json_array_get( position, 2 ) ),
+                    json_number_value( json_array_get( normal, 0 ) ),
+                    json_number_value( json_array_get( normal, 1 ) ),
+                    json_number_value( json_array_get( normal, 2 ) )
+                );
+            }            
             json_t* metadata = json_object_get( message, "metadata" );
             if (metadata)
                 json_incref(metadata);
@@ -1341,7 +1412,8 @@ class IsaacVisualization
                     readback_viewport,
                     myself->interpolation,
                     myself->iso_surface,
-                    isaac_scale
+                    isaac_scale,
+                    myself->clipping
                 );
                 alpaka::wait::wait(myself->stream);
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
@@ -1375,7 +1447,8 @@ class IsaacVisualization
                     readback_viewport,
                     myself->interpolation,
                     myself->iso_surface,
-                    isaac_scale
+                    isaac_scale,
+                    myself->clipping
                 );
                 ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
@@ -1484,6 +1557,25 @@ class IsaacVisualization
                     json_object_set_new( myself->json_root, "background color", matrix = json_array() );
                     for (size_t i = 0; i < 3; i++)
                         json_array_append_new( matrix, json_real( myself->background_color[i] ) );
+                }
+                if ( myself->send_clipping )
+                {
+                    json_object_set_new( myself->json_root, "clipping", matrix = json_array() );
+                    for (size_t i = 0; i < myself->clipping.count; i++)
+                    {
+                        json_t* f = json_object();
+                        json_array_append_new( matrix, f );
+                        json_t* inner = json_array();
+                        json_object_set_new(f, "position", inner );
+                        json_array_append_new( inner, json_real( myself->clipping.elem[i].position.x ) );
+                        json_array_append_new( inner, json_real( myself->clipping.elem[i].position.y ) );
+                        json_array_append_new( inner, json_real( myself->clipping.elem[i].position.z ) );
+                                inner = json_array();
+                        json_object_set_new(f, "normal", inner );
+                        json_array_append_new( inner, json_real( myself->clipping.elem[i].normal.x ) );
+                        json_array_append_new( inner, json_real( myself->clipping.elem[i].normal.y ) );
+                        json_array_append_new( inner, json_real( myself->clipping.elem[i].normal.z ) );
+                    }
                 }
                 char* buffer = json_dumps( myself->json_root, 0 );
                 myself->communicator->serverSend(buffer);
@@ -1618,6 +1710,7 @@ class IsaacVisualization
         bool send_weight;
         bool send_minmax;
         bool send_background_color;
+        bool send_clipping;
         bool interpolation;
         bool iso_surface;
         bool icet_bounding_box;
@@ -1652,6 +1745,7 @@ class IsaacVisualization
         IceTFloat background_color[4];
         static IsaacVisualization *myself;
         TScale scale;
+        clipping_struct clipping;
 };
 
 #if ISAAC_ALPAKA == 1

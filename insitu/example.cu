@@ -273,8 +273,8 @@ int main(int argc, char **argv)
 
 	std::vector<float> scaling;
 		scaling.push_back(1);
-		scaling.push_back(1);
-		scaling.push_back(1);
+		scaling.push_back(2);
+		scaling.push_back(2);
 	
 	///////////////////////////////////////
 	// Create isaac visualization object //

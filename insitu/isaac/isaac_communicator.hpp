@@ -216,7 +216,7 @@ class IsaacCommunicator
 				json_t* js;
 				if (js = json_object_get( content, "done"))
 				{
-					int new_server_id = json_integer_value( js );
+					isaac_uint new_server_id = json_integer_value( js );
 					if (new_server_id > server_id)
 						server_id = new_server_id;
 					json_decref( content );
