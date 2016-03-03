@@ -650,7 +650,7 @@ template <
                                               -                     start.x * clipping.elem[i].normal.x
                                               -                     start.y * clipping.elem[i].normal.y
                                               -                     start.z * clipping.elem[i].normal.z ) / d;
-                if (d < 0)
+                if (d > 0)
                 {
                     if ( last < intersection_step )
                     {
