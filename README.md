@@ -1,6 +1,8 @@
 ISAAC - In Situ Animation of Accelerated Computations
 =====================================================
 
+![Wakefield visualization from PIConGPU](/examples/picongpu_wakefield.png?raw=true "Wakefield visualization from PIConGPU")
+
 About ISAAC
 -----------
 
