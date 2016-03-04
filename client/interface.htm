@@ -681,6 +681,8 @@ function createOptimizedFunction( i, minmax )
 
 function updateMetaDataTable(metadata)
 {
+	if (Object.keys(metadata).length === 0 && JSON.stringify(metadata) === JSON.stringify({}))
+		return;
 	var metadata_table = document.getElementById("metadata_table");
 	while (metadata_table.firstChild) {
 		metadata_table.removeChild(metadata_table.firstChild);
