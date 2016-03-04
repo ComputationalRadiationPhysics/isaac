@@ -343,8 +343,9 @@ errorCode Master::run()
 						while(dc)
 						{
 							int stream;
-							if(dc->t->doesObserve(insitu->t->group->getID(),stream))
-								dc->t->masterSendMessage(new MessageContainer(message->type,message->json_root,true));
+							bool dropable;
+							if(dc->t->doesObserve(insitu->t->group->getID(),stream,dropable))
+								dc->t->masterSendMessage(new MessageContainer(message->type,message->json_root,true,dropable));
 							dc=dc->next;
 						}
 					}
@@ -507,13 +508,14 @@ errorCode Master::run()
 				{
 					int id = json_integer_value( json_object_get(message->json_root, "observe id") );
 					int stream = json_integer_value( json_object_get(message->json_root, "stream") );
+					bool dropable = json_boolean_value( json_object_get(message->json_root, "dropable") );
 					if ( stream < 0 )
 						stream = 0;
 					if ( stream >= imageConnectorList.size() )
 						stream = imageConnectorList.size()-1;
 					const char* url = json_string_value( json_object_get(message->json_root, "url") );
 					void* ref = (void*)dc->t;
-					dc->t->observe( id, stream );
+					dc->t->observe( id, stream, dropable );
 					InsituConnectorGroup* group = NULL;
 					ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
 					while (it)
@@ -555,7 +557,8 @@ errorCode Master::run()
 					const char* url = json_string_value( json_object_get(message->json_root, "url") );
 					void* ref = (void*)dc->t;
 					int stream = 0;
-					dc->t->stopObserve( id, stream );
+					bool dropable = false;
+					dc->t->stopObserve( id, stream, dropable );
 					InsituConnectorGroup* group = NULL;
 					ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront();
 					while (it)
@@ -577,7 +580,8 @@ errorCode Master::run()
 					while (gr)
 					{
 						int stream;
-						if (dc->t->doesObserve(gr->t->getID(), stream))
+						bool dropable;
+						if (dc->t->doesObserve(gr->t->getID(), stream, dropable))
 						{
 							imageConnectorList[ stream ].connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED_STOPPED,NULL,gr->t,1,"",ref));
 						}

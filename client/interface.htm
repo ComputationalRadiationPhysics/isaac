@@ -24,6 +24,7 @@
 	<input type="button" value="Connect" id="connect">
 	<br/><input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()"> Show video and control in one window
 	<br/><input type="checkbox" id="wireframe_checkbox" checked onchange="wireframe_checkbox_click()"> Show wireframe bounding box
+	<br/><input type="checkbox" id="dropable_checkbox" onchange="dropable_checkbox_click()"> Meta data can be dropped (Select before observing!)
 	<br/><select id="stream_select" onchange="stream_select_click()">
 		<option value="h264_vlc">H264 Stream (with vlc)</option>
 		<option value="jpeg_vlc">JPEG Stream (with vlc)</option>
@@ -115,6 +116,7 @@ var particles = null;
 var plugins = new Array();
 var one_window = document.getElementById("one_window_checkbox").checked;
 var wireframe = document.getElementById("wireframe_checkbox").checked;
+var dropable = document.getElementById("dropable_checkbox").checked;
 var stream = document.getElementById("stream_select").selectedIndex;
 if (stream == 4)
 	document.getElementById("preview_div").style.opacity = '1.0';
@@ -456,6 +458,7 @@ function observeSimulation(id)
 	{
 		"type" : "observe",
 		"stream" : connector_id,
+		"dropable" : dropable,
 		"observe id" : observe_id
 	};
 	socket.send(JSON.stringify(obj));
@@ -1282,6 +1285,12 @@ function one_window_checkbox_click()
 function wireframe_checkbox_click()
 {
 	wireframe = document.getElementById("wireframe_checkbox").checked;
+};
+
+
+function dropable_checkbox_click()
+{
+	dropable = document.getElementById("dropable_checkbox").checked;
 };
 
 function interpolation_checkbox_click()

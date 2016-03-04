@@ -22,9 +22,10 @@ class MetaDataClient : public MessageAble<MessageContainer>
 {
 	public:
 		MetaDataClient();
-		void observe(int nr,int stream);
-		void stopObserve(int nr,int& stream);
-		bool doesObserve(int nr,int& stream);
+		void observe(int nr,int stream,bool dropable);
+		void stopObserve(int nr,int& stream,bool& dropable);
+		bool doesObserve(int nr,int& stream,bool& dropable);
 	private:
 		std::map<int,int> observeList;
+		std::map<int,bool> dropableList;
 };
