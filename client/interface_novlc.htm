@@ -41,7 +41,7 @@
 	<!--canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas-->
 	<div id="video_container_div" style="position: relative;">
 		<div id="video_div" style="position: relative; top: 0; left: 0;">
-			<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls="false" windowless="true"/>
+			<canvas id="video" width="512" height="512"></canvas>
 			<div id="url_div" style="display:none;"></div><br/>
 			<form>
 				<input type="button" value="Pause" id="pause">
@@ -808,8 +808,6 @@ document.getElementById("connect").onclick = function()
 						preview.height = obj["framebuffer height"];
 						video.width = obj["framebuffer width"];
 						video.height = obj["framebuffer height"];
-						if (!stream_is_raw( stream ))
-							video.playlist.items.clear();
 						observeSimulation(obj["id"]);
 						redraw();
 					};
@@ -820,11 +818,6 @@ document.getElementById("connect").onclick = function()
 					var url = "http://" + document.getElementById("url").value + ":" + document.getElementById("port").value + "/" + obj["connector"] + "/" + obj["name"] + "/" + obj["reference"];
 					if (stream_is_raw( stream ))
 						document.getElementById("url_div").textContent =  url;
-					else
-					{
-						video.playlist.add( url, "Visualization", ["--network-caching 1", "--live-caching 1", "--disk-caching 1", "--file-caching 1"] );
-						video.playlist.play();
-					}
 				}
 				if (obj["type"] == "period" || obj["type"] == "update")
 				{
@@ -1176,7 +1169,6 @@ document.getElementById("connect").onclick = function()
 					{
 						document.getElementById("video_td").style.display = 'none';
 						document.getElementById("preview_td").style.display = 'none';
-						video.playlist.stop();
 					}
 				}
 				if (obj["type"] == "period video")
