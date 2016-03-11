@@ -14,7 +14,7 @@
 ###############################################################################
 # ISAAC
 ###############################################################################
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.1.0)
 cmake_policy(SET CMP0048 OLD)
 project (ISAAC)
 
