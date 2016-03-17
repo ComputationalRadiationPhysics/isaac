@@ -1,4 +1,4 @@
-![ISAAC](/isaac.svg?raw=true "ISAAC")
+![ISAAC](/isaac.png?raw=true "ISAAC")
 
 In Situ Animation of Accelerated Computations
 =====================================================
