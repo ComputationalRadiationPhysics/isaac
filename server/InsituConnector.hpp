@@ -18,14 +18,23 @@
 #include "MessageAble.hpp"
 #include "ThreadList.hpp"
 
+typedef struct
+{
+	char buffer[ISAAC_MAX_RECEIVE];
+	int pos;
+	int count;
+} json_load_callback_struct;
+
 class InsituConnector : public MessageAble<MessageContainer>
 {
+	friend class InsituConnectorMaster;
 	public:
 		InsituConnector(int sockfd,int id);
 		~InsituConnector();
 		int getID();
 		int getSockFD();
 	private:
+		json_load_callback_struct jlcb;
 		int id;
 		int sockfd;
 };

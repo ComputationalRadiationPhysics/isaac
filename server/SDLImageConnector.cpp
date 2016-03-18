@@ -73,14 +73,14 @@ errorCode SDLImageConnector::run()
 					for (int i = 0; i < message->group->getVideoBufferSize() / 4; i++)
 					{
 						for (int j = 0; j < 3; j++)
-							pixels[i*4+j] = message->buffer[i*4+2-j];
-						pixels[i*4+3] = message->buffer[i*4+3];
+							pixels[i*4+j] = message->image->buffer[i*4+2-j];
+						pixels[i*4+3] = message->image->buffer[i*4+3];
 					}
 					SDL_UnlockSurface( window );
 					SDL_Flip(window);
 				}
 			}
-			message->suicide();
+			clientSendMessage( message );
 		}
 		usleep(1000);
 	}
@@ -94,7 +94,7 @@ errorCode SDLImageConnector::run()
 		{
 			if (message->type == IMG_FORCE_EXIT)
 				finish = 1;
-			message->suicide();
+			clientSendMessage( message );
 		}
 		usleep(1000);
 	}	

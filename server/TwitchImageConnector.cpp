@@ -125,14 +125,14 @@ errorCode TwitchImageConnector::run()
 					uint64_t val = gst_app_src_get_current_level_bytes( (GstAppSrc*)appsrc );
 					if ( val == 0)
 					{
-						message->incref();
-						GstBuffer *buffer = gst_buffer_new_wrapped_full (GstMemoryFlags(0), message->buffer, group->getVideoBufferSize(), 0, group->getVideoBufferSize(), (gpointer)message, suicideNotify);
+						message->image->incref();
+						GstBuffer *buffer = gst_buffer_new_wrapped_full (GstMemoryFlags(0), message->image->buffer, group->getVideoBufferSize(), 0, group->getVideoBufferSize(), (gpointer)(message->image), suicideNotify);
 						if (gst_app_src_push_buffer( (GstAppSrc*)appsrc, buffer) != GST_FLOW_OK)
 							printf("TwitchImageConnector: Error while sending buffer\n");
 					}
 				}
 			}
-			message->suicide();
+			clientSendMessage( message );
 		}
 		usleep(1000);
 	}

@@ -13,8 +13,8 @@
  * You should have received a copy of the GNU General Lesser Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
-#ifndef __MASTER
-#define __MASTER
+#ifndef __BROKER
+#define __BROKER
 
 #include <string>
 #include <vector>
@@ -47,7 +47,7 @@ typedef struct ImageConnectorContainer_struct
 
 class InsituConnectorGroup
 {
-	friend class Master;
+	friend class Broker;
 	public:
 		InsituConnectorGroup(std::string name) :
 			master( NULL ),
@@ -96,11 +96,11 @@ class InsituConnectorGroup
 		pthread_mutex_t streams_mutex;
 };
 
-class Master
+class Broker
 {
 	public:
-		Master(std::string name,int inner_port);
-		~Master();
+		Broker(std::string name,int inner_port);
+		~Broker();
 		errorCode addDataConnector(MetaDataConnector *dataConnector);
 		errorCode addImageConnector(ImageConnector *imageConnector);
 		MetaDataClient* addDataClient();

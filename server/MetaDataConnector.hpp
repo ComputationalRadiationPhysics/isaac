@@ -21,8 +21,8 @@
 #include "ThreadList.hpp"
 #include "Runable.hpp"
 #include "MessageAble.hpp"
-#include "Master.hpp"
-class Master;
+#include "Broker.hpp"
+class Broker;
 
 /** This class is used for the connection between the isaac server and
  * some frontend. It defines and abstracts an interface isaac will use.*/
@@ -35,9 +35,9 @@ class MetaDataConnector : public Runable, public MessageAble<MessageContainer>
 		virtual std::string getName() = 0;
 
 		//Called from the Master
-		void setMaster(Master* master);
+		void setBroker(Broker* broker);
 	protected:
-		Master* master;
+		Broker* broker;
 };
 
 #endif

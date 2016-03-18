@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Lesser Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
-#include "Master.hpp"
+#include "Broker.hpp"
 #include "WebSocketDataConnector.hpp"
 #ifdef ISAAC_SDL
 	#include "SDLImageConnector.hpp"
@@ -120,32 +120,32 @@ int main(int argc, char **argv)
 	printf("Using outer_port=%i and inner_port=%i\n",outer_port,inner_port);
 	
 	printf("\n");
-	Master master(name,inner_port);
+	Broker broker(name,inner_port);
 	WebSocketDataConnector* webSocketDataConnector = new WebSocketDataConnector();
 	if (webSocketDataConnector->init(outer_port))
 		delete webSocketDataConnector;
 	else
-		master.addDataConnector(webSocketDataConnector);
+		broker.addDataConnector(webSocketDataConnector);
 	#ifdef ISAAC_GST
 		RTPImageConnector* rTPImageConnector = new RTPImageConnector(url,false,false);
 		if (rTPImageConnector->init(5000,5099))
 			delete rTPImageConnector;
 		else
-			master.addImageConnector(rTPImageConnector);
+			broker.addImageConnector(rTPImageConnector);
 	#endif
 	#ifdef ISAAC_GST
 		rTPImageConnector = new RTPImageConnector(url,false,true);
 		if (rTPImageConnector->init(5100,5199))
 			delete rTPImageConnector;
 		else
-			master.addImageConnector(rTPImageConnector);
+			broker.addImageConnector(rTPImageConnector);
 	#endif
 	#ifdef ISAAC_JPEG
 		URIImageConnector* uRIImageConnector = new URIImageConnector();
 		if (uRIImageConnector->init(0,0))
 			delete uRIImageConnector;
 		else
-			master.addImageConnector(uRIImageConnector);
+			broker.addImageConnector(uRIImageConnector);
 	#endif
 	#ifdef ISAAC_GST
 		if (twitch_apikey)
@@ -158,7 +158,7 @@ int main(int argc, char **argv)
 			if (twitchImageConnector->init(0,0))
 				delete twitchImageConnector;
 			else
-				master.addImageConnector(twitchImageConnector);
+				broker.addImageConnector(twitchImageConnector);
 		}
 	#endif
 	#ifdef ISAAC_SDL
@@ -166,9 +166,9 @@ int main(int argc, char **argv)
 		if (sDLImageConnector->init(0,0))
 			delete sDLImageConnector;
 		else
-			master.addImageConnector(sDLImageConnector);
+			broker.addImageConnector(sDLImageConnector);
 	#endif
-	if (master.run())
+	if (broker.run())
 	{
 		printf("Error while running isaac\n");
 		return -1;

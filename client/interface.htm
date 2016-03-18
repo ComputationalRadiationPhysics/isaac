@@ -828,6 +828,10 @@ document.getElementById("connect").onclick = function()
 				}
 				if (obj["type"] == "period" || obj["type"] == "update")
 				{
+					if (obj.hasOwnProperty("payload"))
+					{
+						stream_img.src = obj["payload"];
+					}
 					if (obj.hasOwnProperty("metadata"))
 					{
 						if (obj["metadata"].hasOwnProperty("interval"))
@@ -1178,10 +1182,6 @@ document.getElementById("connect").onclick = function()
 						document.getElementById("preview_td").style.display = 'none';
 						video.playlist.stop();
 					}
-				}
-				if (obj["type"] == "period video")
-				{
-					stream_img.src = obj["payload"];
 				}
 			};
 			socket.onclose = function()

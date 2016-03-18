@@ -82,70 +82,17 @@ errorCode URIImageConnector::run()
 				{
 					if (it->second == message->group)
 					{
-						struct jpeg_compress_struct cinfo;
-						struct jpeg_error_mgr jerr;
-						jpeg_destination_mgr dest;
-						dest.init_destination = &isaac_init_destination;
-						dest.empty_output_buffer = &isaac_jpeg_empty_output_buffer;
-						dest.term_destination = &isaac_jpeg_term_destination;
-						cinfo.err = jpeg_std_error(&jerr);
-						jpeg_create_compress(&cinfo);
-						cinfo.dest = &dest;
-						std::vector<unsigned char> jpeg_buffer;
-						jpeg_buffer.resize( message->group->getVideoBufferSize() );
-						cinfo.dest->next_output_byte = (JOCTET*)( jpeg_buffer.data() );
-						cinfo.dest->free_in_buffer = message->group->getVideoBufferSize();
-						cinfo.image_width = message->group->getFramebufferWidth();
-						cinfo.image_height = message->group->getFramebufferHeight();
-						cinfo.input_components = 4;
-						cinfo.in_color_space = JCS_EXT_RGBX;
-						jpeg_set_defaults(&cinfo);
-						jpeg_set_quality(&cinfo, 90, false);
-						jpeg_start_compress(&cinfo, TRUE);
-						while (cinfo.next_scanline < cinfo.image_height)
-						{
-							JSAMPROW row_pointer[1];
-							row_pointer[0] = & ((JSAMPROW)(message->buffer))[cinfo.next_scanline * cinfo.image_width * cinfo.input_components];
-							(void) jpeg_write_scanlines(&cinfo, row_pointer, 1);
-						}
-						jpeg_finish_compress(&cinfo);
-						int count = message->group->getVideoBufferSize() - cinfo.dest->free_in_buffer;
-						jpeg_destroy_compress(&cinfo);
-						
-						
-						using namespace boost::archive::iterators;
-						std::stringstream os;
-						typedef
-							base64_from_binary
-							<
-								transform_width
-								<
-									const unsigned char *,
-									6,
-									8
-								>
-							> 
-							base64_text; // compose all the above operations in to a new iterator
-
-						std::copy(
-							base64_text(jpeg_buffer.data()),
-							base64_text(jpeg_buffer.data() + count),
-							boost::archive::iterators::ostream_iterator<char>(os)
-						);
-						
-						char header[] = "data:image/jpeg;base64,";
-						int l = strlen(header);
-						char* payload = (char*)malloc(os.str().length()+1+l);
-						memcpy(payload,header,l);
-						memcpy(&(payload[l]),os.str().c_str(),os.str().length()+1);
-						ImageBufferContainer* answer = new ImageBufferContainer(SEND_JSON,(uint8_t*)payload,message->group,1,"",it->first);
-						clientSendMessage( answer );
+						pthread_mutex_lock (&(message->json_mutex));
+						pthread_mutex_lock (&(message->payload_mutex));
+						json_object_set( message->json, "payload", message->payload ); 
+						pthread_mutex_unlock (&(message->payload_mutex));
+						pthread_mutex_unlock (&(message->json_mutex));
 					}
 				}
 			}
 			if (message->type == IMG_FORCE_EXIT)
 				finish = 1;
-			message->suicide();
+			clientSendMessage( message );
 		}
 		usleep(1000);
 	}	

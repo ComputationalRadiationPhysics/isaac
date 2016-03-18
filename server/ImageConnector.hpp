@@ -20,8 +20,8 @@
 #include "Runable.hpp"
 #include "MessageAble.hpp"
 #include "ThreadList.hpp"
-#include "Master.hpp"
-class Master;
+#include "Broker.hpp"
+class Broker;
 
 class ImageConnector : public Runable, public MessageAble<ImageBufferContainer>
 {
@@ -33,11 +33,11 @@ class ImageConnector : public Runable, public MessageAble<ImageBufferContainer>
 		virtual std::string getName() = 0;
 
 		//Called from the Master
-		void setMaster(Master* master);	
+		void setBroker(Broker* broker);	
 		
 		bool showClient;
 	protected:
-		Master* master;
+		Broker* broker;
 };
 
 #endif

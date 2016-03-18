@@ -8,7 +8,7 @@ set(SRCS
 	${CMAKE_SOURCE_DIR}/server/ImageConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnectorMaster.cpp
-	${CMAKE_SOURCE_DIR}/server/Master.cpp
+	${CMAKE_SOURCE_DIR}/server/Broker.cpp
 	${CMAKE_SOURCE_DIR}/server/Runable.cpp
 	${CMAKE_SOURCE_DIR}/server/MessageAble.cpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataClient.cpp
@@ -21,7 +21,7 @@ set(HDRS
 	${CMAKE_SOURCE_DIR}/server/InsituConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/InsituConnectorMaster.hpp
 	${CMAKE_SOURCE_DIR}/server/WebSocketDataConnector.hpp
-	${CMAKE_SOURCE_DIR}/server/Master.hpp
+	${CMAKE_SOURCE_DIR}/server/Broker.hpp
 	${CMAKE_SOURCE_DIR}/server/ThreadList.hpp
 	${CMAKE_SOURCE_DIR}/server/Runable.hpp
 	${CMAKE_SOURCE_DIR}/server/MessageAble.hpp

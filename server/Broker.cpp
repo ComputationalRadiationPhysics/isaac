@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Lesser Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
-#include "Master.hpp"
+#include "Broker.hpp"
 #include <stdio.h>
 #include <pthread.h>
 #include "ThreadList.hpp"
@@ -27,12 +27,12 @@
 #include <boost/archive/iterators/binary_from_base64.hpp>
 #include <boost/archive/iterators/transform_width.hpp>
 
-volatile sig_atomic_t Master::force_exit = 0;
+volatile sig_atomic_t Broker::force_exit = 0;
 
 void sighandler(int sig)
 {
 	printf("\n");
-	Master::force_exit = 1;
+	Broker::force_exit = 1;
 }
 
 template <typename Type>
@@ -42,7 +42,7 @@ void* delete_pointer_later(void* ptr)
 	delete( (Type*)ptr );
 }
 
-Master::Master(std::string name,int inner_port)
+Broker::Broker(std::string name,int inner_port)
 {
 	this->name = name;
 	this->inner_port = inner_port;
@@ -54,9 +54,9 @@ Master::Master(std::string name,int inner_port)
 	json_object_set_new( masterHello, "streams", masterHelloConnectorList );
 }
 
-errorCode Master::addDataConnector(MetaDataConnector *dataConnector)
+errorCode Broker::addDataConnector(MetaDataConnector *dataConnector)
 {
-	dataConnector->setMaster(this);
+	dataConnector->setBroker(this);
 	MetaDataConnectorContainer d;
 	d.connector = dataConnector;
 	d.thread = 0;
@@ -64,9 +64,9 @@ errorCode Master::addDataConnector(MetaDataConnector *dataConnector)
 	return 0;
 }
 
-errorCode Master::addImageConnector(ImageConnector *imageConnector)
+errorCode Broker::addImageConnector(ImageConnector *imageConnector)
 {
-	imageConnector->setMaster(this);
+	imageConnector->setBroker(this);
 	ImageConnectorContainer d;
 	d.connector = imageConnector;
 	d.thread = 0;
@@ -81,7 +81,7 @@ errorCode Master::addImageConnector(ImageConnector *imageConnector)
 	return 0;
 }
 
-MetaDataClient* Master::addDataClient()
+MetaDataClient* Broker::addDataClient()
 {
 	MetaDataClient* client = new MetaDataClient();
 	dataClientList.push_back(client);
@@ -134,7 +134,7 @@ MetaDataClient* Master::addDataClient()
 	}
 #endif
 
-void Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char* payload)
+void Broker::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char* payload)
 {
 	//Search for : in payload
 	char* colon = strchr(payload, ':');
@@ -240,7 +240,7 @@ void Master::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char
 	free(payload);
 }
 
-std::string Master::getStream(std::string connector,std::string name,std::string ref)
+std::string Broker::getStream(std::string connector,std::string name,std::string ref)
 {
 	void* reference;
 	try
@@ -272,7 +272,7 @@ std::string Master::getStream(std::string connector,std::string name,std::string
 	return result;
 }
 
-errorCode Master::run()
+errorCode Broker::run()
 {
 	printf("Running ISAAC Master\n");
 	signal(SIGINT, sighandler);
@@ -338,44 +338,29 @@ errorCode Master::run()
 							json_object_set( insitu->t->group->initData, "step", js );
 						if ( js = json_object_get(message->json_root, "background color") )
 							json_object_set( insitu->t->group->initData, "background color", js );
-						//Send json data
-						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc=dataClientList.getFront();
-						while(dc)
+						//Filter payload
+						json_t* payload = json_object_get( message->json_root, "payload" );
+						if (payload)
 						{
-							int stream;
-							bool dropable;
-							if(dc->t->doesObserve(insitu->t->group->getID(),stream,dropable))
-								dc->t->masterSendMessage(new MessageContainer(message->type,message->json_root,true,dropable));
-							dc=dc->next;
+							json_incref( payload );
+							json_incref( message->json_root );
+							json_object_del( message->json_root, "payload" );
 						}
-					}
-				}
-				else
-				if (message->type == PERIOD_VIDEO)
-				{
-					json_t* payload = json_object_get( message->json_root, "payload" );
-					if (payload)
-					{
-						if (insitu->t->group == NULL) //Later!
-						{
-							delete_message = false;
-							insitu->t->connector->clientSendMessage( message );
-						}
-						else
+						if (payload)
 						{
 							//Allocate, receive and send video
 							uint8_t*video_buffer=(uint8_t*)malloc(insitu->t->group->video_buffer_size);
 							receiveVideo(insitu->t->group,video_buffer,json_dumps( payload , JSON_ENCODE_ANY ));
 							int l=imageConnectorList.size();
-							ImageBufferContainer *container=new ImageBufferContainer(UPDATE_BUFFER,video_buffer,insitu->t->group,l);
+							ImageBufferContainer *container=new ImageBufferContainer(UPDATE_BUFFER,video_buffer,insitu->t->group,l,"",NULL,message->json_root,payload,insitu->t->group->getID());
 							if(l==0)
-								container->suicide();
+								container->image->suicide();
 							else
 								for(auto ic=imageConnectorList.begin();ic!=imageConnectorList.end();ic++)
 									(*ic).connector->masterSendMessage(container);
 						}
 					}
-				}				
+				}
 				else
 				if (message->type == REGISTER) //Saving the metadata description for later
 				{
@@ -605,7 +590,7 @@ errorCode Master::run()
 				if (message->type == REGISTER_STREAM)
 				{
 					pthread_mutex_lock(&message->group->streams_mutex);
-					message->group->streams[(*it).connector->getName()].insert( std::pair< void*,std::string >( message->reference, std::string((char*)message->buffer) ));
+					message->group->streams[(*it).connector->getName()].insert( std::pair< void*,std::string >( message->reference, std::string((char*)message->image->buffer) ));
 					pthread_mutex_unlock(&message->group->streams_mutex);
 					json_t* root = json_object();
 					json_object_set_new( root, "type", json_string ("register video") );
@@ -620,22 +605,28 @@ errorCode Master::run()
 					}
 					json_decref( root );
 				}
-				if (message->type == SEND_JSON)
+				message->image->suicide();
+				message->ref_count--;
+				if (message->ref_count == 0)
 				{
-					ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
-					while (dc)
+					//Sending json message
+					if (message->type == UPDATE_BUFFER)
 					{
-						if (dc->t == message->reference)
+						//Send json data
+						ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc=dataClientList.getFront();
+						while(dc)
 						{
-							json_t* root = json_object();
-							json_object_set_new( root, "type", json_string ("period video") );
-							json_object_set_new( root, "payload", json_string ( (char*)(message->buffer) ) );
-							dc->t->masterSendMessage(new MessageContainer(PERIOD_VIDEO,root,false,true));
+							int stream;
+							bool dropable;
+							if(dc->t->doesObserve(message->insitu_id,stream,dropable))
+								dc->t->masterSendMessage(new MessageContainer(NONE,message->json,true,dropable));
+							dc=dc->next;
 						}
-						dc = dc->next;
+						json_decref(message->json);
+						json_decref(message->payload);
 					}
+					delete(message);
 				}
-				message->suicide();
 			}
 		}
 		usleep(100);
@@ -673,7 +664,7 @@ errorCode Master::run()
 	return 0;
 }
 
-Master::~Master()
+Broker::~Broker()
 {
 	json_decref( masterHello );
 	dataConnectorList.clear();

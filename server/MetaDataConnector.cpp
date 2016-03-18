@@ -15,7 +15,7 @@
 
 #include "MetaDataConnector.hpp"
 
-void MetaDataConnector::setMaster(Master* master)
+void MetaDataConnector::setBroker(Broker* broker)
 {
-	this->master = master;
+	this->broker = broker;
 }

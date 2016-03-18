@@ -113,26 +113,21 @@ typedef enum
 	GROUP_FINISHED,
 	REGISTER_STREAM,
 	GROUP_OBSERVED,
-	GROUP_OBSERVED_STOPPED,
-	SEND_JSON
+	GROUP_OBSERVED_STOPPED
 } ImageBufferType;
 
 class InsituConnectorGroup;
 
-class ImageBufferContainer
+class ImageBuffer
 {
 	public:
-		ImageBufferContainer(ImageBufferType type,uint8_t* buffer,InsituConnectorGroup* group,int ref_count,std::string target = "",void* reference = NULL)
+		ImageBuffer(uint8_t* buffer, int ref_count) :
+			buffer( buffer ),
+			ref_count (ref_count )
 		{
-			this->type = type;
-			this->buffer = buffer;
-			this->group = group;
-			this->ref_count = ref_count;
-			this->target = target;
-			this->reference = reference;
 			pthread_mutex_init (&ref_mutex, NULL);
-		}
-		~ImageBufferContainer()
+		}	
+		~ImageBuffer()
 		{
 			pthread_mutex_destroy(&ref_mutex);
 		}
@@ -155,13 +150,43 @@ class ImageBufferContainer
 			else
 				pthread_mutex_unlock (&ref_mutex);
 		}
-		
-		ImageBufferType type;
 		uint8_t* buffer;
+		int ref_count;
+		pthread_mutex_t ref_mutex;
+};
+
+class ImageBufferContainer
+{
+	public:
+		ImageBufferContainer(ImageBufferType type,uint8_t* buffer,InsituConnectorGroup* group,int ref_count,std::string target = "",void* reference = NULL,json_t* json = NULL,json_t* payload = NULL,int insitu_id = 0) :
+			type( type ),
+			group( group ),
+			target( target ),
+			reference( reference ),
+			ref_count( ref_count ),
+			json( json ),
+			payload( payload ),
+			insitu_id( insitu_id )
+		{
+			image = new ImageBuffer( buffer, ref_count );
+			pthread_mutex_init (&json_mutex, NULL);
+			pthread_mutex_init (&payload_mutex, NULL);
+		}
+		~ImageBufferContainer()
+		{
+			pthread_mutex_destroy(&json_mutex);
+			pthread_mutex_destroy(&payload_mutex);
+		}
+		ImageBufferType type;
 		InsituConnectorGroup* group;
 		std::string target;
 		void* reference;
+		ImageBuffer* image;
 		int ref_count;
-		pthread_mutex_t ref_mutex;
+		pthread_mutex_t json_mutex;
+		pthread_mutex_t payload_mutex;
+		json_t* json;
+		json_t* payload;
+		int insitu_id;
 };
 	

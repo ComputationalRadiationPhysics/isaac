@@ -55,13 +55,6 @@ int InsituConnectorMaster::getSockFD()
 	return sockfd;
 }
 
-typedef struct
-{
-	char buffer[ISAAC_MAX_RECEIVE];
-	int pos;
-	int count;
-} json_load_callback_struct;
-
 size_t json_load_callback_function (void *buffer, size_t buflen, void *data)
 {
 	json_load_callback_struct* jlcb = (json_load_callback_struct*)data;
@@ -76,8 +69,6 @@ size_t json_load_callback_function (void *buffer, size_t buflen, void *data)
 
 errorCode InsituConnectorMaster::run()
 {
-	json_load_callback_struct jlcb;
-	
 	listen(sockfd,5);
 	struct sockaddr_in cli_addr;
 	socklen_t clilen = sizeof(cli_addr);
@@ -110,6 +101,7 @@ errorCode InsituConnectorMaster::run()
 					if (newsockfd >= 0)
 					{
 						InsituConnector* insituConnector = new InsituConnector(newsockfd,nextFreeNumber++);
+						insituConnector->jlcb.count = 0;
 						InsituConnectorContainer* d = new InsituConnectorContainer();
 						d->connector = insituConnector;
 						con_array[fdnum] = d;
@@ -124,27 +116,25 @@ errorCode InsituConnectorMaster::run()
 			{
 				if (fd_array[i].revents & POLLIN)
 				{
-					jlcb.pos = 0;
-					uint32_t expected = 0;
-					recv(fd_array[i].fd,&expected,4,0);
-					jlcb.count = 0;
-					while (jlcb.count < expected)
+					while (1)
 					{
-						int add = recv(fd_array[i].fd,&(jlcb.buffer[jlcb.count]),expected-jlcb.count,0);
+						con_array[i]->connector->jlcb.pos = 0;
+						int add = recv(fd_array[i].fd,&(con_array[i]->connector->jlcb.buffer[con_array[i]->connector->jlcb.count]),4096,MSG_DONTWAIT);
 						if (add > 0)
-							jlcb.count += add;
+							con_array[i]->connector->jlcb.count += add;
 						else
-						{
-							jlcb.count = 0;
 							break;
-						}
 					}
+					con_array[i]->connector->jlcb.buffer[con_array[i]->connector->jlcb.count] = 0;
 					bool closed = false;
-					if (jlcb.count > 0)
+					if (con_array[i]->connector->jlcb.count > 0)
 					{
-						jlcb.buffer[jlcb.count] = 0;
-						while (json_t * content = json_load_callback(json_load_callback_function,&jlcb,JSON_DISABLE_EOF_CHECK,NULL))
+						con_array[i]->connector->jlcb.buffer[con_array[i]->connector->jlcb.count] = 0;
+						json_error_t error;
+						int last_working_pos = 0;
+						while (json_t * content = json_load_callback(json_load_callback_function,&con_array[i]->connector->jlcb,JSON_DISABLE_EOF_CHECK,&error))
 						{
+							last_working_pos = con_array[i]->connector->jlcb.pos;
 							MessageContainer* message = new MessageContainer(NONE,content);
 							MessageType type = message->type;
 							if (type == REGISTER)
@@ -172,6 +162,15 @@ errorCode InsituConnectorMaster::run()
 								}
 							}
 						}
+						//If the whole json message was not received yet, we need to keep the start
+						if ( error.position != 1 || strcmp(error.text,"'[' or '{' expected near end of file") != 0 )
+						{
+							for (int j = 0; j < con_array[i]->connector->jlcb.count - last_working_pos; j++)
+								con_array[i]->connector->jlcb.buffer[j] = con_array[i]->connector->jlcb.buffer[j + last_working_pos];
+							con_array[i]->connector->jlcb.count -= last_working_pos;
+						}
+						else
+							con_array[i]->connector->jlcb.count = 0;
 					}
 					else //Closed
 					{

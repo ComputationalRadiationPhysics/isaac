@@ -52,7 +52,7 @@ static int callback_http(
 		void *in,
 		size_t len )
 {
-	Master* master = *((Master**)lws_context_user(lws_get_context(wsi)));
+	Broker* broker = *((Broker**)lws_context_user(lws_get_context(wsi)));
 	switch (reason)
 	{
 		case LWS_CALLBACK_HTTP:
@@ -63,7 +63,7 @@ static int callback_http(
 			std::getline(request, left, '/');
 			std::getline(request, middle, '/');
 			std::getline(request, right, '/');
-			std::string description = master->getStream(left,middle,right);
+			std::string description = broker->getStream(left,middle,right);
 			char buf[LWS_SEND_BUFFER_PRE_PADDING + 2048 + LWS_SEND_BUFFER_POST_PADDING];
 			char* use = &(buf[LWS_SEND_BUFFER_PRE_PADDING]);
 			sprintf(use,"HTTP/1.1 200 OK\n\n%s",description.c_str());
@@ -96,7 +96,7 @@ callback_isaac(
 						  LWS_SEND_BUFFER_POST_PADDING];
 	char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 	struct per_session_data__isaac *pss = (struct per_session_data__isaac *)user;
-	Master* master = *((Master**)lws_context_user(lws_get_context(wsi)));
+	Broker* broker = *((Broker**)lws_context_user(lws_get_context(wsi)));
 	
 	switch (reason) {
 
@@ -156,7 +156,7 @@ callback_isaac(
 		char rip[256];
 		lws_get_peer_addresses(wsi,lws_get_socket_fd(wsi),name,256,rip,256);
 		printf("ISAAC Connection from %s (%s)!\n",name,rip);
-		pss->client = master->addDataClient();
+		pss->client = broker->addDataClient();
 		break;
 	}
 
@@ -194,7 +194,7 @@ errorCode WebSocketDataConnector::init(int port)
 	#ifndef LWS_NO_EXTENSIONS
 		info.extensions = lws_get_internal_extensions();
 	#endif
-	info.user = (void*)(&master);
+	info.user = (void*)(&broker);
 	info.port = port;
 	info.gid = -1;
 	info.uid = -1;

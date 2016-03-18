@@ -820,7 +820,7 @@ class IsaacVisualization
             if (rank == master)
             {
                 char* buffer = json_dumps( json_root, 0 );
-                communicator->serverSend(buffer);
+                communicator->serverSend(buffer,true,true);
                 free(buffer);
                 json_decref( json_root );
                 recreateJSON();
@@ -1285,7 +1285,7 @@ class IsaacVisualization
                 json_root = json_object();
                 json_object_set_new( json_root, "type", json_string( "exit" ) );
                 char* buffer = json_dumps( json_root, 0 );
-                communicator->serverSend(buffer);
+                communicator->serverSend(buffer,true,true);
                 free(buffer);
                 json_decref( json_root );
             }
@@ -1596,14 +1596,19 @@ class IsaacVisualization
             myself->recreateJSON();
             
             //Sending video
-            if (dummy)
+            IceTImage image = { dummy };
+            ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
+            if (myself->communicator)
             {
-                IceTImage image = { dummy };
-                ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
-                if (myself->communicator)
+                if (dummy)
                     myself->communicator->serverSendFrame(icetImageGetColorui(image),myself->framebuffer_size.x,myself->framebuffer_size.y,4);
-                ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
+                else
+                {
+                    myself->communicator->serverSend(NULL,false,true);
+                }
             }
+            ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
+
             myself->metaNr++;
             return 0;
         }

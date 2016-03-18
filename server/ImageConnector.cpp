@@ -20,7 +20,7 @@ ImageConnector::ImageConnector() :
 {
 }
 
-void ImageConnector::setMaster(Master* master)
+void ImageConnector::setBroker(Broker* broker)
 {
-	this->master = master;
+	this->broker = broker;
 }

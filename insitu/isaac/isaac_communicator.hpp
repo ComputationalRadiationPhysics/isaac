@@ -88,28 +88,41 @@ class IsaacCommunicator
 			pthread_create(&readThread,NULL,run_readAndSetMessages,this);
 			return 0;
 		}
-		isaac_int serverSend(char const * const content)
+
+		isaac_int serverSend(char * content, bool starting = true, bool finishing = false)
 		{
-			while (id > server_id + ISAAC_MAX_DIFFERENCE)
-				usleep(1000);
-			uint32_t l = strlen(content);
-			char id_string[32];
-			sprintf(id_string,",\"uid\":%i}",id);
-			uint32_t l_with_id = l + strlen(id_string) - 1;
-			send(sockfd,&l_with_id,4,0);
-			isaac_int n = send(sockfd,content,l-1,MSG_MORE); //without closing }
-			int count = strlen(id_string);
-			int amount = (count+4095)/4096;
-			for (int i = 0; i < amount; i++)
+			int n = 0;
+			if (starting)
 			{
-				if (i == amount - 1)
-					n += send(sockfd,&id_string[i*4096],count - i * 4096,0);
-				else
-					n += send(sockfd,&id_string[i*4096],4096,MSG_MORE);
+				while (id > server_id + ISAAC_MAX_DIFFERENCE)
+					usleep(1000);
+				char id_string[32];
+				sprintf(id_string,"{\"uid\": %i",id);
+				n = send(sockfd,id_string,strlen(id_string),MSG_MORE);
+				id++;
 			}
-			id++;
+			if (content)
+			{
+				content[0] = ',';
+				uint32_t l = strlen(content)-1; //without closing }
+				//content[l] = 0;
+				int amount = (l+4095)/4096;
+				for (int i = 0; i < amount; i++)
+				{
+					if (i == amount - 1)
+						n += send(sockfd,&content[i*4096],l - i * 4096,MSG_MORE);
+					else
+						n += send(sockfd,&content[i*4096],4096,MSG_MORE);
+				}
+			}
+			if (finishing)
+			{
+				char finisher[] = "} ";
+				n += send(sockfd,finisher,2,0);
+			}
 			return n;
 		}
+
 		#if ISAAC_JPEG == 1
 			static void isaac_init_destination(j_compress_ptr cinfo)
 			{
@@ -180,9 +193,9 @@ class IsaacCommunicator
 			);
 			
 			#if ISAAC_JPEG == 1
-				char header[] = "{\"type\": \"period video\", \"payload\": \"data:image/jpeg;base64,";
+				char header[] = "{\"payload\": \"data:image/jpeg;base64,";
 			#else
-				char header[] = "{\"type\": \"period video\", \"payload\": \"data:image/raw-rgba;base64,";
+				char header[] = "{\"payload\": \"data:image/raw-rgba;base64,";
 			#endif
 			char footer[] = "\"}";
 			int hl = strlen(header);
@@ -192,7 +205,7 @@ class IsaacCommunicator
 			memcpy(  message        ,header,hl);
 			memcpy(&(message[hl   ]),payload.str().c_str(),pl);
 			memcpy(&(message[hl+pl]),footer,fl+1); //with 0
-			serverSend( message );
+			serverSend( message, false, true );
 			free(message);
 		}
 		void serverDisconnect()

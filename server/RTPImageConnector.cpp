@@ -54,8 +54,8 @@ errorCode RTPImageConnector::init(int minport,int maxport)
 
 void suicideNotify(gpointer data)
 {
-	ImageBufferContainer* message = (ImageBufferContainer*)data;
-	message->suicide();
+	ImageBuffer* image = (ImageBuffer*)data;
+	image->suicide();
 }
 
 errorCode RTPImageConnector::run()
@@ -196,8 +196,8 @@ errorCode RTPImageConnector::run()
 						uint64_t val = gst_app_src_get_current_level_bytes( (GstAppSrc*)streams[nr].appsrc );
 						if ( val == 0)
 						{
-							message->incref();
-							GstBuffer *buffer = gst_buffer_new_wrapped_full (GstMemoryFlags(0), message->buffer, streams[nr].group->getVideoBufferSize(), 0, streams[nr].group->getVideoBufferSize(), (gpointer)message, suicideNotify);
+							message->image->incref();
+							GstBuffer *buffer = gst_buffer_new_wrapped_full (GstMemoryFlags(0), message->image->buffer, streams[nr].group->getVideoBufferSize(), 0, streams[nr].group->getVideoBufferSize(), (gpointer)(message->image), suicideNotify);
 							if (gst_app_src_push_buffer( (GstAppSrc*)streams[nr].appsrc, buffer) != GST_FLOW_OK)
 								printf("RTIPImageConnector: Error while sending buffer\n");
 						}
@@ -205,7 +205,7 @@ errorCode RTPImageConnector::run()
 			}
 			if (message->type == IMG_FORCE_EXIT)
 				finish = 1;
-			message->suicide();
+			clientSendMessage( message );
 		}
 		usleep(1000);
 	}	
