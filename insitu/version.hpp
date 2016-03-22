@@ -1,0 +1,5 @@
+#pragma once
+
+#define ISAAC_VERSION_MAJOR 0
+#define ISAAC_VERSION_MINOR 1
+#define ISAAC_VERSION_PATCH 0
