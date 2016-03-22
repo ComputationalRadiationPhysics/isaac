@@ -35,7 +35,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ISAAC_DIR}/Modules")
 ###############################################################################
 # OPTIONS
 ###############################################################################
-option(ISAAC_THREADING "Do the video and metadata transmission transport in background. May be buggy, but seems to work fine!" OFF)
+option(ISAAC_THREADING "Do the video and metadata transmission transport in background." ON)
 if (ISAAC_THREADING)
   add_definitions(-DISAAC_THREADING)
 endif ()
