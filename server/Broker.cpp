@@ -345,9 +345,6 @@ errorCode Broker::run()
 							json_incref( payload );
 							json_incref( message->json_root );
 							json_object_del( message->json_root, "payload" );
-						}
-						if (payload)
-						{
 							//Allocate, receive and send video
 							uint8_t*video_buffer=(uint8_t*)malloc(insitu->t->group->video_buffer_size);
 							receiveVideo(insitu->t->group,video_buffer,json_dumps( payload , JSON_ENCODE_ANY ));
@@ -358,6 +355,19 @@ errorCode Broker::run()
 							else
 								for(auto ic=imageConnectorList.begin();ic!=imageConnectorList.end();ic++)
 									(*ic).connector->masterSendMessage(container);
+						}
+						else
+						{
+							//Direct send of metadata!
+							ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc=dataClientList.getFront();
+							while(dc)
+							{
+								int stream;
+								bool dropable;
+								if(dc->t->doesObserve(insitu->t->group->getID(),stream,dropable))
+								dc->t->masterSendMessage(new MessageContainer(message->type,message->json_root,true,dropable));
+								dc=dc->next;
+							}
 						}
 					}
 				}
