@@ -24,8 +24,6 @@ set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}/insitu/isaac")
 set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-std=c++11")
 set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-march=native")
 set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-mtune=native")
-set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_MAX_FUNCTORS=3")
-set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_FUNCTOR_POW_ENABLED=0")
 
 
 ###############################################################################
@@ -47,9 +45,12 @@ if (ISAAC_SHOWBORDER)
   add_definitions(-DISAAC_SHOWBORDER)
 endif ()
 
-option(ISAAC_CUDA "Build the example using cuda." ON)
+option(ISAAC_CUDA "Using CUDA" ON)
+option(ISAAC_ALPAKA "Using ALPKA" OFF)
 
-option(ISAAC_ALPAKA "Build the example using alpaka." OFF)
+if ( (NOT ISAAC_CUDA) AND (NOT ISAAC_ALPAKA) )
+    message( FATAL_ERROR "At least Alpaka or Cuda have to be activated!" )
+endif()
 
 option(ISAAC_JPEG "Use JPEG compression between visualization and isaac server. Deactivating will not work with big images. And with big I am talking about bigger than 800x600." ON)
 if (ISAAC_JPEG)
@@ -61,25 +62,12 @@ endif (ISAAC_JPEG)
 
 
 ###############################################################################
-# PKGCONFIG
-###############################################################################
-find_package (PkgConfig MODULE REQUIRED)
-
-
-###############################################################################
 # JANSSON LIB
 ###############################################################################
-find_package (Jansson MODULE REQUIRED)
+# set(JANSSON_DIR JANSSON_DIR_NOT-FOUND CACHE PATH "The location of the jansson library")
+find_package (Jansson CONFIG REQUIRED)
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
-
-
-###############################################################################
-# LIBWEBSOCKETS
-###############################################################################
-find_package(LibWebSockets MODULE REQUIRED)
-set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${LIBWEBSOCKETS_LIBRARIES})
-set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${LIBWEBSOCKETS_INCLUDE_DIR})
 
 
 ###############################################################################
@@ -96,6 +84,7 @@ find_package(MPI MODULE REQUIRED)
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${MPI_C_INCLUDE_PATH})
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${MPI_C_LIBRARIES})
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${MPI_CXX_LIBRARIES})
+
 
 ################################################################################
 # IceT LIB
@@ -115,28 +104,25 @@ add_definitions(-DBOOST_ALL_NO_LIB)
 
 
 ################################################################################
-# Alpaka LIB
-################################################################################
-find_package(alpaka)
-set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${alpaka_INCLUDE_DIRS})
-set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${alpaka_LIBRARIES})
-set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} ${alpaka_DEFINITIONS})
-set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} ${ALPAKA_DEV_COMPILE_OPTIONS})
-
-
-################################################################################
 # CUDA LIB
 ################################################################################
-find_package( CUDA REQUIRED)
-set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" -std=c++11)
-set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS})
-
-
 if (ISAAC_CUDA)
-endif(ISAAC_CUDA)
+    find_package( CUDA REQUIRED)
+    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" -std=c++11)
+    set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS})
+endif()
 
+
+################################################################################
+# Alpaka LIB
+################################################################################
 if (ISAAC_ALPAKA)
-  set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_ALPAKA")
-  set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wno-literal-suffix" )
-  list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
+    find_package(alpaka)
+    set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${alpaka_INCLUDE_DIRS})
+    set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${alpaka_LIBRARIES})
+    set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} ${alpaka_DEFINITIONS})
+    set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} ${ALPAKA_DEV_COMPILE_OPTIONS})
+    set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_ALPAKA")
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wno-literal-suffix" )
+    list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
 endif()

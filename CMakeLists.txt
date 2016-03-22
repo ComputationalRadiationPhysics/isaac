@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.3)
 project (isaac)
 
 set(SRCS
@@ -76,85 +76,16 @@ add_executable(isaac ${HDRS} ${SRCS})
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules")
 
-find_package (Jansson REQUIRED)
+find_package (Jansson CONFIG REQUIRED)
 set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
 set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
 
-find_package(LibWebSockets REQUIRED)
+find_package(Libwebsockets CONFIG REQUIRED)
 set(LIBS ${LIBS} ${LIBWEBSOCKETS_LIBRARIES})
-set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIR})
+set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIRS})
 
 find_package (Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 include_directories(isaac ${INCLUDE})	
 target_link_libraries(isaac ${LIBS})
-
-option(BUILD_EXAMPLE_CUDA "Build the example using cuda." ON)
-option(BUILD_EXAMPLE_ALPAKA "Build the example using alpaka." OFF)
-
-
-if (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
-	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${JANSSON_INCLUDE_DIRS})
-	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${JPEG_INCLUDE_DIR})
-
-	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${CMAKE_THREAD_LIBS_INIT})
-	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${JANSSON_LIBRARIES})
-	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${JPEG_LIBRARY})
-
-	find_package (IceT REQUIRED)
-	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${ICET_CORE_LIBS})
-	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${ICET_MPI_LIBS})
-	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${ICET_INCLUDE_DIRS})
-
-	find_package (MPI REQUIRED)
-	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${MPI_C_LIBRARIES})
-	set(EXAMPLE_LIBS ${EXAMPLE_LIBS} ${MPI_CXX_LIBRARIES})
-	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${MPI_C_INCLUDE_PATH})
-	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${MPI_CXX_INCLUDE_PATH})
-
-	find_package(Boost 1.56.0 REQUIRED)
-	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${Boost_INCLUDE_DIR})
-	add_definitions(-DBOOST_ALL_NO_LIB)
-
-	option(ISAAC_THREADING "Do the video and metadata transmission transport in background. May be buggy, but seems to work fine!" OFF)
-	if (ISAAC_THREADING)
-		add_definitions(-DISAAC_THREADING)
-	endif ()
-	
-	option(ISAAC_NO_SIMULATION "No update of the fake simulation" OFF)
-	if (ISAAC_NO_SIMULATION)
-		add_definitions(-DISAAC_NO_SIMULATION)
-	endif ()
-	
-	option(ISAAC_SHOWBORDER "Debug and presentation mode, in which the sub volume borders are shown in black" OFF)
-	if (ISAAC_SHOWBORDER)
-		add_definitions(-DISAAC_SHOWBORDER)
-	endif ()
-	
-	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${CMAKE_SOURCE_DIR}/insitu)
-	
-	add_definitions(-DISAAC_MAX_FUNCTORS=3)
-	add_definitions(-DISAAC_FUNCTOR_POW_ENABLED=0)
-	
-	if (BUILD_EXAMPLE_CUDA)
-		find_package( CUDA REQUIRED)
-		set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" -std=c++11)
-		include_directories(example_cuda ${EXAMPLE_INCLUDE} ${CUDA_INCLUDE_DIRS})
-		CUDA_ADD_EXECUTABLE(example_cuda ${CMAKE_SOURCE_DIR}/insitu/example.cu)
-		target_link_libraries(example_cuda ${EXAMPLE_LIBS} ${CUDA_LIBRARIES})
-	endif(BUILD_EXAMPLE_CUDA)
-	
-	if (BUILD_EXAMPLE_ALPAKA)
-		set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/requirement-modules/alpaka/" CACHE STRING  "The location of the alpaka library")
-		set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")
-		find_package( alpaka  REQUIRED)
-		set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wno-literal-suffix" )
-		include_directories(example_alpaka ${EXAMPLE_INCLUDE} ${alpaka_INCLUDE_DIRS})	
-		add_definitions( ${alpaka_DEFINITIONS} ${ALPAKA_DEV_COMPILE_OPTIONS})
-		add_definitions(-DISAAC_ALPAKA)
-		list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
-		ALPAKA_ADD_EXECUTABLE(example_alpaka ${CMAKE_SOURCE_DIR}/insitu/isaac.hpp ${CMAKE_SOURCE_DIR}/insitu/example.cu)
-		target_link_libraries(example_alpaka ${EXAMPLE_LIBS})
-	endif(BUILD_EXAMPLE_ALPAKA)
-endif (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
