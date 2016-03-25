@@ -63,6 +63,10 @@ int main(int argc, char **argv)
 			printf("        --url: Set the url to connect to from outside. Default 127.0.0.1\n");
 			printf("       --name: Set the name of the server.\n");
 			printf("    --version: Shows the version\n");
+		#ifdef ISAAC_GST
+			printf("     --twitch: Set twitch apikey for twitch live streaming\n");
+			printf(" --twitch_url: Set twitch rtmp-url for ssh forwarding or another rtmp service\n");
+		#endif
 			return 0;
 		}
 		else
