@@ -37,22 +37,21 @@ to be cloned with `git clone $LINK`, where $LINK is a link like
 
 ### Requirements for the server and the in situ library
 
-* libjpeg or libjpeg-turbo for (de)compressing the rendered image for the
+* __libjpeg__ or __libjpeg-turbo__ for (de)compressing the rendered image for the
   transmission. It should be part of most distributions, but can also
   be found here: `git@github.com:libjpeg-turbo/libjpeg-turbo.git`.
-* Jansson for the de- and encryption of the JSON messages transfered
+* __Jansson__ for the de- and encryption of the JSON messages transfered
   between server and client. The library is part of most distributions,
   but can also be found here: `https://github.com/akheron/jansson.git`.
-* CMake for building everything.
+* __CMake__ for building everything.
 
 ### Requirements for the server only
 
-* libwebsockets for the connection between server and the HTML5 client.
-  However the most recent version has a bug for large data transmissions,
-  so the Fork https://github.com/theZiz/libwebsockets should be used with
-  `git clone https://github.com/theZiz/libwebsockets.git --branch dirty_hack --depth 1`
-* If streaming over RTP or the Twitch plugin shall be used, gStreamer is
-  needed, too. It shall be possible to build gStreamer yourself, but it
+* __libwebsockets__ for the connection between server and the HTML5 client.
+  It is in steady development and the most recent version (which should be
+  used) can be found here: `https://github.com/warmcat/libwebsockets.git`.
+* __gStreamer__ is needed, if streaming over RTP or the Twitch plugin shall
+  be used. It shall be possible to build gStreamer yourself, but it
   is strongly adviced - even from the gStreamer team themself - to use
   the prebuilt version of your distribution. The HML5 Client can show
   streams of a server without gStreamer.
@@ -62,7 +61,7 @@ to be cloned with `git clone $LINK`, where $LINK is a link like
 The ISAACConfig.cmake searches for these requirements. See
 example/CMakeLists.txt for an easy to adopt example.
 
-* Alpaka for the abstraction of the acceleration device. The library can
+* __Alpaka__ for the abstraction of the acceleration device. The library can
   be found here: `https://github.com/ComputationalRadiationPhysics/alpaka.git`.
   It is an header only library and doesn't need to be installed. However
   the root directory of the libary has to be added to the CMake Variable
@@ -70,18 +69,18 @@ example/CMakeLists.txt for an easy to adopt example.
   ```set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/alpaka/" CACHE STRING  "The location of the alpaka library")
   set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")```
   If only CUDA is used, this library is not needed.
-* CUDA for Nvidia accelerators. The most recent CUDA toolkit can be
+* __CUDA__ for Nvidia accelerators. The most recent CUDA toolkit can be
   downloaded at Nvidia's webpage: `https://developer.nvidia.com/cuda-downloads`.
   If only ALPAKA without CUDA is used, this toolkit is not needed.
-* IceT for combining the visualization created from the in situ plugin.
+* __IceT__ for combining the visualization created from the in situ plugin.
   In Ubuntu IceT is part of the ParaView package `paraview-dev`, but can
   also be found here: `git://public.kitware.com/IceT.git`.
-* MPI for the communication on the cluster. This should be available on
+* __MPI__ for the communication on the cluster. This should be available on
   all clusters these days. However for a local testsystem a common used
   version is OpenMPI, which is found in all distributions, but can also
   be compiled from source from this repository:
   `https://github.com/open-mpi/ompi.git`
-* Boost (at least 1.5.6) is needed, but only template libraries, so no
+* __Boost__ (at least 1.56) is needed, but only template libraries, so no
   installation or static linking is needed here. If the version of the
   distribution is too old, it can be found here:
   `https://github.com/boostorg/boost.git`. Unlike most (read: all) other
