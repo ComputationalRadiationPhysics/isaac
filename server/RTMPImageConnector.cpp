@@ -93,7 +93,6 @@ errorCode RTMPImageConnector::run()
 {
 	pthread_mutex_init (&heartbeat_mutex, NULL);
 	heartbeat_finish = false;
-	heartbeat = getTicksMs();
 	pthread_create(&heartbeat_thread,NULL,RTMPImageConnector::heartbeatFunction,this);
 	int finish = 0;
 	while (finish == 0)
@@ -107,6 +106,11 @@ errorCode RTMPImageConnector::run()
 			{
 				if (group == message->group)
 				{
+					pthread_mutex_lock(&heartbeat_mutex);
+					if (heartbeat_image) //Releasing old frame
+						heartbeat_image->suicide();
+					heartbeat_image = NULL;
+					pthread_mutex_unlock(&heartbeat_mutex);
 					group = NULL;
 					gst_app_src_end_of_stream( (GstAppSrc*)appsrc );
 					gst_element_set_state(pipeline, GST_STATE_NULL);
@@ -119,6 +123,7 @@ errorCode RTMPImageConnector::run()
 				if (group == NULL)
 				{
 					//gst-launch-1.0 appsrc ! video/x-raw,… ! videoconvert ! capsfilter ! video/x-raw,format=I420 ! videorate ! video/x-raw,framerate=15/1 ! x264enc threads=2 bitrate=400 tune=zerolatency ! flvmux ! rtmpsink location=rtmp://live-fra.twitch.tv/app/$APIKEY
+					heartbeat = getTicksMs();
 					gboolean success = 1;
 					RTMP_LOAD_ELEMENT_OR_DIE(appsrc)
 					if (success)
