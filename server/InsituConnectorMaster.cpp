@@ -118,13 +118,13 @@ errorCode InsituConnectorMaster::run()
 				{
 					while (1)
 					{
-						con_array[i]->connector->jlcb.pos = 0;
 						int add = recv(fd_array[i].fd,&(con_array[i]->connector->jlcb.buffer[con_array[i]->connector->jlcb.count]),4096,MSG_DONTWAIT);
 						if (add > 0)
 							con_array[i]->connector->jlcb.count += add;
 						else
 							break;
 					}
+					con_array[i]->connector->jlcb.pos = 0;
 					con_array[i]->connector->jlcb.buffer[con_array[i]->connector->jlcb.count] = 0;
 					bool closed = false;
 					if (con_array[i]->connector->jlcb.count > 0)

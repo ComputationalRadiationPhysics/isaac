@@ -20,7 +20,7 @@
 #endif
 #ifdef ISAAC_GST
 	#include "RTPImageConnector.hpp"
-	#include "TwitchImageConnector.hpp"
+	#include "RTMPImageConnector.hpp"
 #endif
 #ifdef ISAAC_JPEG
 	#include "URIImageConnector.hpp"
@@ -132,8 +132,6 @@ int main(int argc, char **argv)
 			delete rTPImageConnector;
 		else
 			broker.addImageConnector(rTPImageConnector);
-	#endif
-	#ifdef ISAAC_GST
 		rTPImageConnector = new RTPImageConnector(url,false,true);
 		if (rTPImageConnector->init(5100,5199))
 			delete rTPImageConnector;
@@ -150,11 +148,11 @@ int main(int argc, char **argv)
 	#ifdef ISAAC_GST
 		if (twitch_apikey)
 		{
-			TwitchImageConnector* twitchImageConnector;
+			RTMPImageConnector* twitchImageConnector;
 			if (twitch_url)
-				twitchImageConnector = new TwitchImageConnector( std::string(twitch_apikey), std::string(twitch_url) );
+				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string(twitch_url) );
 			else
-				twitchImageConnector = new TwitchImageConnector( std::string(twitch_apikey) );
+				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string("live-fra.twitch.tv/app") );
 			if (twitchImageConnector->init(0,0))
 				delete twitchImageConnector;
 			else
