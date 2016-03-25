@@ -39,11 +39,14 @@ errorCode RTMPImageConnector::init(int minport,int maxport)
 }
 
 #define RTMP_LOAD_ELEMENT_OR_DIE(element) \
-	element = gst_element_factory_make(BOOST_PP_STRINGIZE(element), NULL); \
-	if(!element) \
+	if (success) \
 	{ \
-		fprintf(stderr,"Could not open " BOOST_PP_STRINGIZE(element)"\n"); \
-		return 1; \
+		element = gst_element_factory_make(BOOST_PP_STRINGIZE(element), NULL); \
+		if(!element) \
+		{ \
+			fprintf(stderr,"RTMPImageConnector: Could not open " BOOST_PP_STRINGIZE(element)"\n"); \
+			success = 0; \
+		} \
 	}
 
 uint64_t RTMPImageConnector::getTicksMs()
@@ -115,70 +118,79 @@ errorCode RTMPImageConnector::run()
 			{
 				if (group == NULL)
 				{
-					group = message->group;
 					//gst-launch-1.0 appsrc ! video/x-raw,… ! videoconvert ! capsfilter ! video/x-raw,format=I420 ! videorate ! video/x-raw,framerate=15/1 ! x264enc threads=2 bitrate=400 tune=zerolatency ! flvmux ! rtmpsink location=rtmp://live-fra.twitch.tv/app/$APIKEY
-					
+					gboolean success = 1;
 					RTMP_LOAD_ELEMENT_OR_DIE(appsrc)
-					g_object_set (G_OBJECT (appsrc), "caps",
-						gst_caps_new_simple ("video/x-raw",
-						"format", G_TYPE_STRING, "RGBx",
-						"bpp", G_TYPE_INT, 32,
-						"depth", G_TYPE_INT, 32,
-						"width", G_TYPE_INT, message->group->getFramebufferWidth(),
-						"height", G_TYPE_INT, message->group->getFramebufferHeight(),
-						"framerate", GST_TYPE_FRACTION, 0, 1,
-						NULL), NULL);
-					g_object_set (G_OBJECT (appsrc),
-						"do-timestamp", 1,
-						"min-percent", 0,
-						"min-latency", 0,
-						"emit-signals", 0,
-						"is-live", 1,
-						"format", GST_FORMAT_TIME,
-						NULL);
+					if (success)
+						g_object_set (G_OBJECT (appsrc), "caps",
+							gst_caps_new_simple ("video/x-raw",
+							"format", G_TYPE_STRING, "RGBx",
+							"bpp", G_TYPE_INT, 32,
+							"depth", G_TYPE_INT, 32,
+							"width", G_TYPE_INT, message->group->getFramebufferWidth(),
+							"height", G_TYPE_INT, message->group->getFramebufferHeight(),
+							"framerate", GST_TYPE_FRACTION, 0, 1,
+							NULL), NULL);
+					if (success)
+						g_object_set (G_OBJECT (appsrc),
+							"do-timestamp", 1,
+							"min-percent", 0,
+							"min-latency", 0,
+							"emit-signals", 0,
+							"is-live", 1,
+							"format", GST_FORMAT_TIME,
+							NULL);
 					RTMP_LOAD_ELEMENT_OR_DIE(videorate)
 					RTMP_LOAD_ELEMENT_OR_DIE(capsfilter)
 					videorate_capsfilter = capsfilter;
-					g_object_set (G_OBJECT (videorate_capsfilter), "caps",
-						gst_caps_new_simple ("video/x-raw",
-						"framerate", GST_TYPE_FRACTION, 15, 1,
-						NULL), NULL);
+					if (success)
+						g_object_set (G_OBJECT (videorate_capsfilter), "caps",
+							gst_caps_new_simple ("video/x-raw",
+							"framerate", GST_TYPE_FRACTION, 15, 1,
+							NULL), NULL);
 					RTMP_LOAD_ELEMENT_OR_DIE(videoconvert)
 					RTMP_LOAD_ELEMENT_OR_DIE(capsfilter)
-					g_object_set (G_OBJECT (capsfilter), "caps",
-						gst_caps_new_simple ("video/x-raw",
-						"format", G_TYPE_STRING, "I420",
-						NULL), NULL);
+					if (success)
+						g_object_set (G_OBJECT (capsfilter), "caps",
+							gst_caps_new_simple ("video/x-raw",
+							"format", G_TYPE_STRING, "I420",
+							NULL), NULL);
 					RTMP_LOAD_ELEMENT_OR_DIE(x264enc)
-					g_object_set (G_OBJECT (x264enc),
-						"tune", 0x00000004,
-						"psy-tune", 2,
-						"speed-preset", 1,
-						"bitrate", 400,
-						"threads", 2,
-						"byte-stream", 1,
-						NULL);
+					if (success)
+						g_object_set (G_OBJECT (x264enc),
+							"tune", 0x00000004,
+							"psy-tune", 2,
+							"speed-preset", 1,
+							"bitrate", 400,
+							"threads", 2,
+							"byte-stream", 1,
+							NULL);
 					RTMP_LOAD_ELEMENT_OR_DIE(flvmux)
-					g_object_set (G_OBJECT (flvmux),
-						"streamable", 1,
-						NULL);
+					if (success)
+						g_object_set (G_OBJECT (flvmux),
+							"streamable", 1,
+							NULL);
 					RTMP_LOAD_ELEMENT_OR_DIE(rtmpsink)
 					char location[512];
 					sprintf(location,"rtmp://%s/%s",base_url.c_str(),apikey.c_str());
-					g_object_set(G_OBJECT(rtmpsink),
-						"location", location, NULL);
-					pipeline = gst_pipeline_new( NULL );
-					bin = gst_bin_new( NULL );
-					gboolean success = 0;
-					gst_bin_add_many(GST_BIN(bin), appsrc, videoconvert, capsfilter, x264enc, flvmux, rtmpsink, NULL);
-					gst_bin_add(GST_BIN(pipeline), bin);
-					success = gst_element_link_many(appsrc, videoconvert, capsfilter, x264enc, flvmux, rtmpsink, NULL);
-					if ( !success )
-						fprintf(stderr,"RTMPImageConnector: Could not link elements for rtmp stream.\n");
-					if (gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE)
-						printf("RTMPImageConnector: Could not play stream!\n");
-					else
-						printf("RTMPImageConnector: Openend H264 Stream\n");
+					if (success)
+						g_object_set(G_OBJECT(rtmpsink),
+							"location", location, NULL);
+					if (success)
+					{
+						pipeline = gst_pipeline_new( NULL );
+						bin = gst_bin_new( NULL );
+						gst_bin_add_many(GST_BIN(bin), appsrc, videoconvert, capsfilter, x264enc, flvmux, rtmpsink, NULL);
+						gst_bin_add(GST_BIN(pipeline), bin);
+						success = gst_element_link_many(appsrc, videoconvert, capsfilter, x264enc, flvmux, rtmpsink, NULL);
+						if ( !success )
+							fprintf(stderr,"RTMPImageConnector: Could not link elements for rtmp stream.\n");
+						if (gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE)
+							printf("RTMPImageConnector: Could not play stream!\n");
+						else
+							printf("RTMPImageConnector: Openend H264 Stream\n");
+						group = message->group;
+					}
 				}
 				if (group == message->group) //We show always the very first group
 				{
