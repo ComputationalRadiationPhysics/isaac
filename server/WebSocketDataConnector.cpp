@@ -109,12 +109,20 @@ callback_isaac(
 	case LWS_CALLBACK_SERVER_WRITEABLE:
 		if (pss->client)
 		{
-			MessageContainer* next_message = pss->client->clientGetMessage();
-			MessageContainer* message;
-			while (message = next_message) //New message from master sama!
+			MessageContainer* message = NULL;
+			int l = 0;
+			do
 			{
-				next_message = pss->client->clientGetMessage();
-				if (!next_message || !message->drop_able) //Deleting dropable messages
+				l = pss->client->messagesIn.length();
+				while ( (message = pss->client->clientGetMessage()) != NULL && //new message
+						l > 1 && //at least two
+						message->drop_able ) //only skip if dropable!
+				{
+					printf("WebSocketDataConnector: Dropped one dropable package!\n");
+					delete message;
+					l--;
+				}
+				if (message) //New message from master sama!
 				{
 					char* buffer = json_dumps( message->json_root, 0 );
 					n = strlen(buffer);
@@ -127,11 +135,10 @@ callback_isaac(
 						pss->client->clientSendMessage(new MessageContainer(CLOSED));
 						return -1;
 					}
+					delete message;
 				}
-				else
-					printf("WebSocketDataConnector: Dropped one dropable package!\n");
-				delete message;
 			}
+			while (l > 1 && !lws_send_pipe_choked(wsi));
 		}
 		break;
 	//case LWS_CALLBACK_CLOSED:
