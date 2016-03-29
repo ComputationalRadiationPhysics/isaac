@@ -199,7 +199,7 @@ errorCode WebSocketDataConnector::init(int port)
 	memset(&info, 0, sizeof info);
 	info.protocols = protocols;
 	#ifndef LWS_NO_EXTENSIONS
-		info.extensions = lws_get_internal_extensions();
+		info.extensions = NULL;
 	#endif
 	info.user = (void*)(&broker);
 	info.port = port;
