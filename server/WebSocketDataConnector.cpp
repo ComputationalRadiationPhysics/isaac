@@ -52,7 +52,10 @@ static int callback_http(
 		void *in,
 		size_t len )
 {
-	Broker* broker = *((Broker**)lws_context_user(lws_get_context(wsi)));
+	Broker** broker_ptr = (Broker**)lws_context_user(lws_get_context(wsi));
+	Broker* broker = NULL;
+	if (broker_ptr)
+		broker = *broker_ptr;
 	switch (reason)
 	{
 		case LWS_CALLBACK_HTTP:
@@ -96,7 +99,10 @@ callback_isaac(
 						  LWS_SEND_BUFFER_POST_PADDING];
 	char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 	struct per_session_data__isaac *pss = (struct per_session_data__isaac *)user;
-	Broker* broker = *((Broker**)lws_context_user(lws_get_context(wsi)));
+	Broker** broker_ptr = (Broker**)lws_context_user(lws_get_context(wsi));
+	Broker* broker = NULL;
+	if (broker_ptr)
+		broker = *broker_ptr;
 	
 	switch (reason) {
 
