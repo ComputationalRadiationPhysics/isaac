@@ -20,9 +20,9 @@
 
 typedef struct
 {
-	char buffer[ISAAC_MAX_RECEIVE];
 	int pos;
 	int count;
+	char buffer[ISAAC_MAX_RECEIVE];
 } json_load_callback_struct;
 
 class InsituConnector : public MessageAble<MessageContainer>
