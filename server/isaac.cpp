@@ -67,6 +67,7 @@ int main(int argc, char **argv)
 		#ifdef ISAAC_GST
 			printf("     --twitch: Set twitch apikey for twitch live streaming\n");
 			printf(" --twitch_url: Set twitch rtmp-url for ssh forwarding or another rtmp service\n");
+			printf("--twitch_bitrate: Set twitch bitrate. Default 400\n");
 		#endif
 			return 0;
 		}
