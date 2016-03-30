@@ -52,7 +52,10 @@ static int callback_http(
 		void *in,
 		size_t len )
 {
-	Broker* broker = *((Broker**)lws_context_user(lws_get_context(wsi)));
+	Broker** broker_ptr = (Broker**)lws_context_user(lws_get_context(wsi));
+	Broker* broker = NULL;
+	if (broker_ptr)
+		broker = *broker_ptr;
 	switch (reason)
 	{
 		case LWS_CALLBACK_HTTP:
@@ -96,7 +99,10 @@ callback_isaac(
 						  LWS_SEND_BUFFER_POST_PADDING];
 	char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 	struct per_session_data__isaac *pss = (struct per_session_data__isaac *)user;
-	Broker* broker = *((Broker**)lws_context_user(lws_get_context(wsi)));
+	Broker** broker_ptr = (Broker**)lws_context_user(lws_get_context(wsi));
+	Broker* broker = NULL;
+	if (broker_ptr)
+		broker = *broker_ptr;
 	
 	switch (reason) {
 
@@ -109,12 +115,20 @@ callback_isaac(
 	case LWS_CALLBACK_SERVER_WRITEABLE:
 		if (pss->client)
 		{
-			MessageContainer* next_message = pss->client->clientGetMessage();
-			MessageContainer* message;
-			while (message = next_message) //New message from master sama!
+			MessageContainer* message = NULL;
+			int l = 0;
+			do
 			{
-				next_message = pss->client->clientGetMessage();
-				if (!next_message || !message->drop_able) //Deleting dropable messages
+				l = pss->client->messagesIn.length();
+				while ( (message = pss->client->clientGetMessage()) != NULL && //new message
+						l > 1 && //at least two
+						message->drop_able ) //only skip if dropable!
+				{
+					printf("WebSocketDataConnector: Dropped one dropable package!\n");
+					delete message;
+					l--;
+				}
+				if (message) //New message from master sama!
 				{
 					char* buffer = json_dumps( message->json_root, 0 );
 					n = strlen(buffer);
@@ -127,11 +141,10 @@ callback_isaac(
 						pss->client->clientSendMessage(new MessageContainer(CLOSED));
 						return -1;
 					}
+					delete message;
 				}
-				else
-					printf("WebSocketDataConnector: Dropped one dropable package!\n");
-				delete message;
 			}
+			while (l > 1 && !lws_send_pipe_choked(wsi));
 		}
 		break;
 	//case LWS_CALLBACK_CLOSED:
@@ -192,7 +205,7 @@ errorCode WebSocketDataConnector::init(int port)
 	memset(&info, 0, sizeof info);
 	info.protocols = protocols;
 	#ifndef LWS_NO_EXTENSIONS
-		info.extensions = lws_get_internal_extensions();
+		info.extensions = NULL;
 	#endif
 	info.user = (void*)(&broker);
 	info.port = port;

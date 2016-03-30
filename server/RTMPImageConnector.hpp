@@ -22,23 +22,36 @@
 #include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
 
-class TwitchImageConnector : public ImageConnector
+#define ISAAC_MAX_HEARTBEAT 200
+
+class RTMPImageConnector : public ImageConnector
 {
 	public:
-		TwitchImageConnector(std::string apikey, std::string base_url = std::string("live-fra.twitch.tv") );
+		RTMPImageConnector( std::string name, std::string apikey, std::string base_url );
 		errorCode init(int minport,int maxport);
 		errorCode run();
 		std::string getName();
+		static void* heartbeatFunction(void* ptr);
+		static uint64_t getTicksMs();
+		static void addFrame( ImageBuffer* image, GstAppSrc* appsrc, InsituConnectorGroup* group);
 	private:
 		InsituConnectorGroup* group;
+		std::string name;
 		std::string apikey;
 		std::string base_url;
 		GstElement *appsrc;
 		GstElement *videoconvert;
 		GstElement *capsfilter;
+		GstElement *videorate_capsfilter;
+		GstElement *videorate;
 		GstElement *x264enc;
 		GstElement *flvmux;
 		GstElement *rtmpsink;
 		GstElement *pipeline;
 		GstElement *bin;
+		pthread_mutex_t heartbeat_mutex;
+		pthread_t heartbeat_thread;
+		uint64_t heartbeat;
+		ImageBuffer* heartbeat_image;
+		volatile bool heartbeat_finish;
 };
