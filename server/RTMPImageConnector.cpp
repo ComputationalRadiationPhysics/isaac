@@ -170,7 +170,7 @@ errorCode RTMPImageConnector::run()
 							"bitrate", 400,
 							"threads", 2,
 							"byte-stream", 1,
-							"key-int-max", 20,
+							"key-int-max", 2000/ISAAC_MAX_HEARTBEAT, // key-int-max * min_frame_rate <= 2s!
 							NULL);
 					RTMP_LOAD_ELEMENT_OR_DIE(flvmux)
 					if (success)
