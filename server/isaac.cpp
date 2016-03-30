@@ -47,6 +47,7 @@ int main(int argc, char **argv)
 	#ifdef ISAAC_GST
 		char* twitch_apikey = NULL;
 		char* twitch_url = NULL;
+		int twitch_bitrate = 400;
 	#endif
 	int nr = 1;
 	while (nr < argc)
@@ -112,6 +113,12 @@ int main(int argc, char **argv)
 				ISAAC_INCREASE_NR_OR_DIE
 				twitch_url = argv[nr];
 			}
+			else
+			if (strcmp(argv[nr],"--twitch_bitrate") == 0)
+			{
+				ISAAC_INCREASE_NR_OR_DIE
+				twitch_bitrate = atoi(argv[nr]);
+			}
 		#endif
 		else
 		{
@@ -154,9 +161,9 @@ int main(int argc, char **argv)
 		{
 			RTMPImageConnector* twitchImageConnector;
 			if (twitch_url)
-				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string(twitch_url), true );
+				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string(twitch_url), twitch_bitrate, true );
 			else
-				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string("live-fra.twitch.tv/app"), true );
+				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string("live-fra.twitch.tv/app"), twitch_bitrate, true );
 			if (twitchImageConnector->init(0,0))
 				delete twitchImageConnector;
 			else

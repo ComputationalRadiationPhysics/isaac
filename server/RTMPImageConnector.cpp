@@ -18,12 +18,13 @@
 #include <pthread.h>
 #include <inttypes.h>
 
-RTMPImageConnector::RTMPImageConnector(std::string name, std::string apikey, std::string base_url, bool dummy_audio) :
+RTMPImageConnector::RTMPImageConnector(std::string name, std::string apikey, std::string base_url, int bitrate, bool dummy_audio) :
 	group(NULL),
 	name(name),
 	apikey(apikey),
 	base_url(base_url),
 	heartbeat_image(NULL),
+	bitrate(bitrate),
 	dummy_audio(dummy_audio)
 {
 	showClient = false;
@@ -167,7 +168,7 @@ errorCode RTMPImageConnector::run()
 							"tune", 0x00000004,
 							"psy-tune", 2,
 							"speed-preset", 1,
-							"bitrate", 400,
+							"bitrate", bitrate,
 							"threads", 2,
 							"byte-stream", 1,
 							"key-int-max", 2000/ISAAC_MAX_HEARTBEAT, // key-int-max * min_frame_rate <= 2s!
