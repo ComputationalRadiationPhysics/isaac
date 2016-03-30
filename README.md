@@ -89,6 +89,13 @@ example/CMakeLists.txt for an easy to adopt example.
   `./bootstrap.sh --help` will give you some help for building and
   installing the library.
 
+Known issues
+------------
+
+* If streaming over twitch or another rtmp compatible service is used,
+  but the rtmp port (1935) ist blocked or a wrong url passed, the server
+  will crash because of the underlying gStreamer rtmp implementation.
+
 Building
 --------
 
