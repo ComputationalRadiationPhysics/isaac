@@ -664,17 +664,18 @@ function createWeightFeedback( w, range_name, value_name )
 	};
 }
 
-function createOptimizedFunction( i, minmax )
+function createOptimizedFunction( i, minmax, with_add )
 {
 	return function()
 	{
-		var add = - minmax["min"];
 		var mul = 1 / (minmax["max"] - minmax["min"]);
 		var function_string = document.getElementById("f_" + i + "_string");
 		if (function_string.value == "idem" || function_string.value == "")
-			functions[i] = "add(" + add.toFixed(5) +") | mul(" + mul.toFixed(5) + ")";
+			functions[i] = "mul(" + mul.toFixed(5) + ")";
 		else
-			functions[i] = function_string.value + " | add(" + add.toFixed(5) +") | mul(" + mul.toFixed(5) + ")";
+			functions[i] = function_string.value + " | mul(" + mul.toFixed(5) + ")";
+		if (with_add)
+			functions[i] += " | add(0.5)";
 		function_string.value = functions[i];
 	};
 }
@@ -945,7 +946,13 @@ document.getElementById("connect").onclick = function()
 							apply.type = "button";
 							apply.value = "Optimize function";
 							apply.id = "i_" + i + "_button";
-							apply.onclick = createOptimizedFunction( i, obj["minmax"][i] );
+							apply.onclick = createOptimizedFunction( i, obj["minmax"][i], false);
+							parent.appendChild(apply);
+							    apply = document.createElement("INPUT");
+							apply.type = "button";
+							apply.value = "With add";
+							apply.id = "i_" + i + "_button_add";
+							apply.onclick = createOptimizedFunction( i, obj["minmax"][i], true);
 							parent.appendChild(apply);
 						}
 					}
