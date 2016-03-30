@@ -27,7 +27,7 @@
 class RTMPImageConnector : public ImageConnector
 {
 	public:
-		RTMPImageConnector( std::string name, std::string apikey, std::string base_url );
+		RTMPImageConnector( std::string name, std::string apikey, std::string base_url, bool dummy_audio = false );
 		errorCode init(int minport,int maxport);
 		errorCode run();
 		std::string getName();
@@ -40,6 +40,8 @@ class RTMPImageConnector : public ImageConnector
 		std::string apikey;
 		std::string base_url;
 		GstElement *appsrc;
+		GstElement *audiotestsrc;
+		GstElement *voaacenc;
 		GstElement *videoconvert;
 		GstElement *capsfilter;
 		GstElement *videorate_capsfilter;
@@ -54,4 +56,5 @@ class RTMPImageConnector : public ImageConnector
 		uint64_t heartbeat;
 		ImageBuffer* heartbeat_image;
 		volatile bool heartbeat_finish;
+		bool dummy_audio;
 };

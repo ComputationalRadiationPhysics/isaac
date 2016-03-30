@@ -18,12 +18,13 @@
 #include <pthread.h>
 #include <inttypes.h>
 
-RTMPImageConnector::RTMPImageConnector(std::string name, std::string apikey, std::string base_url) :
+RTMPImageConnector::RTMPImageConnector(std::string name, std::string apikey, std::string base_url, bool dummy_audio) :
 	group(NULL),
 	name(name),
 	apikey(apikey),
 	base_url(base_url),
-	heartbeat_image(NULL)
+	heartbeat_image(NULL),
+	dummy_audio(dummy_audio)
 {
 	showClient = false;
 }
@@ -169,6 +170,7 @@ errorCode RTMPImageConnector::run()
 							"bitrate", 400,
 							"threads", 2,
 							"byte-stream", 1,
+							"key-int-max", 20,
 							NULL);
 					RTMP_LOAD_ELEMENT_OR_DIE(flvmux)
 					if (success)
@@ -181,20 +183,36 @@ errorCode RTMPImageConnector::run()
 					if (success)
 						g_object_set(G_OBJECT(rtmpsink),
 							"location", location, NULL);
-					if (success)
+
+					if (dummy_audio)
 					{
-						pipeline = gst_pipeline_new( NULL );
-						bin = gst_bin_new( NULL );
-						gst_bin_add_many(GST_BIN(bin), appsrc, videoconvert, capsfilter, x264enc, flvmux, rtmpsink, NULL);
-						gst_bin_add(GST_BIN(pipeline), bin);
-						success = gst_element_link_many(appsrc, videoconvert, capsfilter, x264enc, flvmux, rtmpsink, NULL);
-						if ( !success )
-							fprintf(stderr,"RTMPImageConnector: Could not link elements for rtmp stream.\n");
-						if (gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE)
-							printf("RTMPImageConnector: Could not play stream!\n");
-						else
-							printf("RTMPImageConnector: Openend H264 Stream\n");
-						group = message->group;
+						RTMP_LOAD_ELEMENT_OR_DIE(audiotestsrc)
+						if (success)
+							g_object_set(G_OBJECT(audiotestsrc),
+								"volume", 0.0,
+								"is-live", 1,
+								 NULL);
+						RTMP_LOAD_ELEMENT_OR_DIE(voaacenc)
+						if (success)
+						{
+							pipeline = gst_pipeline_new( NULL );
+							bin = gst_bin_new( NULL );
+							gst_bin_add_many(GST_BIN(bin), appsrc, videoconvert, capsfilter, x264enc, flvmux, rtmpsink, NULL);
+							if (dummy_audio)
+								gst_bin_add_many(GST_BIN(bin), audiotestsrc, voaacenc, NULL);
+							gst_bin_add(GST_BIN(pipeline), bin);
+							success  = gst_element_link_many( appsrc, videoconvert, capsfilter, x264enc, flvmux, NULL);
+							if (dummy_audio)
+								success &= gst_element_link_many( audiotestsrc, voaacenc, flvmux, NULL);
+							success &= gst_element_link_many( flvmux, rtmpsink, NULL);
+							if ( !success )
+								fprintf(stderr,"RTMPImageConnector: Could not link elements for rtmp stream.\n");
+							if (gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE)
+								printf("RTMPImageConnector: Could not play stream!\n");
+							else
+								printf("RTMPImageConnector: Openend H264 Stream\n");
+							group = message->group;
+						}
 					}
 				}
 				if (group == message->group) //We show always the very first group

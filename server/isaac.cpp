@@ -154,9 +154,9 @@ int main(int argc, char **argv)
 		{
 			RTMPImageConnector* twitchImageConnector;
 			if (twitch_url)
-				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string(twitch_url) );
+				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string(twitch_url), true );
 			else
-				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string("live-fra.twitch.tv/app") );
+				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string("live-fra.twitch.tv/app"), true );
 			if (twitchImageConnector->init(0,0))
 				delete twitchImageConnector;
 			else
