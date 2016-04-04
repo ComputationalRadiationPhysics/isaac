@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Lesser Public
+ * You should have received a copy of the GNU Lesser General Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 #include "SDLImageConnector.hpp"
