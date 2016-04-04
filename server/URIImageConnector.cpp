@@ -58,7 +58,7 @@ errorCode URIImageConnector::run()
 			{
 				streams.insert( std::pair<void*,InsituConnectorGroup*>(message->reference,message->group));
 				uint8_t* dummy = (uint8_t*)malloc(1);
-				dummy[0] = 0;
+				dummy[0] = 0; //empty string
 				clientSendMessage(new ImageBufferContainer(REGISTER_STREAM,dummy,message->group,1,message->target,message->reference));
 				printf("URIImageConnector: Openend URI JPEG Stream\n");
 			}

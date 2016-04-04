@@ -182,7 +182,16 @@ class IsaacVisualization
                 else
                 {
                     #if ISAAC_ALPAKA == 1
-                        alpaka_vector.push_back( alpaka::mem::buf::Buf< TDevAcc, isaac_float, TFraDim, size_t> ( alpaka::mem::buf::alloc<isaac_float, size_t>(acc, alpaka::Vec<TFraDim, size_t> ( TSource::feature_dim * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE) ) ) ) );
+                        alpaka_vector.push_back(
+                            alpaka::mem::buf::Buf< TDevAcc, isaac_float, TFraDim, size_t> (
+                                alpaka::mem::buf::alloc<isaac_float, size_t> (
+                                    acc,
+                                    alpaka::Vec<TFraDim, size_t> (
+                                        TSource::feature_dim * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE)
+                                    )
+                                )
+                            )
+                        );
                         pointer_array.pointer[I] = alpaka::mem::view::getPtrNative( alpaka_vector.back() );                        
                     #else
                         ISAAC_CUDA_CHECK(cudaMalloc((void**)&(pointer_array.pointer[I]), sizeof(isaac_float_dim< TSource::feature_dim >) * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE) ) );
@@ -1290,6 +1299,19 @@ class IsaacVisualization
                 json_decref( json_root );
             }
             icetDestroyContext(icetContext);
+            #if ISAAC_ALPAKA == 0
+                for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
+                {
+                    if ( pointer_array.pointer[i] )
+                        ISAAC_CUDA_CHECK(cudaFree( pointer_array.pointer[i] ) );
+                    ISAAC_CUDA_CHECK( cudaFree( transfer_d.pointer[i] ) );
+                    free( transfer_h.pointer[i] );
+                }
+                ISAAC_CUDA_CHECK(cudaFree( framebuffer ) );
+                ISAAC_CUDA_CHECK(cudaFree( functor_chain_d ) );
+                ISAAC_CUDA_CHECK(cudaFree( functor_chain_choose_d ) );
+                ISAAC_CUDA_CHECK(cudaFree( local_minmax_array_d ) );
+            #endif
             delete communicator;
         }    
         uint64_t getTicksUs()

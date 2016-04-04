@@ -678,7 +678,8 @@ Broker::~Broker()
 {
 	json_decref( masterHello );
 	dataConnectorList.clear();
-	MetaDataClient* mom;
-	while (mom = dataClientList.pop_front())
-		delete mom;	
+	while (MetaDataClient* mom = dataClientList.pop_front())
+		delete mom;
+	while ( ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr it = insituConnectorGroupList.getFront() )
+		delete( insituConnectorGroupList.remove(it) );
 }

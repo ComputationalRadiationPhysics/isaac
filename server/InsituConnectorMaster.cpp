@@ -209,6 +209,7 @@ InsituConnectorMaster::~InsituConnectorMaster()
 		shutdown(mom->connector->getSockFD(),SHUT_RDWR);
 		printf("Waiting for Connections %i to finish... ",mom->connector->getID());
 		fflush(stdout);
+		delete mom->connector;
 		delete mom;
 		printf("Done\n");
 	}

@@ -134,54 +134,56 @@ int main(int argc, char **argv)
 	printf("\n");
 	Broker broker(name,inner_port);
 	WebSocketDataConnector* webSocketDataConnector = new WebSocketDataConnector();
-	if (webSocketDataConnector->init(outer_port))
-		delete webSocketDataConnector;
-	else
+	if (webSocketDataConnector->init(outer_port) == 0)
 		broker.addDataConnector(webSocketDataConnector);
 	#ifdef ISAAC_GST
-		RTPImageConnector* rTPImageConnector = new RTPImageConnector(url,false,false);
-		if (rTPImageConnector->init(5000,5099))
-			delete rTPImageConnector;
-		else
-			broker.addImageConnector(rTPImageConnector);
-		rTPImageConnector = new RTPImageConnector(url,false,true);
-		if (rTPImageConnector->init(5100,5199))
-			delete rTPImageConnector;
-		else
-			broker.addImageConnector(rTPImageConnector);
+		RTPImageConnector* rTPImageConnector_h264 = new RTPImageConnector(url,false,false);
+		if (rTPImageConnector_h264->init(5000,5099) == 0)
+			broker.addImageConnector(rTPImageConnector_h264);
+		RTPImageConnector* rTPImageConnector_jpeg = new RTPImageConnector(url,false,true);
+		if (rTPImageConnector_jpeg->init(5100,5199) == 0)
+			broker.addImageConnector(rTPImageConnector_jpeg);
 	#endif
 	#ifdef ISAAC_JPEG
 		URIImageConnector* uRIImageConnector = new URIImageConnector();
-		if (uRIImageConnector->init(0,0))
-			delete uRIImageConnector;
-		else
+		if (uRIImageConnector->init(0,0) == 0)
 			broker.addImageConnector(uRIImageConnector);
 	#endif
 	#ifdef ISAAC_GST
+		RTMPImageConnector* twitchImageConnector = NULL;
 		if (twitch_apikey)
 		{
-			RTMPImageConnector* twitchImageConnector;
 			if (twitch_url)
 				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string(twitch_url), twitch_bitrate, true );
 			else
 				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string("live-fra.twitch.tv/app"), twitch_bitrate, true );
-			if (twitchImageConnector->init(0,0))
-				delete twitchImageConnector;
-			else
+			if (twitchImageConnector->init(0,0) == 0)
 				broker.addImageConnector(twitchImageConnector);
 		}
 	#endif
 	#ifdef ISAAC_SDL
 		SDLImageConnector* sDLImageConnector = new SDLImageConnector();
-		if (sDLImageConnector->init(0,0))
-			delete sDLImageConnector;
-		else
+		if (sDLImageConnector->init(0,0) == 0)
 			broker.addImageConnector(sDLImageConnector);
 	#endif
+	int return_code = 0;
 	if (broker.run())
 	{
 		printf("Error while running isaac\n");
-		return -1;
+		return_code = -1;
 	}
-	return 0;
+
+	delete webSocketDataConnector;
+	#ifdef ISAAC_JPEG
+		delete uRIImageConnector;
+	#endif
+	#ifdef ISAAC_GST
+		delete rTPImageConnector_h264;
+		delete rTPImageConnector_jpeg;
+		delete twitchImageConnector;
+	#endif
+	#ifdef ISAAC_SDL
+		delete sDLImageConnector;
+	#endif
+	return return_code;
 }
