@@ -60,7 +60,7 @@ class StereoCompositorSideBySide
 			static_assert(TController::pass_count >= 2, "Not enough passes defined in Controller for StereoCompositor!");
 			uint32_t* left = icetImageGetColorui(image[0]);
 			uint32_t* right = icetImageGetColorui(image[1]);
-			for (int y = 0; y < compbuffer_size.y; y++)
+			for (unsigned int y = 0; y < compbuffer_size.y; y++)
 			{
 				memcpy( &(compbuffer[y*compbuffer_size.x                     ]), &( left[y*framebuffer_size.x]), sizeof(uint32_t) * framebuffer_size.x);
 				memcpy( &(compbuffer[y*compbuffer_size.x + framebuffer_size.x]), &(right[y*framebuffer_size.x]), sizeof(uint32_t) * framebuffer_size.x);
@@ -99,8 +99,8 @@ class StereoCompositorAnaglyph
 			static_assert(TController::pass_count >= 2, "Not enough passes defined in Controller for StereoCompositor!");
 			uint32_t* left = icetImageGetColorui(image[0]);
 			uint32_t* right = icetImageGetColorui(image[1]);
-			for (int x = 0; x < framebuffer_size.x; x++)
-				for (int y = 0; y < framebuffer_size.y; y++)
+			for (unsigned int x = 0; x < framebuffer_size.x; x++)
+				for (unsigned int y = 0; y < framebuffer_size.y; y++)
 					compbuffer[x+y*framebuffer_size.x] =
 						( left[x+y*framebuffer_size.x] &  LeftFilter) |
 						(right[x+y*framebuffer_size.x] & RightFilter);

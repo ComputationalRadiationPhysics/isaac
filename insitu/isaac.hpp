@@ -1521,8 +1521,9 @@ class IsaacVisualization
             ISAAC_STOP_TIME_MEASUREMENT( myself->copy_time, +=, copy, myself->getTicksUs() )
         }
 
-        static void* visualizationFunction(IceTImage* image)
+        static void* visualizationFunction(void* dummy)
         {
+            IceTImage* image = (IceTImage*)dummy;
             //Message sending
             if (myself->rank == myself->master)
             {
