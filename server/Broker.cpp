@@ -542,7 +542,8 @@ errorCode Broker::run()
 							"{\"type\": \"feedback\", \"request\": \"functions\"} "
 							"{\"type\": \"feedback\", \"request\": \"weight\"} "
 							"{\"type\": \"feedback\", \"request\": \"clipping\"} "
-							"{\"type\": \"feedback\", \"request\": \"redraw\"}";
+							"{\"type\": \"feedback\", \"request\": \"redraw\"} "
+							"{\"type\": \"feedback\", \"request\": \"controller\"}";
 						send(group->master->connector->getSockFD(),buffer,strlen(buffer),MSG_NOSIGNAL);
 					}
 				}

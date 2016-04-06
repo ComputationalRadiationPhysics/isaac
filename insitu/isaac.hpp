@@ -52,6 +52,8 @@
 #include "isaac/isaac_kernel.hpp"
 #include "isaac/isaac_communicator.hpp"
 #include "isaac/isaac_helper.hpp"
+#include "isaac/isaac_controllers.hpp"
+#include "isaac/isaac_compositors.hpp"
 
 namespace isaac
 {
@@ -67,7 +69,9 @@ template <
     typename TSourceList,
     typename TDomainSize,
     size_t TTransfer_size,
-    typename TScale
+    typename TScale,
+    typename TController,
+    typename TCompositor
 >
 class IsaacVisualization 
 {
@@ -399,6 +403,8 @@ class IsaacVisualization
             server_url(server_url),
             server_port(server_port),
             framebuffer_size(framebuffer_size),
+            compbuffer_size(TCompositor::getCompositedbufferSize(framebuffer_size)),
+            compositor(framebuffer_size),
             metaNr(0),
             visualizationThread(0),
             kernel_time(0),
@@ -455,7 +461,8 @@ class IsaacVisualization
             {
                 this->communicator = NULL;
             }
-            setPerspective( 45.0f, (isaac_float)framebuffer_size.x/(isaac_float)framebuffer_size.y,ISAAC_Z_NEAR, ISAAC_Z_FAR);
+            recreateJSON();
+            controller.updateProjection( projection, framebuffer_size, NULL, true );
             look_at[0] = 0.0f;
             look_at[1] = 0.0f;
             look_at[2] = 0.0f;
@@ -518,53 +525,55 @@ class IsaacVisualization
             }
             updateTransfer();
 
-            //ISAAC:
-            IceTCommunicator icetComm;
-            icetComm = icetCreateMPICommunicator(mpi_world);
-            icetContext = icetCreateContext(icetComm);
-            icetDestroyMPICommunicator(icetComm);
-            icetResetTiles();
-            icetAddTile(0, 0, framebuffer_size.x, framebuffer_size.y, master);
-            //icetStrategy(ICET_STRATEGY_DIRECT);
-            icetStrategy(ICET_STRATEGY_SEQUENTIAL);
-            //icetStrategy(ICET_STRATEGY_REDUCE);
-
-            //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC );
-            icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_BSWAP );
-            //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_RADIXK );
-            //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_TREE );
-
-            /*IceTBoolean supports;
-            icetGetBooleanv( ICET_STRATEGY_SUPPORTS_ORDERING, &supports );
-            if (supports)
-                printf("yes\n");
-            else
-                printf("no\n");*/
-
-            icetSetColorFormat(ICET_IMAGE_COLOR_RGBA_UBYTE);
-            icetSetDepthFormat(ICET_IMAGE_DEPTH_NONE);
-            icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
-            icetEnable(ICET_ORDERED_COMPOSITE);
-
             max_size = max(uint32_t(global_size[0]),uint32_t(global_size[1]));
             if (TSimDim::value > 2)
                 max_size = max(uint32_t(global_size[2]),uint32_t(max_size));
             max_size_scaled = max(uint32_t(global_size_scaled[0]),uint32_t(global_size_scaled[1]));
             if (TSimDim::value > 2)
                 max_size_scaled = max(uint32_t(global_size_scaled[2]),uint32_t(max_size_scaled));
+
+            //ICET:
+            IceTCommunicator icetComm;
+            icetComm = icetCreateMPICommunicator(mpi_world);
+            for (int pass = 0; pass < TController::pass_count; pass++)
+            {
+                icetContext[pass] = icetCreateContext(icetComm);
+                icetResetTiles();
+                icetAddTile(0, 0, framebuffer_size.x, framebuffer_size.y, master);
+                //icetStrategy(ICET_STRATEGY_DIRECT);
+                icetStrategy(ICET_STRATEGY_SEQUENTIAL);
+                //icetStrategy(ICET_STRATEGY_REDUCE);
+
+                //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_AUTOMATIC );
+                icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_BSWAP );
+                //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_RADIXK );
+                //icetSingleImageStrategy( ICET_SINGLE_IMAGE_STRATEGY_TREE );
+
+                /*IceTBoolean supports;
+                icetGetBooleanv( ICET_STRATEGY_SUPPORTS_ORDERING, &supports );
+                if (supports)
+                    printf("yes\n");
+                else
+                    printf("no\n");*/
+
+                icetSetColorFormat(ICET_IMAGE_COLOR_RGBA_UBYTE);
+                icetSetDepthFormat(ICET_IMAGE_DEPTH_NONE);
+                icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
+                icetEnable(ICET_ORDERED_COMPOSITE);
+                icetPhysicalRenderSize(framebuffer_size.x, framebuffer_size.y);
+                icetDrawCallback( drawCallBack );
+            }
+            icetDestroyMPICommunicator(icetComm);
             updateBounding( );
-            icetPhysicalRenderSize(framebuffer_size.x, framebuffer_size.y);
-            icetDrawCallback( drawCallBack );
 
             //JSON
-            recreateJSON();
             if (rank == master)
             {
                 json_object_set_new( json_root, "type", json_string( "register" ) );
                 json_object_set_new( json_root, "name", json_string( name.c_str() ) );
                 json_object_set_new( json_root, "nodes", json_integer( numProc ) );
-                json_object_set_new( json_root, "framebuffer width", json_integer ( framebuffer_size.x ) );
-                json_object_set_new( json_root, "framebuffer height", json_integer ( framebuffer_size.y ) );
+                json_object_set_new( json_root, "framebuffer width", json_integer ( compbuffer_size.x ) );
+                json_object_set_new( json_root, "framebuffer height", json_integer ( compbuffer_size.y ) );
                 
                 json_object_set_new( json_root, "max functors", json_integer( ISAAC_MAX_FUNCTORS ) );
                 json_t *json_functors_array = json_array();
@@ -573,8 +582,9 @@ class IsaacVisualization
                 isaac_for_each_params( functors, functor_2_json_iterator(), json_functors_array );
 
                 json_t *matrix;
+                json_object_set_new( json_root, "projection count", json_integer ( TController::pass_count ) );
                 json_object_set_new( json_root, "projection", matrix = json_array() );
-                ISAAC_JSON_ADD_MATRIX(matrix,projection,16)
+                ISAAC_JSON_ADD_MATRIX(matrix,projection,16 * TController::pass_count)
                 json_object_set_new( json_root, "position", matrix = json_array() );
                 ISAAC_JSON_ADD_MATRIX(matrix,look_at,3)
                 json_object_set_new( json_root, "rotation", matrix = json_array() );
@@ -640,22 +650,26 @@ class IsaacVisualization
         }
         void updateBounding()
         {
-            if (icet_bounding_box)
+            for (int pass = 0; pass < TController::pass_count; pass++)
             {
-                isaac_float f_l_width = (isaac_float)local_size_scaled[0]/(isaac_float)max_size_scaled * 2.0f;
-                isaac_float f_l_height = (isaac_float)local_size_scaled[1]/(isaac_float)max_size_scaled * 2.0f;
-                isaac_float f_l_depth = 0.0f;
-                if (TSimDim::value > 2)
-                    f_l_depth = (isaac_float)local_size_scaled[2]/(isaac_float)max_size_scaled * 2.0f;
-                isaac_float f_x = (isaac_float)position_scaled[0]/(isaac_float)max_size_scaled * 2.0f - (isaac_float)global_size_scaled[0]/(isaac_float)max_size_scaled;
-                isaac_float f_y = (isaac_float)position_scaled[1]/(isaac_float)max_size_scaled * 2.0f - (isaac_float)global_size_scaled[1]/(isaac_float)max_size_scaled;
-                isaac_float f_z = 0.0f;
-                if (TSimDim::value > 2)
-                    f_z = (isaac_float)position_scaled[2]/(isaac_float)max_size_scaled * isaac_float(2) - (isaac_float)global_size_scaled[2]/(isaac_float)max_size_scaled;
-                icetBoundingBoxf( f_x, f_x + f_l_width, f_y, f_y + f_l_height, f_z, f_z + f_l_depth);
+                icetSetContext( icetContext[pass] );
+                if (icet_bounding_box)
+                {
+                    isaac_float f_l_width = (isaac_float)local_size_scaled[0]/(isaac_float)max_size_scaled * 2.0f;
+                    isaac_float f_l_height = (isaac_float)local_size_scaled[1]/(isaac_float)max_size_scaled * 2.0f;
+                    isaac_float f_l_depth = 0.0f;
+                    if (TSimDim::value > 2)
+                        f_l_depth = (isaac_float)local_size_scaled[2]/(isaac_float)max_size_scaled * 2.0f;
+                    isaac_float f_x = (isaac_float)position_scaled[0]/(isaac_float)max_size_scaled * 2.0f - (isaac_float)global_size_scaled[0]/(isaac_float)max_size_scaled;
+                    isaac_float f_y = (isaac_float)position_scaled[1]/(isaac_float)max_size_scaled * 2.0f - (isaac_float)global_size_scaled[1]/(isaac_float)max_size_scaled;
+                    isaac_float f_z = 0.0f;
+                    if (TSimDim::value > 2)
+                        f_z = (isaac_float)position_scaled[2]/(isaac_float)max_size_scaled * isaac_float(2) - (isaac_float)global_size_scaled[2]/(isaac_float)max_size_scaled;
+                    icetBoundingBoxf( f_x, f_x + f_l_width, f_y, f_y + f_l_height, f_z, f_z + f_l_depth);
+                }
+                else
+                    icetBoundingVertices(0,0,0,0,NULL);
             }
-            else
-                icetBoundingVertices(0,0,0,0,NULL);
         }
         void updatePosition( const TDomainSize position )
         {
@@ -867,6 +881,7 @@ class IsaacVisualization
             send_minmax = false;
             send_background_color = false;
             send_clipping = false;
+            send_controller = false;
 
             //Handle messages
             json_t* message;
@@ -910,6 +925,8 @@ class IsaacVisualization
                             send_background_color = true;
                         if ( strcmp( target, "clipping" ) == 0 )
                             send_clipping = true;
+                        if ( strcmp( target, "controller" ) == 0 )
+                            send_controller = true;
                     }
                     //Search for scene changes
                     if (json_array_size( js = json_object_get(last, "rotation absolute") ) == 9)
@@ -1012,6 +1029,9 @@ class IsaacVisualization
                         distance += json_number_value( js );
                         json_object_del( last, "distance relative" );
                     }
+                    //Giving the Controller the chance to grep for controller specific messages:
+                    if ( controller.updateProjection( projection, framebuffer_size, last ) )
+                        send_projection = true;
                     mergeJSON(message,last);
                     json_decref( last );
                 }
@@ -1055,7 +1075,7 @@ class IsaacVisualization
             }
             
             //Scene set?
-            if (json_array_size( js = json_object_get(message, "projection") ) == 16)
+            if (json_array_size( js = json_object_get(message, "projection") ) == 16 * TController::pass_count)
             {
                 redraw = true;
                 send_projection = true;
@@ -1135,12 +1155,16 @@ class IsaacVisualization
                 redraw = true;
                 json_array_foreach(js, index, value)
                     background_color[index] = json_number_value( value );
-                if (background_color[0] == 0.0f &&
-                    background_color[1] == 0.0f && 
-                    background_color[2] == 0.0f )
-                    icetDisable(ICET_CORRECT_COLORED_BACKGROUND);
-                else
-                    icetEnable(ICET_CORRECT_COLORED_BACKGROUND);
+                for (int pass = 0; pass < TController::pass_count; pass++)
+                {
+                    icetSetContext( icetContext[pass] );
+                    if (background_color[0] == 0.0f &&
+                        background_color[1] == 0.0f && 
+                        background_color[2] == 0.0f )
+                        icetDisable(ICET_CORRECT_COLORED_BACKGROUND);
+                    else
+                        icetEnable(ICET_CORRECT_COLORED_BACKGROUND);
+                }
                 send_background_color = true;
             }
             if (js = json_object_get(message, "clipping add") )
@@ -1210,47 +1234,53 @@ class IsaacVisualization
                 }
             }
             
-            IceTImage image = { NULL };
+            IceTImage image[TController::pass_count];
+            for (int pass = 0; pass < TController::pass_count; pass++)
+                image[pass].opaque_internals = NULL;
             
             if (redraw)
             {
-                //Calc order
-                ISAAC_START_TIME_MEASUREMENT( sorting, getTicksUs() )
-                //Every rank calculates it's distance to the camera
-                IceTDouble point[4] =
+                for (int pass = 0; pass < TController::pass_count; pass++)
                 {
-                    (IceTDouble(position_scaled[0]) + (IceTDouble(local_size_scaled[0]) - IceTDouble(global_size_scaled[0])) / 2.0) / IceTDouble(max_size_scaled/2),
-                    (IceTDouble(position_scaled[1]) + (IceTDouble(local_size_scaled[1]) - IceTDouble(global_size_scaled[1])) / 2.0) / IceTDouble(max_size_scaled/2),
-                    (IceTDouble(position_scaled[2]) + (IceTDouble(local_size_scaled[2]) - IceTDouble(global_size_scaled[2])) / 2.0) / IceTDouble(max_size_scaled/2),
-                    1.0
-                };
-                IceTDouble result[4];
-                mulMatrixVector(result,modelview,point);
-                float point_distance = sqrt(result[0] * result[0] + result[1] * result[1] + result[2] * result[2]);
-                //Allgather of the distances
-                float receive_buffer[numProc];
-                MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, mpi_world);
-                //Putting to a std::multimap of {rank, distance}
-                std::multimap<float, isaac_int, std::less< float > > distance_map;
-                for (isaac_int i = 0; i < numProc; i++)
-                    distance_map.insert( std::pair<float, isaac_int>( receive_buffer[i], i ) );
-                //Putting in an array for IceT
-                IceTInt icet_order_array[numProc];
-                {
-                    isaac_int i = 0;
-                    for (auto it = distance_map.begin(); it != distance_map.end(); it++)
+                    icetSetContext( icetContext[pass] );
+                    //Calc order
+                    ISAAC_START_TIME_MEASUREMENT( sorting, getTicksUs() )
+                    //Every rank calculates it's distance to the camera
+                    IceTDouble point[4] =
                     {
-                        icet_order_array[i] = it->second;
-                        i++;
+                        (IceTDouble(position_scaled[0]) + (IceTDouble(local_size_scaled[0]) - IceTDouble(global_size_scaled[0])) / 2.0) / IceTDouble(max_size_scaled/2),
+                        (IceTDouble(position_scaled[1]) + (IceTDouble(local_size_scaled[1]) - IceTDouble(global_size_scaled[1])) / 2.0) / IceTDouble(max_size_scaled/2),
+                        (IceTDouble(position_scaled[2]) + (IceTDouble(local_size_scaled[2]) - IceTDouble(global_size_scaled[2])) / 2.0) / IceTDouble(max_size_scaled/2),
+                        1.0
+                    };
+                    IceTDouble result[4];
+                    mulMatrixVector(result,modelview,point);
+                    float point_distance = sqrt(result[0] * result[0] + result[1] * result[1] + result[2] * result[2]);
+                    //Allgather of the distances
+                    float receive_buffer[numProc];
+                    MPI_Allgather( &point_distance, 1, MPI_FLOAT, receive_buffer, 1, MPI_FLOAT, mpi_world);
+                    //Putting to a std::multimap of {rank, distance}
+                    std::multimap<float, isaac_int, std::less< float > > distance_map;
+                    for (isaac_int i = 0; i < numProc; i++)
+                        distance_map.insert( std::pair<float, isaac_int>( receive_buffer[i], i ) );
+                    //Putting in an array for IceT
+                    IceTInt icet_order_array[numProc];
+                    {
+                        isaac_int i = 0;
+                        for (auto it = distance_map.begin(); it != distance_map.end(); it++)
+                        {
+                            icet_order_array[i] = it->second;
+                            i++;
+                        }
                     }
-                }
-                icetCompositeOrder( icet_order_array );
-                ISAAC_STOP_TIME_MEASUREMENT( sorting_time, +=, sorting, getTicksUs() )
+                    icetCompositeOrder( icet_order_array );
+                    ISAAC_STOP_TIME_MEASUREMENT( sorting_time, +=, sorting, getTicksUs() )
 
-                //Drawing
-                ISAAC_START_TIME_MEASUREMENT( merge, getTicksUs() )
-                image = icetDrawFrame(projection,modelview,background_color);
-                ISAAC_STOP_TIME_MEASUREMENT( merge_time, +=, merge, getTicksUs() )
+                    //Drawing
+                    ISAAC_START_TIME_MEASUREMENT( merge, getTicksUs() )
+                    image[pass] = icetDrawFrame(&(projection[pass * 16]),modelview,background_color);
+                    ISAAC_STOP_TIME_MEASUREMENT( merge_time, +=, merge, getTicksUs() )
+                }
             }
             else
                 usleep(10000);
@@ -1279,9 +1309,9 @@ class IsaacVisualization
             }
             
             #ifdef ISAAC_THREADING
-                pthread_create(&visualizationThread,NULL,visualizationFunction,image.opaque_internals);
+                pthread_create(&visualizationThread,NULL,visualizationFunction,image);
             #else
-                visualizationFunction(image.opaque_internals);
+                visualizationFunction(image);
             #endif
             return metadata;
         }
@@ -1298,7 +1328,8 @@ class IsaacVisualization
                 free(buffer);
                 json_decref( json_root );
             }
-            icetDestroyContext(icetContext);
+            for (int pass = 0; pass < TController::pass_count; pass++)
+                icetDestroyContext(icetContext[pass]);
             #if ISAAC_ALPAKA == 0
                 for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
                 {
@@ -1490,7 +1521,7 @@ class IsaacVisualization
             ISAAC_STOP_TIME_MEASUREMENT( myself->copy_time, +=, copy, myself->getTicksUs() )
         }
 
-        static void* visualizationFunction(void* dummy)
+        static void* visualizationFunction(IceTImage* image)
         {
             //Message sending
             if (myself->rank == myself->master)
@@ -1502,7 +1533,7 @@ class IsaacVisualization
                 if ( myself->send_projection )
                 {
                     json_object_set_new( myself->json_root, "projection", matrix = json_array() );
-                    ISAAC_JSON_ADD_MATRIX(matrix,myself->projection,16)
+                    ISAAC_JSON_ADD_MATRIX(matrix,myself->projection,16 * TController::pass_count)
                 }
                 if ( myself->send_look_at )
                 {
@@ -1609,6 +1640,7 @@ class IsaacVisualization
                         json_array_append_new( inner, json_real( myself->clipping_saved_normals[i].z ) );
                     }
                 }
+                myself->controller.sendFeedback( myself->json_root, myself->send_controller );
                 char* buffer = json_dumps( myself->json_root, 0 );
                 myself->communicator->serverSend(buffer);
                 free(buffer);
@@ -1618,12 +1650,11 @@ class IsaacVisualization
             myself->recreateJSON();
             
             //Sending video
-            IceTImage image = { dummy };
             ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
             if (myself->communicator)
             {
-                if (dummy)
-                    myself->communicator->serverSendFrame(icetImageGetColorui(image),myself->framebuffer_size.x,myself->framebuffer_size.y,4);
+                if (image[0].opaque_internals)
+                    myself->communicator->serverSendFrame(myself->compositor.doCompositing(image),myself->compbuffer_size.x,myself->compbuffer_size.y,4);
                 else
                 {
                     myself->communicator->serverSend(NULL,false,true);
@@ -1633,36 +1664,6 @@ class IsaacVisualization
 
             myself->metaNr++;
             return 0;
-        }
-        void setFrustum(const isaac_float left,const isaac_float right,const isaac_float bottom,const isaac_float top,const isaac_float znear,const isaac_float zfar )
-        {
-            isaac_float  znear2 = znear * isaac_float(2);
-            isaac_float  width = right - left;
-            isaac_float  height = top - bottom;
-            isaac_float  zRange = znear - zfar;
-            projection[ 0] = znear2 / width;
-            projection[ 1] = isaac_float( 0);
-            projection[ 2] = isaac_float( 0);
-            projection[ 3] = isaac_float( 0);
-            projection[ 4] = isaac_float( 0);
-            projection[ 5] = znear2 / height;
-            projection[ 6] = isaac_float( 0);
-            projection[ 7] = isaac_float( 0);
-            projection[ 8] = ( right + left ) / width;
-            projection[ 9] = ( top + bottom ) / height;
-            projection[10] = ( zfar + znear) / zRange;
-            projection[11] = isaac_float(-1);
-            projection[12] = isaac_float( 0);
-            projection[13] = isaac_float( 0);
-            projection[14] = ( -znear2 * zfar ) / -zRange;
-            projection[15] = isaac_float( 0);
-        }
-        void setPerspective(const isaac_float fovyInDegrees,const isaac_float aspectRatio,const isaac_float __znear,const isaac_float zfar )
-        {
-            isaac_float znear = __znear;
-            isaac_float ymax = znear * tan( fovyInDegrees * M_PI / isaac_float(360) );
-            isaac_float xmax = ymax * aspectRatio;
-            setFrustum( -xmax, xmax, -ymax, ymax, znear, zfar );
         }
         void recreateJSON()
         {
@@ -1709,6 +1710,7 @@ class IsaacVisualization
         std::string server_url;
         isaac_uint server_port;
         isaac_size2 framebuffer_size;
+        isaac_size2 compbuffer_size;
         #if ISAAC_ALPAKA == 1
             alpaka::Vec<TFraDim, size_t> framebuffer_prod;
             alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t> framebuffer;
@@ -1731,7 +1733,7 @@ class IsaacVisualization
         std::vector<size_t> local_size_scaled;
         std::vector<size_t> position_scaled;
         MPI_Comm mpi_world;
-        IceTDouble projection[16];
+        IceTDouble projection[16 * TController::pass_count];
         IceTDouble look_at[3];
         IceTDouble rotation[9];
         IceTDouble distance;
@@ -1748,6 +1750,7 @@ class IsaacVisualization
         bool send_minmax;
         bool send_background_color;
         bool send_clipping;
+        bool send_controller;
         bool interpolation;
         bool iso_surface;
         bool icet_bounding_box;
@@ -1761,7 +1764,7 @@ class IsaacVisualization
         isaac_int numProc;
         isaac_uint metaNr;
         TSourceList& sources;
-        IceTContext icetContext;
+        IceTContext icetContext[TController::pass_count];
         IsaacVisualizationMetaEnum thr_metaTargets;
         pthread_t visualizationThread;
         #if ISAAC_ALPAKA == 1
@@ -1784,14 +1787,16 @@ class IsaacVisualization
         TScale scale;
         clipping_struct clipping;
         isaac_float3 clipping_saved_normals[ISAAC_MAX_CLIPPING];
+        TController controller;
+        TCompositor compositor;
 };
 
 #if ISAAC_ALPAKA == 1
-    template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size,typename TScale>
-    IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale>::myself = NULL;
+    template <typename THost,typename TAcc,typename TStream,typename TAccDim,typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size,typename TScale,typename TController,typename TCompositor>
+    IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale,TController,TCompositor>* IsaacVisualization<THost,TAcc,TStream,TAccDim,TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale,TController,TCompositor>::myself = NULL;
 #else
-    template <typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size,typename TScale>
-    IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale>* IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale>::myself = NULL;
+    template <typename TSimDim, typename TSourceList, typename TDomainSize, size_t TTransfer_size,typename TScale,typename TController,typename TCompositor>
+    IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale,TController,TCompositor>* IsaacVisualization<TSimDim,TSourceList,TDomainSize,TTransfer_size,TScale,TController,TCompositor>::myself = NULL;
 #endif
 
 } //namespace isaac;

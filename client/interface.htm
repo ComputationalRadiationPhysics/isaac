@@ -54,6 +54,7 @@
 				<span id="interval_span">1</span>
 				<input type="button" value="Set" id="interval_change">
 			</form>
+			<div id="stereo_div"></div>
 			<div id="functions_div"></div>
 			<div id="weight_div"></div>
 			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation
@@ -932,6 +933,33 @@ document.getElementById("connect").onclick = function()
 						};
 						functions_div.appendChild(minmax_button);
 					}
+					if (obj.hasOwnProperty("eye distance"))
+					{
+						var stereo_div = document.getElementById("stereo_div");
+						while (stereo_div.firstChild) {
+							stereo_div.removeChild(stereo_div.firstChild);
+						}
+						eye_distance = obj["eye distance"];
+						var title = document.createElement("SPAN");
+						title.innerHTML = "Eye Distance: ";
+						stereo_div.appendChild(title);
+						var stereo_range = document.createElement("INPUT");
+						stereo_range.type = "range";
+						stereo_range.min = 0;
+						stereo_range.max = 200;
+						stereo_range.id = "stereo_range";
+						stereo_range.value = Math.floor(eye_distance * 1000.0);
+						stereo_div.appendChild(stereo_range);
+						var submit = document.createElement("INPUT");
+						submit.type = "button";
+						submit.value = "Set distance";
+						submit.onclick = function()
+						{
+							sendFeedback( "eye distance", parseFloat(document.getElementById("stereo_range").value) / 1000.0 );
+							sendFeedback( "request", "redraw" );
+						};
+						stereo_div.appendChild(submit);
+					}
 					if (obj.hasOwnProperty("minmax"))
 					{
 						for (var i in obj["minmax"])
@@ -945,7 +973,7 @@ document.getElementById("connect").onclick = function()
 							parent.appendChild(title);
 							var apply = document.createElement("INPUT");
 							apply.type = "button";
-							apply.value = "Optimize function";
+							apply.value = "Optimize";
 							apply.id = "i_" + i + "_button";
 							apply.onclick = createOptimizedFunction( i, obj["minmax"][i], false);
 							parent.appendChild(apply);

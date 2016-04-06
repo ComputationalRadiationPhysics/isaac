@@ -253,4 +253,45 @@ isaac_float4 getHSVA(isaac_float h, isaac_float s, isaac_float v, isaac_float a)
 	return result;
 }
 
+void setFrustum(IceTDouble * const projection, const isaac_float left,const isaac_float right,const isaac_float bottom,const isaac_float top,const isaac_float znear,const isaac_float zfar )
+{
+	isaac_float  znear2 = znear * isaac_float(2);
+	isaac_float  width = right - left;
+	isaac_float  height = top - bottom;
+	isaac_float  zRange = znear - zfar;
+	projection[ 0] = znear2 / width;
+	projection[ 1] = isaac_float( 0);
+	projection[ 2] = isaac_float( 0);
+	projection[ 3] = isaac_float( 0);
+	projection[ 4] = isaac_float( 0);
+	projection[ 5] = znear2 / height;
+	projection[ 6] = isaac_float( 0);
+	projection[ 7] = isaac_float( 0);
+	projection[ 8] = ( right + left ) / width;
+	projection[ 9] = ( top + bottom ) / height;
+	projection[10] = ( zfar + znear) / zRange;
+	projection[11] = isaac_float(-1);
+	projection[12] = isaac_float( 0);
+	projection[13] = isaac_float( 0);
+	projection[14] = ( -znear2 * zfar ) / -zRange;
+	projection[15] = isaac_float( 0);
+}
+void setPerspective(IceTDouble * const projection, const isaac_float fovyInDegrees,const isaac_float aspectRatio,const isaac_float znear,const isaac_float zfar )
+{
+	isaac_float ymax = znear * tan( fovyInDegrees * M_PI / isaac_float(360) );
+	isaac_float xmax = ymax * aspectRatio;
+	setFrustum(projection, -xmax, xmax, -ymax, ymax, znear, zfar );
+}
+
+void spSetPerspectiveStereoscopic( IceTDouble * const projection, const isaac_float fovyInDegrees,const isaac_float aspectRatio,const isaac_float znear,const isaac_float zfar,const isaac_float z0,const isaac_float distance )
+{
+	isaac_float xmin = -znear * tan( fovyInDegrees * M_PI / isaac_float(360) ) + distance/2.0f*znear/z0;
+	isaac_float xmax =  znear * tan( fovyInDegrees * M_PI / isaac_float(360) ) + distance/2.0f*znear/z0;
+	isaac_float ymin = -1.0f/aspectRatio * znear * tan( fovyInDegrees * M_PI / isaac_float(360) );
+	isaac_float ymax =  1.0f/aspectRatio * znear * tan( fovyInDegrees * M_PI / isaac_float(360) );
+	setFrustum(projection, xmin, xmax, ymin, ymax, znear, zfar );
+	projection[12] = distance;
+}
+
+
 } //namespace isaac;

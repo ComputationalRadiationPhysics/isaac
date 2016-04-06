@@ -168,8 +168,8 @@ int main(int argc, char **argv)
 	//This defines the size of the generated rendering
 	isaac_size2 framebuffer_size =
 	{
-		size_t(1024),
-		size_t(768)
+		size_t(800),
+		size_t(600)
 	};
 	
 	#if ISAAC_ALPAKA == 1
@@ -294,7 +294,14 @@ int main(int argc, char **argv)
 			std::vector<size_t>, //Type of the 3D vectors used later
 		#endif
 		1024, //Size of the transfer functions
-		std::vector<float> //user defined type of scaling
+		std::vector<float>, //user defined type of scaling
+		
+		isaac::DefaultController,
+		//isaac::StereoController,
+		
+		isaac::DefaultCompositor
+		//isaac::StereoCompositorSideBySide<isaac::StereoController>
+		//isaac::StereoCompositorAnaglyph<isaac::StereoController,0x000000FF,0x00FFFF00>
 	> (
 		#if ISAAC_ALPAKA == 1
 			devHost, //Alpaka specific host dev instance
