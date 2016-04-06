@@ -949,7 +949,6 @@ document.getElementById("connect").onclick = function()
 						submit.onclick = function()
 						{
 							sendFeedback( "eye distance", parseFloat(document.getElementById("stereo_range").value) / 1000.0 );
-							sendFeedback( "request", "redraw" );
 						};
 						stereo_div.appendChild(submit);
 					}

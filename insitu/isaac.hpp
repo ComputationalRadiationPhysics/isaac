@@ -1031,7 +1031,13 @@ class IsaacVisualization
                     }
                     //Giving the Controller the chance to grep for controller specific messages:
                     if ( controller.updateProjection( projection, framebuffer_size, last ) )
+                    {
+                        redraw = true;
                         send_projection = true;
+                        json_t *matrix;
+                        json_object_set_new( message, "projection", matrix = json_array() );
+                        ISAAC_JSON_ADD_MATRIX(matrix,projection,16 * TController::pass_count)
+                    }
                     mergeJSON(message,last);
                     json_decref( last );
                 }
