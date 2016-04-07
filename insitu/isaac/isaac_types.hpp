@@ -240,6 +240,9 @@ struct minmax_array_struct
 
 struct clipping_struct
 {
+    inline clipping_struct() :
+        count(0)
+    {}
     isaac_uint count;
     struct
     {

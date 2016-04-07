@@ -419,8 +419,7 @@ class IsaacVisualization
             framebuffer_prod(size_t(framebuffer_size.x) * size_t(framebuffer_size.y)),
             sources( sources ),
             scale( scale ),
-            icet_bounding_box( true ),
-            clipping( {0} )
+            icet_bounding_box( true )
             #if ISAAC_ALPAKA == 1
                 ,framebuffer(alpaka::mem::buf::alloc<uint32_t, size_t>(acc, framebuffer_prod))
                 ,inverse_d(alpaka::mem::buf::alloc<isaac_float, size_t>(acc, size_t(16)))
