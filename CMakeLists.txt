@@ -12,6 +12,7 @@ set(SRCS
 	${CMAKE_SOURCE_DIR}/server/Runable.cpp
 	${CMAKE_SOURCE_DIR}/server/MessageAble.cpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataClient.cpp
+	${CMAKE_SOURCE_DIR}/server/TCPDataConnector.cpp
 )
 
 set(HDRS
@@ -26,6 +27,7 @@ set(HDRS
 	${CMAKE_SOURCE_DIR}/server/Runable.hpp
 	${CMAKE_SOURCE_DIR}/server/MessageAble.hpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataClient.hpp
+	${CMAKE_SOURCE_DIR}/server/TCPDataConnector.hpp
 )
 
 option(ISAAC_SDL "Build SDL ImageConnector" OFF)

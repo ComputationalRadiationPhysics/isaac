@@ -94,6 +94,10 @@ class MessageContainer
 			else
 				this->type = type;
 		}
+		void suicide()
+		{
+			delete this;
+		}
 		~MessageContainer()
 		{
 			if (json_root)
@@ -171,6 +175,12 @@ class ImageBufferContainer
 			image = new ImageBuffer( buffer, ref_count );
 			pthread_mutex_init (&json_mutex, NULL);
 			pthread_mutex_init (&payload_mutex, NULL);
+		}
+		void suicide()
+		{
+			ref_count--;
+			if (ref_count <= 0)
+				delete this;
 		}
 		~ImageBufferContainer()
 		{

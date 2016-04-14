@@ -26,9 +26,9 @@ class MessageAble
 		{
 			MessageTemplate* mom;
 			while (mom = messagesIn.pop_front())
-				delete mom;
+				mom->suicide();
 			while (mom = messagesOut.pop_front())
-				delete mom;
+				mom->suicide();
 		}
 		//Called from MetaDataConnector / Client
 		errorCode clientSendMessage(MessageTemplate* message)

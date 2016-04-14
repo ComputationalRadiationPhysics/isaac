@@ -237,4 +237,5 @@ errorCode WebSocketDataConnector::run()
 		usleep(100);
 	}
 	lws_context_destroy(context);
+	return 0;
 }

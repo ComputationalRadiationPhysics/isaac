@@ -14,35 +14,18 @@
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 #pragma once
-#include "Common.hpp"
-#include "Runable.hpp"
-#include "ThreadList.hpp"
-#include "InsituConnector.hpp"
-#include <memory>
-class InsituConnectorGroup;
 
-#define MAX_SOCKETS 32768
+#include "MetaDataConnector.hpp"
 
-typedef struct InsituConnectorContainer_struct
-{
-	InsituConnector* connector;
-	InsituConnectorGroup* group;
-} InsituConnectorContainer;
-
-size_t json_load_callback_function (void *buffer, size_t buflen, void *data);
-
-class InsituConnectorMaster : public Runable
+/** This class is used for the connection between the isaac server and
+ * some frontend. It defines and abstract interface isaac will use.*/
+class TCPDataConnector : public MetaDataConnector
 {
 	public:
-		InsituConnectorMaster();
+		TCPDataConnector();
 		errorCode init(int port);
 		errorCode run();
-		~InsituConnectorMaster();
-		ThreadList< InsituConnectorContainer* > insituConnectorList;
-		int getSockFD();
-		void setExit();
+		std::string getName();
 	private:
-		int nextFreeNumber;
 		int sockfd;
-		volatile bool force_exit;
 };

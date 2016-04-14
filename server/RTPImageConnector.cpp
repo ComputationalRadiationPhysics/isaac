@@ -218,7 +218,7 @@ errorCode RTPImageConnector::run()
 			clientSendMessage( message );
 		}
 		usleep(1000);
-	}	
+	}
 	int nr;
 	for (nr = 0; nr < streams.size(); nr++)
 		if (streams[nr].is_used)

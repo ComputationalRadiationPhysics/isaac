@@ -648,7 +648,6 @@ errorCode Broker::run()
 	insituMaster.setExit();
 	printf("Waiting for insitu Master thread to finish... ");
 	fflush(stdout);
-	//Yeah... "finish"
 	pthread_join(insituThread,NULL);
 	printf("Done\n");
 	for (auto it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)

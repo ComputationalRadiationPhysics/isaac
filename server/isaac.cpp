@@ -15,6 +15,7 @@
 
 #include "Broker.hpp"
 #include "WebSocketDataConnector.hpp"
+#include "TCPDataConnector.hpp"
 #ifdef ISAAC_SDL
 	#include "SDLImageConnector.hpp"
 #endif
@@ -38,8 +39,9 @@
 
 int main(int argc, char **argv)
 {
-	int outer_port = 2459;
-	int inner_port = 2460;
+	int tcp_port = 2458;
+	int web_port = 2459;
+	int sim_port = 2460;
 	const char __name[] = "ISAAC Visualization server";
 	const char __url[] = "127.0.0.1";
 	const char* name = __name;
@@ -56,11 +58,12 @@ int main(int argc, char **argv)
 		{
 			printf("ISAAC - In Situ Animation of Accelerated Computations " ISAAC_VERSION"\n");
 			printf("Usage:\n");
-			printf("isaac [--help] [--outer_port <X>] [--inner_port <X>] [--url <X>] [--name <X>]\n");
+			printf("isaac [--help] [--web_port <X>] [--sim_port <X>] [--url <X>] [--name <X>]\n");
 			printf("      [--jpeg] [--version]\n");
 			printf("       --help: Shows this help\n");
-			printf(" --outer_port: Set port for the clients to connect. Default 2459\n");
-			printf(" --inner_port: Set port for the simulations to connect to. Default 2460\n");
+			printf("   --web_port: Set port for the websocket clients to connect. Default %i\n",web_port);
+			printf("   --tcp_port: Set port for the tcp clients to connect. Default %i\n",tcp_port);
+			printf("   --sim_port: Set port for the simulations to connect to. Default %i\n",sim_port);
 			printf("        --url: Set the url to connect to from outside. Default 127.0.0.1\n");
 			printf("       --name: Set the name of the server.\n");
 			printf("    --version: Shows the version\n");
@@ -78,16 +81,22 @@ int main(int argc, char **argv)
 			return 0;
 		}
 		else
-		if (strcmp(argv[nr],"--outer_port") == 0)
+		if (strcmp(argv[nr],"--web_port") == 0)
 		{
 			ISAAC_INCREASE_NR_OR_DIE
-			outer_port = atoi(argv[nr]);
+			web_port = atoi(argv[nr]);
 		}
 		else
-		if (strcmp(argv[nr],"--inner_port") == 0)
+		if (strcmp(argv[nr],"--tcp_port") == 0)
 		{
 			ISAAC_INCREASE_NR_OR_DIE
-			inner_port = atoi(argv[nr]);
+			tcp_port = atoi(argv[nr]);
+		}
+		else
+		if (strcmp(argv[nr],"--sim_port") == 0)
+		{
+			ISAAC_INCREASE_NR_OR_DIE
+			sim_port = atoi(argv[nr]);
 		}
 		else
 		if (strcmp(argv[nr],"--url") == 0)
@@ -129,13 +138,16 @@ int main(int argc, char **argv)
 		nr++;
 	}
 	
-	printf("Using outer_port=%i and inner_port=%i\n",outer_port,inner_port);
+	printf("Using web_port=%i, tcp_port=%i and sim_port=%i\n",web_port,tcp_port,sim_port);
 	
 	printf("\n");
-	Broker broker(name,inner_port);
+	Broker broker(name,sim_port);
 	WebSocketDataConnector* webSocketDataConnector = new WebSocketDataConnector();
-	if (webSocketDataConnector->init(outer_port) == 0)
+	if (webSocketDataConnector->init(web_port) == 0)
 		broker.addDataConnector(webSocketDataConnector);
+	TCPDataConnector* tCPDataConnector = new TCPDataConnector();
+	if (tCPDataConnector->init(tcp_port) == 0)
+		broker.addDataConnector(tCPDataConnector);
 	#ifdef ISAAC_GST
 		RTPImageConnector* rTPImageConnector_h264 = new RTPImageConnector(url,false,false);
 		if (rTPImageConnector_h264->init(5000,5099) == 0)
@@ -174,6 +186,7 @@ int main(int argc, char **argv)
 	}
 
 	delete webSocketDataConnector;
+	delete tCPDataConnector;
 	#ifdef ISAAC_JPEG
 		delete uRIImageConnector;
 	#endif
