@@ -63,7 +63,7 @@ errorCode TCPDataConnector::run()
 	struct pollfd fd_array[MAX_SOCKETS];
 	memset(fd_array,0,sizeof(fd_array));
 	std::vector< MetaDataClient* > client_array = std::vector< MetaDataClient* >(MAX_SOCKETS,NULL);
-	std::vector< jlcb_container* > jlcb_array = std::vector< jlcb_container* >(MAX_SOCKETS,NULL);
+	std::vector< jlcb_container* > jlcb_array = std::vector< jlcb_container* >(MAX_SOCKETS,NULL);	
 	
 	fd_array[0].fd = sockfd;
 	fd_array[0].events = POLLIN;
@@ -113,16 +113,18 @@ errorCode TCPDataConnector::run()
 			//Messages of children
 			while (MessageContainer* message = client_array[i]->clientGetMessage())
 			{
+				pthread_mutex_lock(&MessageContainer::deep_copy_mutex);
 				char* buffer = json_dumps( message->json_root, 0 );
+				pthread_mutex_unlock(&MessageContainer::deep_copy_mutex);
 				int l = strlen(buffer);
 				int n = 0;
 				int amount = (l+4095)/4096;
 				for (int j = 0; j < amount; j++)
 				{
 					if (j == amount - 1)
-						n += send(fd_array[i].fd,&buffer[j*4096],l - j * 4096,0);
+						n += send(fd_array[i].fd,&buffer[j*4096],l - j * 4096,MSG_NOSIGNAL);
 					else
-						n += send(fd_array[i].fd,&buffer[j*4096],4096,MSG_MORE);
+						n += send(fd_array[i].fd,&buffer[j*4096],4096,MSG_MORE | MSG_NOSIGNAL);
 				}
 				if (n < l)
 				{
@@ -155,6 +157,7 @@ errorCode TCPDataConnector::run()
 						last_working_pos = jlcb_array[i]->jlcb.pos;
 						MessageContainer* message = new MessageContainer(NONE,content);
 						MessageType type = message->type;
+						json_object_set_new( message->json_root, "url", json_string( "127.0.0.1" ) ); //TODO: Using real url
 						client_array[i]->clientSendMessage(message);
 					}
 					//If the whole json message was not received yet, we need to keep the start

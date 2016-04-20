@@ -365,7 +365,7 @@ errorCode Broker::run()
 								int stream;
 								bool dropable;
 								if(dc->t->doesObserve(insitu->t->group->getID(),stream,dropable))
-								dc->t->masterSendMessage(new MessageContainer(message->type,message->json_root,true,dropable));
+									dc->t->masterSendMessage(new MessageContainer(message->type,message->json_root,true,dropable));
 								dc=dc->next;
 							}
 						}

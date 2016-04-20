@@ -3,6 +3,7 @@ project (isaac)
 
 set(SRCS
 	${CMAKE_SOURCE_DIR}/server/isaac.cpp
+	${CMAKE_SOURCE_DIR}/server/Common.cpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/WebSocketDataConnector.cpp
 	${CMAKE_SOURCE_DIR}/server/ImageConnector.cpp

@@ -46,12 +46,18 @@ typedef enum
 class MessageContainer
 {
 	public:
+		static pthread_mutex_t deep_copy_mutex;
 		MessageContainer(MessageType type = NONE,json_t *json_root = NULL, bool keep_json = false, bool drop_able = false)
-		: json_root(json_root)
-		, drop_able(drop_able)
+		: drop_able(drop_able)
 		{
 			if (keep_json && json_root)
+			{
+				pthread_mutex_lock(&deep_copy_mutex);
+				//json_root = json_deep_copy( json_root );
 				json_incref( json_root );
+				pthread_mutex_unlock(&deep_copy_mutex);
+			}
+			this->json_root = json_root;
 			json_t *json_type;
 			if (type == NONE && (json_type = json_object_get(json_root, "type")) && json_is_string(json_type))
 			{
@@ -107,7 +113,6 @@ class MessageContainer
 		json_t *json_root;
 		bool drop_able;
 };
-
 
 typedef enum
 {

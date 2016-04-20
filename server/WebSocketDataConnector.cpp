@@ -130,7 +130,9 @@ callback_isaac(
 				}
 				if (message) //New message from master sama!
 				{
+					pthread_mutex_lock(&MessageContainer::deep_copy_mutex);
 					char* buffer = json_dumps( message->json_root, 0 );
+					pthread_mutex_unlock(&MessageContainer::deep_copy_mutex);
 					n = strlen(buffer);
 					sprintf(p,"%s",buffer);
 					m = lws_write(wsi, (unsigned char*)p, n, LWS_WRITE_TEXT);

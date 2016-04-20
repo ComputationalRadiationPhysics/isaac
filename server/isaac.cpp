@@ -39,6 +39,7 @@
 
 int main(int argc, char **argv)
 {
+	json_object_seed(0);
 	int tcp_port = 2458;
 	int web_port = 2459;
 	int sim_port = 2460;
