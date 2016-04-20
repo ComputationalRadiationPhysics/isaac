@@ -68,7 +68,7 @@ errorCode URIImageConnector::run()
 				while (it != streams.end())
 				{
 					auto next_it = std::next(it);
-					if (it->second == message->group)
+					if (it->first == message->reference && it->second == message->group)
 					{
 						streams.erase(it);
 						printf("URIImageConnector: Closed Stream\n");
@@ -84,7 +84,8 @@ errorCode URIImageConnector::run()
 					{
 						pthread_mutex_lock (&(message->json_mutex));
 						pthread_mutex_lock (&(message->payload_mutex));
-						json_object_set( message->json, "payload", message->payload ); 
+						if ( json_object_get( message->json, "payload" ) == NULL)
+							json_object_set( message->json, "payload", message->payload ); 
 						pthread_mutex_unlock (&(message->payload_mutex));
 						pthread_mutex_unlock (&(message->json_mutex));
 					}
