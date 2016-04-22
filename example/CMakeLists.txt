@@ -14,6 +14,20 @@ set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_FUNCTOR_POW_ENABLED=0")
 add_definitions(${ISAAC_DEFINITIONS})
 include_directories(example_cuda ${ISAAC_INCLUDE_DIRS})
 
+SET(ISAAC_STEREO "No" CACHE STRING "Using stereoscopy")
+SET_PROPERTY(CACHE ISAAC_STEREO PROPERTY STRINGS No SideBySide Anaglyph)
+
+if(${ISAAC_STEREO} STREQUAL "No")
+	add_definitions(-DISAAC_STEREO=0)
+endif()
+if(${ISAAC_STEREO} STREQUAL "SideBySide")
+	add_definitions(-DISAAC_STEREO=1)
+endif()
+if(${ISAAC_STEREO} STREQUAL "Anaglyph")
+	add_definitions(-DISAAC_STEREO=2)
+endif()
+
+
 if (ISAAC_ALPAKA)
 	ALPAKA_ADD_EXECUTABLE(example_alpaka ${CMAKE_SOURCE_DIR}/example.cu)
 	target_link_libraries(example_alpaka ${ISAAC_LIBRARIES})

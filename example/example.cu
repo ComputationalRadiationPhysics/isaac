@@ -296,13 +296,18 @@ int main(int argc, char **argv)
 		1024, //Size of the transfer functions
 		std::vector<float>, //user defined type of scaling
 		
-		isaac::DefaultController,
-		//isaac::StereoController,
-		
-		isaac::DefaultCompositor
-		//isaac::StereoCompositorSideBySide<isaac::StereoController>
-		//isaac::StereoCompositorAnaglyph<isaac::StereoController,0x000000FF,0x00FFFF00>
-	> (
+		#if (ISAAC_STEREO == 0)
+			isaac::DefaultController,
+			isaac::DefaultCompositor
+		#else
+			isaac::StereoController,
+			#if (ISAAC_STEREO == 1)
+				isaac::StereoCompositorSideBySide<isaac::StereoController>
+			#else
+				isaac::StereoCompositorAnaglyph<isaac::StereoController,0x000000FF,0x00FFFF00>
+			#endif
+		#endif
+		> (
 		#if ISAAC_ALPAKA == 1
 			devHost, //Alpaka specific host dev instance
 			devAcc, //Alpaka specific accelerator dev instance

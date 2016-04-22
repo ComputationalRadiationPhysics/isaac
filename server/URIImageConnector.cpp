@@ -68,7 +68,7 @@ errorCode URIImageConnector::run()
 				while (it != streams.end())
 				{
 					auto next_it = std::next(it);
-					if (it->first == message->reference && it->second == message->group)
+					if ((!message->reference || it->first == message->reference) && it->second == message->group)
 					{
 						streams.erase(it);
 						printf("URIImageConnector: Closed Stream\n");
