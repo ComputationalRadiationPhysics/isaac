@@ -43,7 +43,8 @@ class IsaacCommunicator
 			server_id(0),
 			url(url),
 			port(port),
-			sockfd(0)
+			sockfd(0),
+			jpeg_quality(90)
 		{
 			pthread_mutex_init (&deleteMessageMutex, NULL);
 		}
@@ -135,6 +136,12 @@ class IsaacCommunicator
 			{
 			}
 		#endif
+		void setJpegQuality(isaac_uint jpeg_quality)
+		{
+			if (jpeg_quality > 100)
+				jpeg_quality = 100;
+			this->jpeg_quality = jpeg_quality;
+		}
 		void serverSendFrame(void* ptr,const isaac_uint width,const isaac_uint height,const isaac_uint depth)
 		{
 			//First the size
@@ -158,7 +165,7 @@ class IsaacCommunicator
 				cinfo.input_components = depth;
 				cinfo.in_color_space = JCS_EXT_RGBX;
 				jpeg_set_defaults(&cinfo);
-				jpeg_set_quality(&cinfo, 90, false);
+				jpeg_set_quality(&cinfo, jpeg_quality, false);
 				jpeg_start_compress(&cinfo, TRUE);
 				while (cinfo.next_scanline < cinfo.image_height)
 				{
@@ -256,6 +263,7 @@ class IsaacCommunicator
 		std::string url;
 		isaac_uint port;
 		isaac_int sockfd;
+		isaac_uint jpeg_quality;
 		std::list<json_t*> messageList;
 		pthread_mutex_t deleteMessageMutex;
 		pthread_t readThread;

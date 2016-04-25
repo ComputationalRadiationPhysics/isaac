@@ -607,6 +607,11 @@ class IsaacVisualization
                     json_object_set_new( json_root, "depth", json_integer ( global_size_scaled[2] ) );
             }
         }
+        void setJpegQuality(isaac_uint jpeg_quality)
+        {
+            if (communicator)
+                communicator->setJpegQuality(jpeg_quality);
+        }
         bool editClipping(isaac_uint nr,isaac_float px,isaac_float py,isaac_float pz,isaac_float nx,isaac_float ny,isaac_float nz)
         {
             if (nr >= ISAAC_MAX_CLIPPING)
