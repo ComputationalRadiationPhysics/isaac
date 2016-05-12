@@ -18,8 +18,8 @@ cmake_minimum_required (VERSION 3.1.0)
 cmake_policy(SET CMP0048 OLD)
 project (ISAAC)
 
-set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}/insitu")
-set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}/insitu/isaac")
+set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}")
+set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}/isaac")
 
 set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-std=c++11")
 set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-march=native")
@@ -89,7 +89,7 @@ set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${MPI_CXX_LIBRARIES})
 ################################################################################
 # IceT LIB
 ################################################################################
-find_package (IceT MODULE REQUIRED)
+find_package (IceT CONFIG REQUIRED)
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${ICET_CORE_LIBS})
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${ICET_MPI_LIBS})
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${ICET_INCLUDE_DIRS})
