@@ -290,7 +290,7 @@ void spSetPerspectiveStereoscopic( IceTDouble * const projection, const isaac_fl
 	isaac_float ymin = -1.0f/aspectRatio * znear * tan( fovyInDegrees * M_PI / isaac_float(360) );
 	isaac_float ymax =  1.0f/aspectRatio * znear * tan( fovyInDegrees * M_PI / isaac_float(360) );
 	setFrustum(projection, xmin, xmax, ymin, ymax, znear, zfar );
-	projection[12] = distance;
+	//projection[12] = distance;
 }
 
 
