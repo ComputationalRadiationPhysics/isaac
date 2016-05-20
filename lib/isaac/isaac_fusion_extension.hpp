@@ -23,7 +23,6 @@
 namespace isaac
 {
 
-
 template<int N,int I>
 struct isaac_for_each_unrolled_params
 {

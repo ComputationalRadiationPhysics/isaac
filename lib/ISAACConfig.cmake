@@ -112,7 +112,7 @@ set(ISAAC_PRIVATE_FOUND true)
 # CUDA LIB
 ################################################################################
 if (ISAAC_CUDA)
-    find_package( CUDA )
+    find_package( CUDA 7.0 )
     if (!CUDA_FOUND)
         set(ISAAC_PRIVATE_FOUND false)
     else()

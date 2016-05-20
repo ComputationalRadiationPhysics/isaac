@@ -90,5 +90,9 @@ set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIRS})
 find_package (Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
-include_directories(isaac ${INCLUDE})	
+find_package(Boost MODULE REQUIRED)
+set(INCLUDE ${INCLUDE} ${Boost_INCLUDE_DIR})
+add_definitions(-DBOOST_ALL_NO_LIB)
+
+include_directories(isaac ${INCLUDE})
 target_link_libraries(isaac ${LIBS})
