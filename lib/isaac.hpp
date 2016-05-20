@@ -73,7 +73,7 @@ template <
     typename TController,
     typename TCompositor
 >
-class IsaacVisualization 
+class IsaacVisualization
 {
     public:
         #if ISAAC_ALPAKA == 1
@@ -92,7 +92,7 @@ class IsaacVisualization
             {
                 json_t *content = json_object();
                 json_array_append_new( jsonRoot, content );
-                json_object_set_new( content, "name", json_string ( s.name.c_str() ) );
+                json_object_set_new( content, "name", json_string ( TSource::getName().c_str() ) );
                 json_object_set_new( content, "feature dimension", json_integer ( s.feature_dim ) );
             }
         };
@@ -108,8 +108,8 @@ class IsaacVisualization
             {
                 json_t *content = json_object();
                 json_array_append_new( jsonRoot, content );
-                json_object_set_new( content, "name", json_string ( TFunctor::name.c_str() ) );
-                json_object_set_new( content, "description", json_string ( TFunctor::description.c_str() ) );
+                json_object_set_new( content, "name", json_string ( TFunctor::getName().c_str() ) );
+                json_object_set_new( content, "description", json_string ( TFunctor::getDescription().c_str() ) );
                 json_object_set_new( content, "uses parameter", json_boolean ( TFunctor::uses_parameter ) );
             }
         };
@@ -125,7 +125,7 @@ class IsaacVisualization
             >
             ISAAC_HOST_INLINE  void operator()( const int I,TFunctor& f,const TName& name, TValue& value, TFound& found) const
             {
-                if (!found && name == TFunctor::name)
+                if (!found && name == TFunctor::getName())
                 {
                     value = I;
                     found = true;
@@ -154,10 +154,10 @@ class IsaacVisualization
                     chain_nr *= ISAAC_FUNCTOR_COUNT;
                     chain_nr += functions[I].bytecode[i];
                 }
-                dest.nr[I] = chain_nr * 4 + TSource::feature_dim - 1;                
+                dest.nr[I] = chain_nr * 4 + TSource::feature_dim - 1;
             }
         };
-        
+
         struct allocate_pointer_array_iterator
         {
             template
@@ -196,14 +196,14 @@ class IsaacVisualization
                                 )
                             )
                         );
-                        pointer_array.pointer[I] = alpaka::mem::view::getPtrNative( alpaka_vector.back() );                        
+                        pointer_array.pointer[I] = alpaka::mem::view::getPtrNative( alpaka_vector.back() );
                     #else
                         ISAAC_CUDA_CHECK(cudaMalloc((void**)&(pointer_array.pointer[I]), sizeof(isaac_float_dim< TSource::feature_dim >) * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE) ) );
                     #endif
                 }
             }
         };
-        
+
         struct update_pointer_array_iterator
         {
             template
@@ -250,8 +250,8 @@ class IsaacVisualization
                             grid_size.x = size_t(local_size[0] + ISAAC_GUARD_SIZE * 2);
                             grid_size.y = size_t(local_size[0] + ISAAC_GUARD_SIZE * 2);
                             block_size.x = size_t(1);
-                            block_size.y = size_t(1);                    
-                        }                
+                            block_size.y = size_t(1);
+                        }
                         const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
                         const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
                         const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
@@ -268,7 +268,7 @@ class IsaacVisualization
                                 local_size_array
                             )
                         );
-                        alpaka::stream::enqueue(stream, instance);                
+                        alpaka::stream::enqueue(stream, instance);
                         alpaka::wait::wait(stream);
                     #else
                         dim3 block (block_size.x, block_size.y);
@@ -279,7 +279,7 @@ class IsaacVisualization
                 }
             }
         };
-        
+
         struct calc_minmax_iterator
         {
             template
@@ -329,8 +329,8 @@ class IsaacVisualization
                         grid_size.x = size_t(local_size[0]);
                         grid_size.y = size_t(local_size[0]);
                         block_size.x = size_t(1);
-                        block_size.y = size_t(1);                    
-                    }                
+                        block_size.y = size_t(1);
+                    }
                     const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
                     const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
                     const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
@@ -351,7 +351,7 @@ class IsaacVisualization
                             pointer_array.pointer[ I ]
                         )
                     );
-                    alpaka::stream::enqueue(stream, instance);                
+                    alpaka::stream::enqueue(stream, instance);
                     alpaka::wait::wait(stream);
                     alpaka::mem::buf::BufPlainPtrWrapper<THost, minmax_struct, TFraDim, size_t> minmax_buffer(local_minmax_array_h, host, size_t(local_size_array.x * local_size_array.y));
                     alpaka::mem::view::copy( stream, minmax_buffer, local_minmax, size_t(local_size_array.x * local_size_array.y));
@@ -372,7 +372,7 @@ class IsaacVisualization
                 }
             }
         };
-        
+
         IsaacVisualization(
             #if ISAAC_ALPAKA == 1
                 THost host,
@@ -442,12 +442,12 @@ class IsaacVisualization
                  local_size_scaled.push_back( isaac_int( (isaac_float) local_size[i] * (isaac_float)scale[i] ) );
                    position_scaled.push_back( isaac_int( (isaac_float)   position[i] * (isaac_float)scale[i] ) );
             }
-            
+
             background_color[0] = 0;
             background_color[1] = 0;
             background_color[2] = 0;
             background_color[3] = 1;
-            
+
             //INIT
             MPI_Comm_dup(MPI_COMM_WORLD, &mpi_world);
             MPI_Comm_rank(mpi_world, &rank);
@@ -485,7 +485,7 @@ class IsaacVisualization
                         alpaka::mem::view::getPtrNative(functor_chain_d)
                     )
                 );
-                alpaka::stream::enqueue(stream, instance);                
+                alpaka::stream::enqueue(stream, instance);
                 alpaka::wait::wait(stream);
             #else
                 dim3 grid(1);
@@ -497,7 +497,7 @@ class IsaacVisualization
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
                 functions[i].source = std::string("idem");
             updateFunctions();
-            
+
             //non persistent buffer memory
             isaac_for_each_params(sources,allocate_pointer_array_iterator(),pointer_array,local_size
             #if ISAAC_ALPAKA == 1
@@ -505,7 +505,7 @@ class IsaacVisualization
                 ,acc
             #endif
             );
-            
+
             //Transfer func memory:
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
@@ -573,7 +573,7 @@ class IsaacVisualization
                 json_object_set_new( json_root, "nodes", json_integer( numProc ) );
                 json_object_set_new( json_root, "framebuffer width", json_integer ( compbuffer_size.x ) );
                 json_object_set_new( json_root, "framebuffer height", json_integer ( compbuffer_size.y ) );
-                
+
                 json_object_set_new( json_root, "max functors", json_integer( ISAAC_MAX_FUNCTORS ) );
                 json_t *json_functors_array = json_array();
                 json_object_set_new( json_root, "functors", json_functors_array );
@@ -598,7 +598,7 @@ class IsaacVisualization
                 json_object_set_new( json_root, "interpolation", json_boolean( interpolation ) );
                 json_object_set_new( json_root, "iso surface", json_boolean( iso_surface ) );
                 json_object_set_new( json_root, "step", json_real( step ) );
-                
+
                 json_object_set_new( json_root, "dimension", json_integer ( TSimDim::value ) );
                 json_object_set_new( json_root, "width", json_integer ( global_size_scaled[0] ) );
                 if (TSimDim::value > 1)
@@ -757,7 +757,7 @@ class IsaacVisualization
                         functions[i].error_code = -2;
                         break;
                     }
-                    
+
                     elem++;
                 }
                 for (;elem < ISAAC_MAX_FUNCTORS; elem++)
@@ -793,8 +793,8 @@ class IsaacVisualization
                         dest
                     )
                 );
-                alpaka::stream::enqueue(stream, instance);                
-                alpaka::wait::wait(stream);                
+                alpaka::stream::enqueue(stream, instance);
+                alpaka::wait::wait(stream);
             #else
                 ISAAC_CUDA_CHECK(cudaMemcpyToSymbol( isaac_parameter_d, isaac_parameter_h, sizeof( isaac_parameter_h )));
                 dim3 grid(1);
@@ -1083,7 +1083,7 @@ class IsaacVisualization
                 if ( strcmp( target, "minmax" ) == 0 )
                     send_minmax = true;
             }
-            
+
             //Scene set?
             if (json_array_size( js = json_object_get(message, "projection") ) == 16 * TController::pass_count)
             {
@@ -1169,7 +1169,7 @@ class IsaacVisualization
                 {
                     icetSetContext( icetContext[pass] );
                     if (background_color[0] == 0.0f &&
-                        background_color[1] == 0.0f && 
+                        background_color[1] == 0.0f &&
                         background_color[2] == 0.0f )
                         icetDisable(ICET_CORRECT_COLORED_BACKGROUND);
                     else
@@ -1197,7 +1197,7 @@ class IsaacVisualization
                 redraw = true;
                 send_clipping = true;
                 removeClipping( json_integer_value( js ) );
-            }            
+            }
             if (js = json_object_get(message, "clipping edit") )
             {
                 redraw = true;
@@ -1221,7 +1221,7 @@ class IsaacVisualization
                 json_incref(metadata);
             json_decref(message);
             thr_metaTargets = metaTargets;
-            
+
             if (send_minmax)
             {
                 isaac_for_each_params( sources, calc_minmax_iterator(), pointer_array, minmax_array, local_minmax_array_d, local_size
@@ -1243,11 +1243,11 @@ class IsaacVisualization
                     MPI_Reduce( minmax_array.max, NULL, boost::mpl::size< TSourceList >::type::value, MPI_FLOAT, MPI_MAX, master, mpi_world);
                 }
             }
-            
+
             IceTImage image[TController::pass_count];
             for (int pass = 0; pass < TController::pass_count; pass++)
                 image[pass].opaque_internals = NULL;
-            
+
             if (redraw)
             {
                 for (int pass = 0; pass < TController::pass_count; pass++)
@@ -1317,7 +1317,7 @@ class IsaacVisualization
                 else
                     MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, master, mpi_world);
             }
-            
+
             #ifdef ISAAC_THREADING
                 pthread_create(&visualizationThread,NULL,visualizationFunction,image);
             #else
@@ -1354,7 +1354,7 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaFree( local_minmax_array_d ) );
             #endif
             delete communicator;
-        }    
+        }
         uint64_t getTicksUs()
         {
             struct timespec ts;
@@ -1368,7 +1368,7 @@ class IsaacVisualization
         uint64_t copy_time;
         uint64_t sorting_time;
         uint64_t buffer_time;
-    private:        
+    private:
         static void drawCallBack(
             const IceTDouble * projection_matrix,
             const IceTDouble * modelview_matrix,
@@ -1417,14 +1417,14 @@ class IsaacVisualization
             if (TSimDim::value > 2)
                 size_h[0].local_size_scaled.value.z = myself->local_size_scaled[2];
             size_h[0].max_global_size_scaled = static_cast<float>(max(max(uint32_t(myself->global_size_scaled[0]),uint32_t(myself->global_size_scaled[1])),uint32_t(myself->global_size_scaled[2])));
-            
+
             isaac_float3 isaac_scale =
             {
                 myself->scale[0],
                 myself->scale[1],
                 myself->scale[2]
             };
-            
+
             #if ISAAC_ALPAKA == 1
                 alpaka::mem::view::copy(myself->stream, myself->inverse_d, inverse_h_buf, size_t(16));
                 alpaka::mem::view::copy(myself->stream, myself->size_d, size_h_buf, size_t(1));
@@ -1463,8 +1463,8 @@ class IsaacVisualization
                     TStream,
                     alpaka::mem::buf::Buf<TDevAcc, float, TFraDim, size_t>,
                     alpaka::mem::buf::Buf<TDevAcc, isaac_size_struct< TSimDim::value >, TFraDim, size_t>,
-                    alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TFraDim, size_t>,                    
-                    alpaka::mem::buf::Buf<TDevAcc, isaac_functor_chain_pointer_N, TFraDim, size_t>,                    
+                    alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TFraDim, size_t>,
+                    alpaka::mem::buf::Buf<TDevAcc, isaac_functor_chain_pointer_N, TFraDim, size_t>,
                     boost::mpl::size< TSourceList >::type::value
                 >
                 ::call(
@@ -1659,7 +1659,7 @@ class IsaacVisualization
 
             json_decref( myself->json_root );
             myself->recreateJSON();
-            
+
             //Sending video
             ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
             if (myself->communicator)
@@ -1689,7 +1689,7 @@ class IsaacVisualization
             look_at_m[12] = look_at[0];
             look_at_m[13] = look_at[1];
             look_at_m[14] = look_at[2];
-            
+
             IceTDouble rotation_m[16];
             for (isaac_int x = 0; x < 4; x++)
                 for (isaac_int y = 0; y < 4; y++)
@@ -1706,9 +1706,9 @@ class IsaacVisualization
             IceTDouble distance_m[16];
             ISAAC_SET_IDENTITY(4,distance_m)
             distance_m[14] = distance;
-            
+
             IceTDouble temp[16];
-            
+
             mulMatrixMatrix( temp, rotation_m, look_at_m );
             mulMatrixMatrix( modelview, distance_m, temp );
         }

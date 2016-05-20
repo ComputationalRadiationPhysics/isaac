@@ -66,9 +66,17 @@ struct IsaacFunctorIdem
     {
         return v;
     }
+    ISAAC_HOST_INLINE
+    static std::string getName()
+    {
+        return std::string("idem");
+    }
+    ISAAC_HOST_INLINE
+    static std::string getDescription()
+    {
+        return std::string("Does nothing. Keeps the feature dimension.");
+    }
 };
-const std::string IsaacFunctorIdem::name = "idem";
-const std::string IsaacFunctorIdem::description = "Does nothing. Keeps the feature dimension.";
 
 #if ISAAC_FUNCTOR_LENGTH_ENABLED == 1
 struct IsaacFunctorLength
@@ -121,9 +129,17 @@ struct IsaacFunctorLength
         isaac_float_dim<1> result = { fabs( v.value.x ) };
         return result;
     }
+    ISAAC_HOST_INLINE
+    static std::string getName()
+    {
+        return std::string("length");
+    }
+    ISAAC_HOST_INLINE
+    static std::string getDescription()
+    {
+        return std::string("Calculates the length of an input. Reduces the feature dimension to 1.");
+    }
 };
-const std::string IsaacFunctorLength::name = "length";
-const std::string IsaacFunctorLength::description = "Calculates the length of an input. Reduces the feature dimension to 1.";
 #endif
 
 #if ISAAC_FUNCTOR_MUL_ENABLED == 1
@@ -165,9 +181,17 @@ struct IsaacFunctorMul
         isaac_float_dim<1> result = { v.value.x * p.x };
         return result;
     }
+    ISAAC_HOST_INLINE
+    static std::string getName()
+    {
+        return std::string("mul");
+    }
+    ISAAC_HOST_INLINE
+    static std::string getDescription()
+    {
+        return std::string("Multiplies the input with a constant parameter. Keeps the feature dimension.");
+    }
 };
-const std::string IsaacFunctorMul::name = "mul";
-const std::string IsaacFunctorMul::description = "Multiplies the input with a constant parameter. Keeps the feature dimension.";
 #endif
 
 #if ISAAC_FUNCTOR_ADD_ENABLED == 1
@@ -209,9 +233,17 @@ struct IsaacFunctorAdd
         isaac_float_dim<1> result = { v.value.x + p.x };
         return result;
     }
+    ISAAC_HOST_INLINE
+    static std::string getName()
+    {
+        return std::string("add");
+    }
+    ISAAC_HOST_INLINE
+    static std::string getDescription()
+    {
+        return std::string("Summarizes the input with a constant parameter. Keeps the feature dimension.");
+    }
 };
-const std::string IsaacFunctorAdd::name = "add";
-const std::string IsaacFunctorAdd::description = "Summarizes the input with a constant parameter. Keeps the feature dimension.";
 #endif
 
 #if ISAAC_FUNCTOR_POW_ENABLED == 1
@@ -259,9 +291,17 @@ struct IsaacFunctorPow
         isaac_float_dim<1> result = { pow( v.value.x, p.x ) };
         return result;
     }
+    ISAAC_HOST_INLINE
+    static std::string getName()
+    {
+        return std::string("pow");
+    }
+    ISAAC_HOST_INLINE
+    static std::string getDescription()
+    {
+        return std::string("Calculates the power of the input with a constant exponent. Keeps the feature dimension.");
+    }
 };
-const std::string IsaacFunctorPow::name = "pow";
-const std::string IsaacFunctorPow::description = "Calculates the power of the input with a constant exponent. Keeps the feature dimension.";
 #endif
 
 #if ISAAC_FUNCTOR_SUM_ENABLED == 1
@@ -309,9 +349,17 @@ struct IsaacFunctorSum
         isaac_float_dim<1> result = { v.value.x };
         return result;
     }
+    ISAAC_HOST_INLINE
+    static std::string getName()
+    {
+        return std::string("sum");
+    }
+    ISAAC_HOST_INLINE
+    static std::string getDescription()
+    {
+        return std::string("Calculates the sum of all components. Reduces the feature dimension to 1.");
+    }
 };
-const std::string IsaacFunctorSum::name = "sum";
-const std::string IsaacFunctorSum::description = "Calculates the sum of all components. Reduces the feature dimension to 1.";
 #endif
 
 typedef fus::list <

@@ -33,11 +33,10 @@ template < typename TDevAcc, typename THost, typename TStream >
 class TestSource1
 {
 	public:
-		static const std::string name;
 		static const size_t feature_dim = 3;
 		static const bool has_guard = false;
 		static const bool persistent = true;
-	
+
 		ISAAC_NO_HOST_DEVICE_WARNING
         TestSource1 (
             #if ISAAC_ALPAKA == 1
@@ -49,11 +48,16 @@ class TestSource1
         ) :
 		ptr(ptr)
 		{}
-		
+
+		ISAAC_HOST_INLINE static std::string getName()
+		{
+			return std::string("Test Source 1");
+		}
+
 		ISAAC_HOST_INLINE void update(bool enabled, void* pointer) {}
-		
+
 		isaac_float3* ptr;
-		
+
 		ISAAC_NO_HOST_DEVICE_WARNING
 		ISAAC_HOST_DEVICE_INLINE isaac_float_dim< feature_dim > operator[] (const isaac_int3& nIndex) const
 		{
@@ -78,7 +82,6 @@ template < typename TDevAcc, typename THost, typename TStream >
 class TestSource2
 {
 	public:
-		static const std::string name;
 		static const size_t feature_dim = 1;
 		static const bool has_guard = false;
 		static const bool persistent = false;
@@ -93,13 +96,18 @@ class TestSource2
             isaac_float* ptr
         ) :
 		ptr(ptr)
-		{ }
+		{}
+
+		ISAAC_HOST_INLINE static std::string getName()
+		{
+			return std::string("Test Source 1");
+		}
 
 		ISAAC_HOST_INLINE void update(bool enabled, void* pointer) {}
-		
+
 		isaac_float* ptr;
-		
-		ISAAC_NO_HOST_DEVICE_WARNING		
+
+		ISAAC_NO_HOST_DEVICE_WARNING
 		ISAAC_HOST_DEVICE_INLINE isaac_float_dim< feature_dim > operator[] (const isaac_int3& nIndex) const
 		{
 			isaac_float value = ptr[
@@ -113,18 +121,6 @@ class TestSource2
 		}
 };
 
-/////////////////////////////////////////////////////
-// External const definitions for the test sources //
-/////////////////////////////////////////////////////
-#if ISAAC_ALPAKA == 1
-	template < typename TDevAcc, typename THost, typename TStream >
-	const std::string TestSource1< TDevAcc, THost, TStream >::name = "Test Source 1";
-	template < typename TDevAcc, typename THost, typename TStream >
-	const std::string TestSource2< TDevAcc, THost, TStream >::name = "Test Source 2";
-#else //CUDA
-	const std::string TestSource1::name = "Test Source 1";
-	const std::string TestSource2::name = "Test Source 2";
-#endif
 
 //////////////////
 // Main program //
@@ -152,7 +148,7 @@ int main(int argc, char **argv)
 	size_t d[3] = {1,1,1};
 	recursive_kgv(d,numProc,2);
 	size_t p[3] = { rank % d[0], (rank / d[0]) % d[1],  (rank / d[0] / d[1]) % d[2] };
-	
+
 	//Let's generate some unique name for the simulation and broadcast it
 	int id;
 	if (rank == 0)
@@ -164,14 +160,14 @@ int main(int argc, char **argv)
 	char name[32];
 	sprintf(name,"Example_%i",id);
 	printf("Using name %s\n",name);
-	
+
 	//This defines the size of the generated rendering
 	isaac_size2 framebuffer_size =
 	{
 		size_t(800),
 		size_t(600)
 	};
-	
+
 	#if ISAAC_ALPAKA == 1
 		////////////////////////////////////
 		// Alpaka specific initialization //
@@ -185,10 +181,10 @@ int main(int argc, char **argv)
 		using Stream  = alpaka::stream::StreamCpuSync;
 		//using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
 		//using Stream  = alpaka::stream::StreamCpuSync;
-				
+
 		using DevAcc = alpaka::dev::Dev<Acc>;
 		using DevHost = alpaka::dev::DevCpu;
-		
+
 		DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(rank % alpaka::dev::DevMan<Acc>::getDevCount()));
 		DevHost devHost (alpaka::dev::cpu::getDev());
 		Stream  stream  (devAcc);
@@ -268,14 +264,14 @@ int main(int argc, char **argv)
 			TestSource2
 		>;
 	#endif
-	
+
 	SourceList sources( testSource1, testSource2 );
 
 	std::vector<float> scaling;
 		scaling.push_back(1);
 		scaling.push_back(1);
 		scaling.push_back(1);
-	
+
 	///////////////////////////////////////
 	// Create isaac visualization object //
 	///////////////////////////////////////
@@ -295,7 +291,7 @@ int main(int argc, char **argv)
 		#endif
 		1024, //Size of the transfer functions
 		std::vector<float>, //user defined type of scaling
-		
+
 		#if (ISAAC_STEREO == 0)
 			isaac::DefaultController,
 			isaac::DefaultCompositor
@@ -324,7 +320,7 @@ int main(int argc, char **argv)
 		sources, //instances of the sources to render
 		scaling
 	);
-	
+
 	//Setting up the metadata description (only master, but however slaves could then add metadata, too, it would be merged)
 	if (rank == 0)
 	{
@@ -345,8 +341,8 @@ int main(int argc, char **argv)
 		fprintf(stderr,"Isaac init failed.\n");
 		return -1;
 	}
-	
-	
+
+
 	////////////////////////////////////////////////
 	// Program flow and time mesaurment variables //
 	////////////////////////////////////////////////
@@ -388,7 +384,7 @@ int main(int argc, char **argv)
 			int start_simulation = visualization->getTicksUs();
 			#if ISAAC_NO_SIMULATION == 0
 				update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
-			#endif	
+			#endif
 			simulation_time +=visualization->getTicksUs() - start_simulation;
 		}
 		step++;
@@ -495,7 +491,7 @@ int main(int argc, char **argv)
 				}
 			}
 		}
-	}	
+	}
 	MPI_Barrier(MPI_COMM_WORLD);
 	printf("%i finished\n",rank);
 
@@ -503,15 +499,15 @@ int main(int argc, char **argv)
 	// Winter wrap up //
 	////////////////////
 	delete( visualization );
-	
+
 	#if ISAAC_ALPAKA == 0
 		free(hostBuffer1);
 		free(hostBuffer2);
 		cudaFree(deviceBuffer1);
 		cudaFree(deviceBuffer2);
 	#endif
-	
-	MPI_Finalize();	
+
+	MPI_Finalize();
 	return 0;
 }
 
