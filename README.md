@@ -29,7 +29,7 @@ simulation, e.g. to restart it with improved settings.
 Installing requirements, building and using in own application
 --------------------------------------------------------------
 
-Please see in [INSTALL.md](../blob/master/INSTALL.md)
+Please see in [INSTALL.md](./INSTALL.md)
 
 Known issues
 ------------
