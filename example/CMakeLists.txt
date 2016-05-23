@@ -35,6 +35,7 @@ endif()
 
 if (ISAAC_CUDA)
 	REMOVE_DEFINITIONS(REMOVE_ITEM "-DISAAC_ALPAKA")
+	set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" -std=c++11)
 	CUDA_ADD_EXECUTABLE(example_cuda ${CMAKE_SOURCE_DIR}/example.cu)
 	target_link_libraries(example_cuda ${ISAAC_LIBRARIES})
 endif()
