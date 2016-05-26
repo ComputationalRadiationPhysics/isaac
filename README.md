@@ -29,7 +29,10 @@ simulation, e.g. to restart it with improved settings.
 Installing requirements, building and using in own application
 --------------------------------------------------------------
 
-Please see in [INSTALL.md](./INSTALL.md)
+Please see in [INSTALL.md](./INSTALL.md) for installing, building and
+using ISAAC.
+If you need to install ISAAC on a server not accessible from the outside
+you need to [tunnel the connections](./TUNNEL.md) of the clients.
 
 Known issues
 ------------
