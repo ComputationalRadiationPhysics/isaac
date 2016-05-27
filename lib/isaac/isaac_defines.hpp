@@ -94,3 +94,9 @@
     if (all_true) \
         return; \
 }
+
+#if ISAAC_ALPAKA == 1
+    #define ISAAC_CONSTANT ALPAKA_STATIC_DEV_MEM_CONSTANT
+#else
+    #define ISAAC_CONSTANT __constant__
+#endif

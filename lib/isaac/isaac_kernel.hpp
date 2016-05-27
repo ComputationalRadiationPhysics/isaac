@@ -39,24 +39,16 @@ namespace isaac
 namespace fus = boost::fusion;
 namespace mpl = boost::mpl;
 
-#if ISAAC_ALPAKA == 1
-    #define ISAAC_FUNCTOR_PARAM ,isaac_float4 const * const
-#else
-    #define ISAAC_FUNCTOR_PARAM
-#endif
-typedef isaac_float (*isaac_functor_chain_pointer_4)(isaac_float_dim <4>, isaac_int ISAAC_FUNCTOR_PARAM );
-typedef isaac_float (*isaac_functor_chain_pointer_3)(isaac_float_dim <3>, isaac_int ISAAC_FUNCTOR_PARAM );
-typedef isaac_float (*isaac_functor_chain_pointer_2)(isaac_float_dim <2>, isaac_int ISAAC_FUNCTOR_PARAM );
-typedef isaac_float (*isaac_functor_chain_pointer_1)(isaac_float_dim <1>, isaac_int ISAAC_FUNCTOR_PARAM );
-typedef isaac_float (*isaac_functor_chain_pointer_N)(void*              , isaac_int ISAAC_FUNCTOR_PARAM );
-#undef ISAAC_FUNCTOR_PARAM
+typedef isaac_float (*isaac_functor_chain_pointer_4)(isaac_float_dim <4>, isaac_int );
+typedef isaac_float (*isaac_functor_chain_pointer_3)(isaac_float_dim <3>, isaac_int );
+typedef isaac_float (*isaac_functor_chain_pointer_2)(isaac_float_dim <2>, isaac_int );
+typedef isaac_float (*isaac_functor_chain_pointer_1)(isaac_float_dim <1>, isaac_int );
+typedef isaac_float (*isaac_functor_chain_pointer_N)(void*              , isaac_int );
 
-#if ISAAC_ALPAKA == 0
-    __constant__ isaac_float isaac_inverse_d[16];
-    __constant__ isaac_size_struct<3> isaac_size_d[1]; //[1] to access it for cuda and alpaka the same way
-    __constant__ isaac_float4 isaac_parameter_d[ ISAAC_MAX_SOURCES*ISAAC_MAX_FUNCTORS ];
-    __constant__ isaac_functor_chain_pointer_N isaac_function_chain_d[ ISAAC_MAX_SOURCES ];
-#endif
+ISAAC_CONSTANT isaac_float isaac_inverse_d[16];
+ISAAC_CONSTANT isaac_size_struct<3> isaac_size_d[1]; //[1] to access it for cuda and alpaka the same way
+ISAAC_CONSTANT isaac_float4 isaac_parameter_d[ ISAAC_MAX_SOURCES*ISAAC_MAX_FUNCTORS ];
+ISAAC_CONSTANT isaac_functor_chain_pointer_N isaac_function_chain_d[ ISAAC_MAX_SOURCES ];
 
 
 template
@@ -91,9 +83,6 @@ template
 ISAAC_DEVICE isaac_float applyFunctorChain (
     isaac_float_dim < TFeatureDim > const value,
     isaac_int const src_id
-#if ISAAC_ALPAKA == 1
-    ,isaac_float4 const * const isaac_parameter_d
-#endif
 )
 {
     #define  ISAAC_LEFT_DEF(Z,I,U) mpl::at_c< TFunctorVector, ISAAC_MAX_FUNCTORS - I - 1 >::type::call(
@@ -180,10 +169,6 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
     const TPointerArray& pointerArray,
     const TLocalSize& local_size,
     const TScale& scale
-#if ISAAC_ALPAKA == 1
-    ,isaac_float4 const * const isaac_parameter_d
-    ,isaac_functor_chain_pointer_N const * const isaac_function_chain_d
-#endif
 )
 {
     isaac_float_dim < TSource::feature_dim > data;
@@ -249,23 +234,16 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
     }
     isaac_float result = isaac_float(0);
 
-    #if ISAAC_ALPAKA == 1
-        #define ISAAC_PARAMETER_PARAM ,isaac_parameter_d
-    #else
-        #define ISAAC_PARAMETER_PARAM
-    #endif
-
     #if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
         if (TSource::feature_dim == 1)
-            result = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<1>* >(&data)), NR::value ISAAC_PARAMETER_PARAM );
+            result = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<1>* >(&data)), NR::value );
         if (TSource::feature_dim == 2)
-            result = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<2>* >(&data)), NR::value ISAAC_PARAMETER_PARAM );
+            result = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<2>* >(&data)), NR::value );
         if (TSource::feature_dim == 3)
-            result = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<3>* >(&data)), NR::value ISAAC_PARAMETER_PARAM );
+            result = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<3>* >(&data)), NR::value );
         if (TSource::feature_dim == 4)
-            result = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), NR::value ISAAC_PARAMETER_PARAM );
+            result = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), NR::value );
     #endif
-    #undef ISAAC_PARAMETER_PARAM
     return result;
 }
 
@@ -308,9 +286,6 @@ struct merge_source_iterator
         typename TStep,
         typename TStepLength,
         typename TScale
-#if ISAAC_ALPAKA == 1
-        ,typename TParameter
-#endif
     >
     ISAAC_HOST_DEVICE_INLINE  void operator()(
         const NR& nr,
@@ -325,21 +300,11 @@ struct merge_source_iterator
         const TStep& step,
         const TStepLength& stepLength,
         const TScale& scale
-#if ISAAC_ALPAKA == 1
-        ,const TParameter isaac_parameter_d
-        ,isaac_functor_chain_pointer_N const * const isaac_function_chain_d
-#endif
     ) const
     {
-        #if ISAAC_ALPAKA == 1
-            #define ISAAC_FUNCTION_CHAIN_PARAM ,isaac_parameter_d, isaac_function_chain_d
-        #else
-            #define ISAAC_FUNCTION_CHAIN_PARAM
-        #endif
-
         if ( mpl::at_c< TFilter, NR::value >::type::value )
         {
-            isaac_float result = get_value< TInterpolation, NR >( source, pos, pointerArray, local_size, scale ISAAC_FUNCTION_CHAIN_PARAM );
+            isaac_float result = get_value< TInterpolation, NR >( source, pos, pointerArray, local_size, scale );
             isaac_int lookup_value = isaac_int( round(result * isaac_float( Ttransfer_size ) ) );
             if (lookup_value < 0 )
                 lookup_value = 0;
@@ -394,12 +359,12 @@ struct merge_source_iterator
 
                     isaac_float3 gradient=
                     {
-                        (get_value< TInterpolation, NR >( source, right, pointerArray, local_size, scale ISAAC_FUNCTION_CHAIN_PARAM ) -
-                         get_value< TInterpolation, NR >( source,  left, pointerArray, local_size, scale ISAAC_FUNCTION_CHAIN_PARAM )) / d1,
-                        (get_value< TInterpolation, NR >( source,  down, pointerArray, local_size, scale ISAAC_FUNCTION_CHAIN_PARAM ) -
-                         get_value< TInterpolation, NR >( source,    up, pointerArray, local_size, scale ISAAC_FUNCTION_CHAIN_PARAM )) / d2,
-                        (get_value< TInterpolation, NR >( source,  back, pointerArray, local_size, scale ISAAC_FUNCTION_CHAIN_PARAM ) -
-                         get_value< TInterpolation, NR >( source, front, pointerArray, local_size, scale ISAAC_FUNCTION_CHAIN_PARAM )) / d3
+                        (get_value< TInterpolation, NR >( source, right, pointerArray, local_size, scale ) -
+                         get_value< TInterpolation, NR >( source,  left, pointerArray, local_size, scale )) / d1,
+                        (get_value< TInterpolation, NR >( source,  down, pointerArray, local_size, scale ) -
+                         get_value< TInterpolation, NR >( source,    up, pointerArray, local_size, scale )) / d2,
+                        (get_value< TInterpolation, NR >( source,  back, pointerArray, local_size, scale ) -
+                         get_value< TInterpolation, NR >( source, front, pointerArray, local_size, scale )) / d3
                     };
                     isaac_float l = sqrt(
                         gradient.x * gradient.x +
@@ -434,7 +399,6 @@ struct merge_source_iterator
             }
         }
     }
-    #undef ISAAC_FUNCTION_CHAIN_PARAM
 };
 
 template <
@@ -472,17 +436,13 @@ template <
     typename TScale
 >
 #if ISAAC_ALPAKA == 1
-    struct isaacFillRectKernel
+    struct isaacRenderKernel
     {
         template <typename TAcc__>
         ALPAKA_FN_ACC void operator()(
             TAcc__ const &acc,
-            isaac_float const * const isaac_inverse_d,
-            isaac_size_struct<TSimDim::value> const * const isaac_size_d,
-            isaac_float4 const * const isaac_parameter_d,
-            isaac_functor_chain_pointer_N const * const isaac_function_chain_d,
 #else
-        __global__ void isaacFillRectKernel(
+        __global__ void isaacRenderKernel(
 #endif
             uint32_t * const pixels,
             const isaac_size2 framebuffer_size,
@@ -505,8 +465,8 @@ template <
             auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
             ISAAC_ELEM_ITERATE(e)
             {
-                pixel[e].x = isaac_uint(threadIdx[1]) * isaac_uint(ISAAC_VECTOR_ELEM) + e;
-                pixel[e].y = isaac_uint(threadIdx[2]);
+                pixel[e].x = isaac_uint(threadIdx[2]) * isaac_uint(ISAAC_VECTOR_ELEM) + e;
+                pixel[e].y = isaac_uint(threadIdx[1]);
 #else
             ISAAC_ELEM_ITERATE(e)
             {
@@ -763,10 +723,6 @@ template <
                         step_vec[e],
                         step,
                         scale
-    #if ISAAC_ALPAKA == 1
-                        ,isaac_parameter_d
-                        ,isaac_function_chain_d
-    #endif
                     );
                     /*if ( mpl::size< TSourceList >::type::value > 1)
                         value = value / isaac_float( mpl::size< TSourceList >::type::value );*/
@@ -825,22 +781,15 @@ template <
     typename TAccDim,
     typename TAcc,
     typename TStream,
-    typename TInverse,
-    typename TSize,
-    typename TParameter,
     typename TFunctionChain,
 #endif
     int N
 >
-struct IsaacFillRectKernelStruct
+struct IsaacRenderKernelCaller
 {
     inline static void call(
 #if ISAAC_ALPAKA == 1
-        const TInverse inverse_d,
-        const TSize size_d,
-        const TParameter parameter_d,
         TStream stream,
-        const TFunctionChain function_chain_d,
 #endif
         TFramebuffer framebuffer,
         const isaac_size2& framebuffer_size,
@@ -859,7 +808,7 @@ struct IsaacFillRectKernelStruct
     )
     {
         if (sourceWeight.value[ mpl::size< TSourceList >::type::value - N] == isaac_float(0) )
-            IsaacFillRectKernelStruct
+            IsaacRenderKernelCaller
             <
                 TSimDim,
                 TSourceList,
@@ -874,20 +823,13 @@ struct IsaacFillRectKernelStruct
                 TAccDim,
                 TAcc,
                 TStream,
-                TInverse,
-                TSize,
-                TParameter,
                 TFunctionChain,
 #endif
                 N - 1
             >
             ::call(
 #if ISAAC_ALPAKA == 1
-                inverse_d,
-                size_d,
-                parameter_d,
                 stream,
-                function_chain_d,
 #endif
                 framebuffer,
                 framebuffer_size,
@@ -905,7 +847,7 @@ struct IsaacFillRectKernelStruct
                 clipping
             );
     else
-            IsaacFillRectKernelStruct
+            IsaacRenderKernelCaller
             <
                 TSimDim,
                 TSourceList,
@@ -920,20 +862,13 @@ struct IsaacFillRectKernelStruct
                 TAccDim,
                 TAcc,
                 TStream,
-                TInverse,
-                TSize,
-                TParameter,
                 TFunctionChain,
 #endif
                 N - 1
             >
             ::call(
 #if ISAAC_ALPAKA == 1
-                inverse_d,
-                size_d,
-                parameter_d,
                 stream,
-                function_chain_d,
 #endif
                 framebuffer,
                 framebuffer_size,
@@ -967,13 +902,10 @@ template <
     ,typename TAccDim
     ,typename TAcc
     ,typename TStream
-    ,typename TInverse
-    ,typename TSize
-    ,typename TParameter
     ,typename TFunctionChain
 #endif
 >
-struct IsaacFillRectKernelStruct
+struct IsaacRenderKernelCaller
 <
     TSimDim,
     TSourceList,
@@ -988,9 +920,6 @@ struct IsaacFillRectKernelStruct
     TAccDim,
     TAcc,
     TStream,
-    TInverse,
-    TSize,
-    TParameter,
     TFunctionChain,
 #endif
     0 //<-- spezialisation
@@ -998,11 +927,7 @@ struct IsaacFillRectKernelStruct
 {
     inline static void call(
 #if ISAAC_ALPAKA == 1
-        const TInverse inverse_d,
-        const TSize size_d,
-        const TParameter parameter_d,
         TStream stream,
-        const TFunctionChain function_chain_d,
 #endif
         TFramebuffer framebuffer,
         const isaac_size2& framebuffer_size,
@@ -1039,12 +964,12 @@ struct IsaacFillRectKernelStruct
                 block_size.y = size_t(1);
             }
             const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(ISAAC_VECTOR_ELEM));
-            const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
-            const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
+            const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.y, block_size.x);
+            const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.y, grid_size.x);
             auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
             #define ISAAC_KERNEL_START \
             { \
-                isaacFillRectKernel \
+                isaacRenderKernel \
                 < \
                     TSimDim, \
                     TSourceList, \
@@ -1063,10 +988,6 @@ struct IsaacFillRectKernelStruct
                     ( \
                         workdiv, \
                         kernel, \
-                        alpaka::mem::view::getPtrNative(inverse_d), \
-                        alpaka::mem::view::getPtrNative(size_d), \
-                        alpaka::mem::view::getPtrNative(parameter_d), \
-                        alpaka::mem::view::getPtrNative(function_chain_d), \
                         alpaka::mem::view::getPtrNative(framebuffer), \
                         framebuffer_size, \
                         framebuffer_start, \
@@ -1086,7 +1007,7 @@ struct IsaacFillRectKernelStruct
             dim3 block (block_size.x, block_size.y);
             dim3 grid  (grid_size.x, grid_size.y);
             #define ISAAC_KERNEL_START \
-                isaacFillRectKernel \
+                isaacRenderKernel \
                 < \
                     TSimDim, \
                     TSourceList, \
@@ -1265,8 +1186,6 @@ template
         template <typename TAcc__>
         ALPAKA_FN_ACC void operator()(
             TAcc__ const &acc,
-            isaac_functor_chain_pointer_N const * const isaac_function_chain_d,
-            isaac_float4 const * const isaac_parameter_d,
 #else
         __global__ void minMaxKernel(
 #endif
@@ -1310,22 +1229,16 @@ template
                     data = ptr[coord.x + ISAAC_GUARD_SIZE + (coord.y + ISAAC_GUARD_SIZE) * (local_size.x + 2 * ISAAC_GUARD_SIZE) + (coord.z + ISAAC_GUARD_SIZE) * ( (local_size.x + 2 * ISAAC_GUARD_SIZE) * (local_size.y + 2 * ISAAC_GUARD_SIZE) )];
                 };
                 isaac_float value = isaac_float(0);
-                #if ISAAC_ALPAKA == 1
-                    #define ISAAC_PARAMETER_PARAM ,isaac_parameter_d
-                #else
-                    #define ISAAC_PARAMETER_PARAM
-                #endif
                 #if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
                     if (TSource::feature_dim == 1)
-                        value = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chain_d[ nr ])( *(reinterpret_cast< isaac_float_dim<1>* >(&data)), nr ISAAC_PARAMETER_PARAM );
+                        value = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chain_d[ nr ])( *(reinterpret_cast< isaac_float_dim<1>* >(&data)), nr );
                     if (TSource::feature_dim == 2)
-                        value = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chain_d[ nr ])( *(reinterpret_cast< isaac_float_dim<2>* >(&data)), nr ISAAC_PARAMETER_PARAM );
+                        value = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chain_d[ nr ])( *(reinterpret_cast< isaac_float_dim<2>* >(&data)), nr );
                     if (TSource::feature_dim == 3)
-                        value = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chain_d[ nr ])( *(reinterpret_cast< isaac_float_dim<3>* >(&data)), nr ISAAC_PARAMETER_PARAM );
+                        value = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chain_d[ nr ])( *(reinterpret_cast< isaac_float_dim<3>* >(&data)), nr );
                     if (TSource::feature_dim == 4)
-                        value = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chain_d[ nr ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), nr ISAAC_PARAMETER_PARAM );
+                        value = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chain_d[ nr ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), nr );
                 #endif
-                #undef ISAAC_PARAMETER_PARAM
                 if (value > max)
                     max = value;
                 if (value < min)
