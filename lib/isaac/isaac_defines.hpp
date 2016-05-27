@@ -17,6 +17,10 @@
 
 #include <boost/preprocessor.hpp>
 
+#ifndef ISAAC_VECTOR_ELEM
+    #define ISAAC_VECTOR_ELEM 2
+#endif
+
 #ifndef ISAAC_MAX_DIFFERENCE
     #define ISAAC_MAX_DIFFERENCE 4
 #endif
@@ -78,3 +82,15 @@
 #else
     #define ISAAC_NO_HOST_DEVICE_WARNING
 #endif
+
+#define ISAAC_ELEM_ITERATE( NAME ) for (isaac_uint NAME = 0; NAME < isaac_uint(ISAAC_VECTOR_ELEM); NAME++)
+
+#define ISAAC_ELEM_ALL_TRUE_RETURN( NAME ) \
+{ \
+    bool all_true = true; \
+    for (isaac_uint e = 0; e < isaac_uint(ISAAC_VECTOR_ELEM); e++) \
+        if (NAME[e] == false) \
+            all_true = false; \
+    if (all_true) \
+        return; \
+}

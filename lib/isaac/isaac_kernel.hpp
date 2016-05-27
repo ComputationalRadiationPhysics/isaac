@@ -43,7 +43,7 @@ namespace mpl = boost::mpl;
     #define ISAAC_FUNCTOR_PARAM ,isaac_float4 const * const
 #else
     #define ISAAC_FUNCTOR_PARAM
-#endif            
+#endif
 typedef isaac_float (*isaac_functor_chain_pointer_4)(isaac_float_dim <4>, isaac_int ISAAC_FUNCTOR_PARAM );
 typedef isaac_float (*isaac_functor_chain_pointer_3)(isaac_float_dim <3>, isaac_int ISAAC_FUNCTOR_PARAM );
 typedef isaac_float (*isaac_functor_chain_pointer_2)(isaac_float_dim <2>, isaac_int ISAAC_FUNCTOR_PARAM );
@@ -93,7 +93,7 @@ ISAAC_DEVICE isaac_float applyFunctorChain (
     isaac_int const src_id
 #if ISAAC_ALPAKA == 1
     ,isaac_float4 const * const isaac_parameter_d
-#endif    
+#endif
 )
 {
     #define  ISAAC_LEFT_DEF(Z,I,U) mpl::at_c< TFunctorVector, ISAAC_MAX_FUNCTORS - I - 1 >::type::call(
@@ -253,7 +253,7 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
         #define ISAAC_PARAMETER_PARAM ,isaac_parameter_d
     #else
         #define ISAAC_PARAMETER_PARAM
-    #endif            
+    #endif
 
     #if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
         if (TSource::feature_dim == 1)
@@ -335,8 +335,8 @@ struct merge_source_iterator
             #define ISAAC_FUNCTION_CHAIN_PARAM ,isaac_parameter_d, isaac_function_chain_d
         #else
             #define ISAAC_FUNCTION_CHAIN_PARAM
-        #endif            
-        
+        #endif
+
         if ( mpl::at_c< TFilter, NR::value >::type::value )
         {
             isaac_float result = get_value< TInterpolation, NR >( source, pos, pointerArray, local_size, scale ISAAC_FUNCTION_CHAIN_PARAM );
@@ -363,7 +363,7 @@ struct merge_source_iterator
                         d1 = right.x - left.x;
                     else
                         d1 = isaac_int(right.x) - isaac_int(left.x);
-                    
+
                     isaac_float3    up = { 0,-1, 0};
                     up = up + pos;
                     if (!TSource::has_guard && TSource::persistent)
@@ -391,7 +391,7 @@ struct merge_source_iterator
                         d3 = back.z - front.z;
                     else
                         d3 = isaac_int(back.z) - isaac_int(front.z);
-                    
+
                     isaac_float3 gradient=
                     {
                         (get_value< TInterpolation, NR >( source, right, pointerArray, local_size, scale ISAAC_FUNCTION_CHAIN_PARAM ) -
@@ -494,262 +494,318 @@ template <
             const TSourceWeight sourceWeight,
             const TPointerArray pointerArray,
             const TScale scale,
-            clipping_struct clipping)
+            const clipping_struct input_clipping)
 #if ISAAC_ALPAKA == 1
         const
 #endif
         {
-            #if ISAAC_ALPAKA == 1
-                auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-                isaac_uint2 pixel =
-                {
-                    isaac_uint(threadIdx[1]),
-                    isaac_uint(threadIdx[2])
-                };
-            #else
-                isaac_uint2 pixel =
-                {
-                    isaac_uint(threadIdx.x + blockIdx.x * blockDim.x),
-                    isaac_uint(threadIdx.y + blockIdx.y * blockDim.y)
-                };
-            #endif
-            pixel = pixel + framebuffer_start;
-            if ( ISAAC_FOR_EACH_DIM_TWICE(2, pixel, >= framebuffer_size, || ) 0 )
-                return;
-
-            bool at_least_one = true;
-            isaac_for_each_with_mpl_params( sources, check_no_source_iterator<TFilter>(), at_least_one );
-            if (!at_least_one)
-            {
-                ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], background_color )
-                return;
-            }
-            
-            isaac_float2 pixel_f =
-            {
-                isaac_float( pixel.x )/(isaac_float)framebuffer_size.x*isaac_float(2)-isaac_float(1),
-                isaac_float( pixel.y )/(isaac_float)framebuffer_size.y*isaac_float(2)-isaac_float(1)
-            };
-            isaac_float4 start_p = {pixel_f.x*ISAAC_Z_NEAR,pixel_f.y*ISAAC_Z_NEAR,-1.0f*ISAAC_Z_NEAR,1.0f*ISAAC_Z_NEAR}; //znear
-            isaac_float4   end_p = {pixel_f.x* ISAAC_Z_FAR,pixel_f.y* ISAAC_Z_FAR, 1.0f* ISAAC_Z_FAR,1.0f* ISAAC_Z_FAR}; //zfar
-            isaac_float3 start =
-            {
-                isaac_inverse_d[ 0] * start_p.x + isaac_inverse_d[ 4] * start_p.y +  isaac_inverse_d[ 8] * start_p.z + isaac_inverse_d[12] * start_p.w,
-                isaac_inverse_d[ 1] * start_p.x + isaac_inverse_d[ 5] * start_p.y +  isaac_inverse_d[ 9] * start_p.z + isaac_inverse_d[13] * start_p.w,
-                isaac_inverse_d[ 2] * start_p.x + isaac_inverse_d[ 6] * start_p.y +  isaac_inverse_d[10] * start_p.z + isaac_inverse_d[14] * start_p.w
-            };
-            isaac_float3 end =
-            {
-                isaac_inverse_d[ 0] *   end_p.x + isaac_inverse_d[ 4] *   end_p.y +  isaac_inverse_d[ 8] *   end_p.z + isaac_inverse_d[12] *   end_p.w,
-                isaac_inverse_d[ 1] *   end_p.x + isaac_inverse_d[ 5] *   end_p.y +  isaac_inverse_d[ 9] *   end_p.z + isaac_inverse_d[13] *   end_p.w,
-                isaac_inverse_d[ 2] *   end_p.x + isaac_inverse_d[ 6] *   end_p.y +  isaac_inverse_d[10] *   end_p.z + isaac_inverse_d[14] *   end_p.w
-            };
-            isaac_float max_size = isaac_size_d[0].max_global_size_scaled / 2.0f;
-
-            //scale to globale grid size
-            start = start * max_size;
-              end =   end * max_size;
-            for (isaac_int i = 0; i < clipping.count; i++)
-                clipping.elem[i].position = clipping.elem[i].position * max_size;
-
-            //move to local (scaled) grid
-            isaac_int3 move =
-            {
-                isaac_int(isaac_size_d[0].global_size_scaled.value.x) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.x),
-                isaac_int(isaac_size_d[0].global_size_scaled.value.y) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.y),
-                isaac_int(isaac_size_d[0].global_size_scaled.value.z) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.z)
-            };
-            isaac_float3 move_f =
-            {
-                isaac_float(move.x),
-                isaac_float(move.y),
-                isaac_float(move.z)
-            };
-            start = start + move_f;
-              end =   end + move_f;
-            for (isaac_int i = 0; i < clipping.count; i++)
-                clipping.elem[i].position = clipping.elem[i].position + move_f;
-
-            isaac_float3 vec = end - start;
-            isaac_float l_scaled = sqrt( vec.x * vec.x + vec.y * vec.y + vec.z * vec.z );
-
-            start.x = start.x / scale.x;
-            start.y = start.y / scale.y;
-            start.z = start.z / scale.z;
-              end.x =   end.x / scale.x;
-              end.y =   end.y / scale.y;
-              end.z =   end.z / scale.z;
-            for (isaac_int i = 0; i < clipping.count; i++)
-            {
-                clipping.elem[i].position.x = clipping.elem[i].position.x / scale.x;
-                clipping.elem[i].position.y = clipping.elem[i].position.y / scale.y;
-                clipping.elem[i].position.z = clipping.elem[i].position.z / scale.z;
-            }
-
-            vec = end - start;
-            isaac_float l = sqrt( vec.x * vec.x + vec.y * vec.y + vec.z * vec.z );
-            
-            isaac_float3 step_vec = vec / l * step;
-            isaac_float3 count_start =  - start / step_vec;
-            isaac_float3 local_size_f =
-            {
-                isaac_float(isaac_size_d[0].local_size.value.x),
-                isaac_float(isaac_size_d[0].local_size.value.y),
-                isaac_float(isaac_size_d[0].local_size.value.z)
-            };
-            isaac_float3 count_end = ( local_size_f - start ) / step_vec;
-
-            //count_start shall have the smaller values
-            ISAAC_SWITCH_IF_SMALLER( count_end.x, count_start.x )
-            ISAAC_SWITCH_IF_SMALLER( count_end.y, count_start.y )
-            ISAAC_SWITCH_IF_SMALLER( count_end.z, count_start.z )
-            
-            //calc intersection of all three super planes and save in [count_start.x ; count_end.x]
-            count_start.x = max( max( count_start.x, count_start.y ), count_start.z );
-              count_end.x = min( min(   count_end.x,   count_end.y ),   count_end.z );
-            if ( count_start.x > count_end.x)
-            {
-                ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], background_color )
-                return;
-            }
-            
-            isaac_int first = isaac_int( floor(count_start.x) );
-            isaac_int last = isaac_int( ceil(count_end.x) );
-
-
-            //Moving last and first until their points are valid
-            isaac_float3 pos = start + step_vec * isaac_float(last);
-            isaac_int3 coord = { isaac_int(floor(pos.x)), isaac_int(floor(pos.y)), isaac_int(floor(pos.z)) };
-            while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord, >= isaac_size_d[0].local_size.value, || )
-                     ISAAC_FOR_EACH_DIM      (3, coord, < 0 || ) 0 ) && first <= last)
-            {
-                last--;
-                pos = start + step_vec * isaac_float(last);
-                coord = { isaac_int(floor(pos.x)), isaac_int(floor(pos.y)), isaac_int(floor(pos.z)) };
-            }
-            pos = start + step_vec * isaac_float(first);
-            coord = { isaac_int(floor(pos.x)), isaac_int(floor(pos.y)), isaac_int(floor(pos.z)) };
-            while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord, >= isaac_size_d[0].local_size.value, || )
-                     ISAAC_FOR_EACH_DIM      (3, coord, < 0 || ) 0 ) && first <= last)
-            {
-                first++;
-                pos = start + step_vec * isaac_float(first);
-                coord = { isaac_int(floor(pos.x)), isaac_int(floor(pos.y)), isaac_int(floor(pos.z)) };
-            }
-            
-            //Extra clipping
-            for (isaac_int i = 0; i < clipping.count; i++)
-            {
-                isaac_float d = step_vec.x * clipping.elem[i].normal.x
-                              + step_vec.y * clipping.elem[i].normal.y
-                              + step_vec.z * clipping.elem[i].normal.z;
-                isaac_float intersection_step = (
-                                              + clipping.elem[i].position.x * clipping.elem[i].normal.x
-                                              + clipping.elem[i].position.y * clipping.elem[i].normal.y
-                                              + clipping.elem[i].position.z * clipping.elem[i].normal.z
-                                              -                     start.x * clipping.elem[i].normal.x
-                                              -                     start.y * clipping.elem[i].normal.y
-                                              -                     start.z * clipping.elem[i].normal.z ) / d;
-                if (d > 0)
-                {
-                    if ( last < intersection_step )
-                    {
-                        ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], background_color )
-                        return;
-                    }
-                    if ( first < intersection_step )
-                        first = ceil( intersection_step );
-                }
-                else
-                {
-                    if ( first > intersection_step )
-                    {
-                        ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], background_color )
-                        return;
-                    }
-                    if ( last > intersection_step )
-                        last = floor( intersection_step );
-                }
-            }
-
-            //Starting the main loop
-            isaac_float4 color = background_color;
-            isaac_float min_size = min(
-                int(isaac_size_d[0].global_size.value.x), min (
-                int(isaac_size_d[0].global_size.value.y),
-                int(isaac_size_d[0].global_size.value.z) ) );
-            isaac_float factor = step / /*isaac_size_d[0].max_global_size*/ min_size * isaac_float(2) * l/l_scaled;
-            for (isaac_int i = first; i <= last; i++)
-            {
-                pos = start + step_vec * isaac_float(i);
-                isaac_float4 value = {0, 0, 0, 0};
-                isaac_int result = 0;
-                isaac_for_each_with_mpl_params
-                (
-                    sources,
-                    merge_source_iterator
-                    <
-                        Ttransfer_size,
-                        TFilter,
-                        TInterpolation,
-                        TIsoSurface
-                    >(),
-                    value,
-                    pos,
-                    isaac_size_d[0].local_size,
-                    transferArray,
-                    sourceWeight,
-                    pointerArray,
-                    result,
-                    step_vec,
-                    step,
-                    scale
+            isaac_uint2 pixel[ISAAC_VECTOR_ELEM];
+            bool finish[ISAAC_VECTOR_ELEM];
 #if ISAAC_ALPAKA == 1
-                    ,isaac_parameter_d
-                    ,isaac_function_chain_d
+            auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            ISAAC_ELEM_ITERATE(e)
+            {
+                pixel[e].x = isaac_uint(threadIdx[1]) * isaac_uint(ISAAC_VECTOR_ELEM) + e;
+                pixel[e].y = isaac_uint(threadIdx[2]);
+#else
+            ISAAC_ELEM_ITERATE(e)
+            {
+                pixel[e].x = isaac_uint(threadIdx.x + blockIdx.x * blockDim.x) * isaac_uint(ISAAC_VECTOR_ELEM) + e;
+                pixel[e].y = isaac_uint(threadIdx.y + blockIdx.y * blockDim.y);
 #endif
-                );
-                /*if ( mpl::size< TSourceList >::type::value > 1)
-                    value = value / isaac_float( mpl::size< TSourceList >::type::value );*/
-                if (TIsoSurface)
+                finish[e] = false;
+                pixel[e] = pixel[e] + framebuffer_start;
+                if ( ISAAC_FOR_EACH_DIM_TWICE(2, pixel[e], >= framebuffer_size, || ) 0 )
+                    finish[e] = true;
+            }
+            ISAAC_ELEM_ALL_TRUE_RETURN( finish )
+
+            bool at_least_one[ISAAC_VECTOR_ELEM];
+            isaac_float4 color[ISAAC_VECTOR_ELEM];
+
+            ISAAC_ELEM_ITERATE(e)
+            {
+                color[e] = background_color;
+                at_least_one[e] = true;
+                isaac_for_each_with_mpl_params( sources, check_no_source_iterator<TFilter>(), at_least_one[e] );
+                if (!at_least_one[e])
                 {
-                    if (result)
-                    {
-                        color = value;
-                        break;
-                    }
-                }
-                else
-                {
-                    isaac_float oma = isaac_float(1) - color.w;
-                    value = value * factor;
-                    isaac_float4 color_add =
-                    {
-                        oma * value.x, // * value.w does merge_source_iterator
-                        oma * value.y, // * value.w does merge_source_iterator
-                        oma * value.z, // * value.w does merge_source_iterator
-                        oma * value.w
-                    };
-                    color = color + color_add;
-                    if (color.w > isaac_float(0.99))
-                        break;
+                    if (!finish[e])
+                        ISAAC_SET_COLOR( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], color[e] )
+                    finish[e] = true;
                 }
             }
-            #if ISAAC_SHOWBORDER == 1
-                if (color.w <= isaac_float(0.99))
+            ISAAC_ELEM_ALL_TRUE_RETURN( finish )
+
+            isaac_float2 pixel_f[ISAAC_VECTOR_ELEM];
+            isaac_float4 start_p[ISAAC_VECTOR_ELEM];
+            isaac_float4 end_p[ISAAC_VECTOR_ELEM];
+            isaac_float3 start[ISAAC_VECTOR_ELEM];
+            isaac_float3 end[ISAAC_VECTOR_ELEM];
+            isaac_int3 move[ISAAC_VECTOR_ELEM];
+            isaac_float3 move_f[ISAAC_VECTOR_ELEM];
+            clipping_struct clipping[ISAAC_VECTOR_ELEM];
+            isaac_float3 vec[ISAAC_VECTOR_ELEM];
+            isaac_float l_scaled[ISAAC_VECTOR_ELEM];
+            isaac_float l[ISAAC_VECTOR_ELEM];
+            isaac_float3 step_vec[ISAAC_VECTOR_ELEM];
+            isaac_float3 count_start[ISAAC_VECTOR_ELEM];
+            isaac_float3 local_size_f[ISAAC_VECTOR_ELEM];
+            isaac_float3 count_end[ISAAC_VECTOR_ELEM];
+
+            ISAAC_ELEM_ITERATE(e)
+            {
+                pixel_f[e].x = isaac_float( pixel[e].x )/(isaac_float)framebuffer_size.x*isaac_float(2)-isaac_float(1);
+                pixel_f[e].y = isaac_float( pixel[e].y )/(isaac_float)framebuffer_size.y*isaac_float(2)-isaac_float(1);
+
+                start_p[e].x = pixel_f[e].x*ISAAC_Z_NEAR;
+                start_p[e].y = pixel_f[e].y*ISAAC_Z_NEAR;
+                start_p[e].z = -1.0f*ISAAC_Z_NEAR;
+                start_p[e].w = 1.0f*ISAAC_Z_NEAR;
+
+                end_p[e].x = pixel_f[e].x*ISAAC_Z_FAR;
+                end_p[e].y = pixel_f[e].y*ISAAC_Z_FAR;
+                end_p[e].z = 1.0f*ISAAC_Z_FAR;
+                end_p[e].w = 1.0f*ISAAC_Z_FAR;
+
+                start[e].x = isaac_inverse_d[ 0] * start_p[e].x + isaac_inverse_d[ 4] * start_p[e].y +  isaac_inverse_d[ 8] * start_p[e].z + isaac_inverse_d[12] * start_p[e].w;
+                start[e].y = isaac_inverse_d[ 1] * start_p[e].x + isaac_inverse_d[ 5] * start_p[e].y +  isaac_inverse_d[ 9] * start_p[e].z + isaac_inverse_d[13] * start_p[e].w;
+                start[e].z = isaac_inverse_d[ 2] * start_p[e].x + isaac_inverse_d[ 6] * start_p[e].y +  isaac_inverse_d[10] * start_p[e].z + isaac_inverse_d[14] * start_p[e].w;
+
+                end[e].x =   isaac_inverse_d[ 0] *   end_p[e].x + isaac_inverse_d[ 4] *   end_p[e].y +  isaac_inverse_d[ 8] *   end_p[e].z + isaac_inverse_d[12] *   end_p[e].w;
+                end[e].y =   isaac_inverse_d[ 1] *   end_p[e].x + isaac_inverse_d[ 5] *   end_p[e].y +  isaac_inverse_d[ 9] *   end_p[e].z + isaac_inverse_d[13] *   end_p[e].w;
+                end[e].z =   isaac_inverse_d[ 2] *   end_p[e].x + isaac_inverse_d[ 6] *   end_p[e].y +  isaac_inverse_d[10] *   end_p[e].z + isaac_inverse_d[14] *   end_p[e].w;
+                isaac_float max_size = isaac_size_d[0].max_global_size_scaled / 2.0f;
+
+                //scale to globale grid size
+                start[e] = start[e] * max_size;
+                  end[e] =   end[e] * max_size;
+
+                for (isaac_int i = 0; i < input_clipping.count; i++)
+                    clipping[e].elem[i].position = input_clipping.elem[i].position * max_size;
+
+                //move to local (scaled) grid
+                move[e].x = isaac_int(isaac_size_d[0].global_size_scaled.value.x) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.x);
+                move[e].y = isaac_int(isaac_size_d[0].global_size_scaled.value.y) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.y);
+                move[e].z = isaac_int(isaac_size_d[0].global_size_scaled.value.z) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.z);
+
+                move_f[e].x = isaac_float(move[e].x);
+                move_f[e].y = isaac_float(move[e].y);
+                move_f[e].z = isaac_float(move[e].z);
+
+                start[e] = start[e] + move_f[e];
+                  end[e] =   end[e] + move_f[e];
+                for (isaac_int i = 0; i < input_clipping.count; i++)
+                    clipping[e].elem[i].position = clipping[e].elem[i].position + move_f[e];
+
+                vec[e] = end[e] - start[e];
+                l_scaled[e] = sqrt( vec[e].x * vec[e].x + vec[e].y * vec[e].y + vec[e].z * vec[e].z );
+
+                start[e].x = start[e].x / scale.x;
+                start[e].y = start[e].y / scale.y;
+                start[e].z = start[e].z / scale.z;
+                  end[e].x =   end[e].x / scale.x;
+                  end[e].y =   end[e].y / scale.y;
+                  end[e].z =   end[e].z / scale.z;
+                for (isaac_int i = 0; i < input_clipping.count; i++)
                 {
-                    isaac_float oma = isaac_float(1) - color.w;
-                    isaac_float4 color_add =
-                    {
-                        0,
-                        0,
-                        0,
-                        oma * factor * isaac_float(10)
-                    };
-                    color = color + color_add;
+                    clipping[e].elem[i].position.x = clipping[e].elem[i].position.x / scale.x;
+                    clipping[e].elem[i].position.y = clipping[e].elem[i].position.y / scale.y;
+                    clipping[e].elem[i].position.z = clipping[e].elem[i].position.z / scale.z;
                 }
-            #endif
-            ISAAC_SET_COLOR( pixels[pixel.x + pixel.y * framebuffer_size.x], color )
+
+                vec[e] = end[e] - start[e];
+                l[e] = sqrt( vec[e].x * vec[e].x + vec[e].y * vec[e].y + vec[e].z * vec[e].z );
+
+                step_vec[e] = vec[e] / l[e] * step;
+                count_start[e] =  - start[e] / step_vec[e];
+                local_size_f[e].x = isaac_float(isaac_size_d[0].local_size.value.x);
+                local_size_f[e].y = isaac_float(isaac_size_d[0].local_size.value.y);
+                local_size_f[e].z = isaac_float(isaac_size_d[0].local_size.value.z);
+
+                count_end[e] = ( local_size_f[e] - start[e] ) / step_vec[e];
+
+                //count_start shall have the smaller values
+                ISAAC_SWITCH_IF_SMALLER( count_end[e].x, count_start[e].x )
+                ISAAC_SWITCH_IF_SMALLER( count_end[e].y, count_start[e].y )
+                ISAAC_SWITCH_IF_SMALLER( count_end[e].z, count_start[e].z )
+
+                //calc intersection of all three super planes and save in [count_start.x ; count_end.x]
+                count_start[e].x = max( max( count_start[e].x, count_start[e].y ), count_start[e].z );
+                  count_end[e].x = min( min(   count_end[e].x,   count_end[e].y ),   count_end[e].z );
+                if ( count_start[e].x > count_end[e].x)
+                {
+                    if (!finish[e])
+                        ISAAC_SET_COLOR( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], color[e] )
+                    finish[e] = true;
+                }
+            }
+            ISAAC_ELEM_ALL_TRUE_RETURN( finish )
+
+            isaac_int first[ISAAC_VECTOR_ELEM];
+            isaac_int last[ISAAC_VECTOR_ELEM];
+            isaac_float3 pos[ISAAC_VECTOR_ELEM];
+            isaac_int3 coord[ISAAC_VECTOR_ELEM];
+            isaac_float d[ISAAC_VECTOR_ELEM];
+            isaac_float intersection_step[ISAAC_VECTOR_ELEM];
+
+            ISAAC_ELEM_ITERATE(e)
+            {
+                first[e] = isaac_int( floor(count_start[e].x) );
+                last[e] = isaac_int( ceil(count_end[e].x) );
+
+                //Moving last and first until their points are valid
+                pos[e] = start[e] + step_vec[e] * isaac_float(last[e]);
+                coord[e].x = isaac_int(floor(pos[e].x));
+                coord[e].y = isaac_int(floor(pos[e].y));
+                coord[e].z = isaac_int(floor(pos[e].z));
+                while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord[e], >= isaac_size_d[0].local_size.value, || )
+                         ISAAC_FOR_EACH_DIM      (3, coord[e], < 0 || ) 0 ) && first[e] <= last[e])
+                {
+                    last[e]--;
+                    pos[e] = start[e] + step_vec[e] * isaac_float(last[e]);
+                    coord[e].x = isaac_int(floor(pos[e].x));
+                    coord[e].y = isaac_int(floor(pos[e].y));
+                    coord[e].z = isaac_int(floor(pos[e].z));
+                }
+                pos[e] = start[e] + step_vec[e] * isaac_float(first[e]);
+                coord[e].x = isaac_int(floor(pos[e].x));
+                coord[e].y = isaac_int(floor(pos[e].y));
+                coord[e].z = isaac_int(floor(pos[e].z));
+                while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord[e], >= isaac_size_d[0].local_size.value, || )
+                         ISAAC_FOR_EACH_DIM      (3, coord[e], < 0 || ) 0 ) && first[e] <= last[e])
+                {
+                    first[e]++;
+                    pos[e] = start[e] + step_vec[e] * isaac_float(first[e]);
+                    coord[e].x = isaac_int(floor(pos[e].x));
+                    coord[e].y = isaac_int(floor(pos[e].y));
+                    coord[e].z = isaac_int(floor(pos[e].z));
+                }
+
+                //Extra clipping
+                for (isaac_int i = 0; i < input_clipping.count; i++)
+                {
+                    d[e] = step_vec[e].x * clipping[e].elem[i].normal.x
+                         + step_vec[e].y * clipping[e].elem[i].normal.y
+                         + step_vec[e].z * clipping[e].elem[i].normal.z;
+                    intersection_step[e] = ( clipping[e].elem[i].position.x * clipping[e].elem[i].normal.x
+                                           + clipping[e].elem[i].position.y * clipping[e].elem[i].normal.y
+                                           + clipping[e].elem[i].position.z * clipping[e].elem[i].normal.z
+                                           -                     start[e].x * clipping[e].elem[i].normal.x
+                                           -                     start[e].y * clipping[e].elem[i].normal.y
+                                           -                     start[e].z * clipping[e].elem[i].normal.z ) / d[e];
+                    if (d[e] > 0)
+                    {
+                        if ( last[e] < intersection_step[e] )
+                        {
+                            if (!finish[e])
+                                ISAAC_SET_COLOR( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], color[e] )
+                            finish[e] = true;
+                        }
+                        if ( first[e] < intersection_step[e] )
+                            first[e] = ceil( intersection_step[e] );
+                    }
+                    else
+                    {
+                        if ( first[e] > intersection_step[e] )
+                        {
+                            if (!finish[e])
+                                ISAAC_SET_COLOR( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], color[e] )
+                            finish[e] = true;
+                        }
+                        if ( last[e] > intersection_step[e] )
+                            last[e] = floor( intersection_step[e] );
+                    }
+                }
+            }
+            ISAAC_ELEM_ALL_TRUE_RETURN( finish )
+
+            isaac_float min_size[ISAAC_VECTOR_ELEM];
+            isaac_float factor[ISAAC_VECTOR_ELEM];
+            isaac_float4 value[ISAAC_VECTOR_ELEM];
+            isaac_int result[ISAAC_VECTOR_ELEM];
+            isaac_float oma[ISAAC_VECTOR_ELEM];
+            isaac_float4 color_add[ISAAC_VECTOR_ELEM];
+
+            ISAAC_ELEM_ITERATE(e)
+            {
+                //Starting the main loop
+                min_size[e] = min(
+                    int(isaac_size_d[0].global_size.value.x), min (
+                    int(isaac_size_d[0].global_size.value.y),
+                    int(isaac_size_d[0].global_size.value.z) ) );
+                factor[e] = step / /*isaac_size_d[0].max_global_size*/ min_size[e] * isaac_float(2) * l[e]/l_scaled[e];
+                for (isaac_int i = first[e]; i <= last[e]; i++)
+                {
+                    pos[e] = start[e] + step_vec[e] * isaac_float(i);
+                    value[e].x = 0;
+                    value[e].y = 0;
+                    value[e].z = 0;
+                    value[e].w = 0;
+                    result[e] = 0;
+                    isaac_for_each_with_mpl_params
+                    (
+                        sources,
+                        merge_source_iterator
+                        <
+                            Ttransfer_size,
+                            TFilter,
+                            TInterpolation,
+                            TIsoSurface
+                        >(),
+                        value[e],
+                        pos[e],
+                        isaac_size_d[0].local_size,
+                        transferArray,
+                        sourceWeight,
+                        pointerArray,
+                        result[e],
+                        step_vec[e],
+                        step,
+                        scale
+    #if ISAAC_ALPAKA == 1
+                        ,isaac_parameter_d
+                        ,isaac_function_chain_d
+    #endif
+                    );
+                    /*if ( mpl::size< TSourceList >::type::value > 1)
+                        value = value / isaac_float( mpl::size< TSourceList >::type::value );*/
+                    if (TIsoSurface)
+                    {
+                        if (result[e])
+                        {
+                            color[e] = value[e];
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        oma[e] = isaac_float(1) - color[e].w;
+                        value[e] = value[e] * factor[e];
+                        color_add[e].x = oma[e] * value[e].x; // * value.w does merge_source_iterator
+                        color_add[e].y = oma[e] * value[e].y; // * value.w does merge_source_iterator
+                        color_add[e].z = oma[e] * value[e].z; // * value.w does merge_source_iterator
+                        color_add[e].w = oma[e] * value[e].w;
+                        color[e] = color[e] + color_add[e];
+                        if (color[e].w > isaac_float(0.99))
+                            break;
+                    }
+                }
+                #if ISAAC_SHOWBORDER == 1
+                    if (color[e].w <= isaac_float(0.99))
+                    {
+                        oma[e] = isaac_float(1) - color[e].w;
+                        color_add[e].x = 0;
+                        color_add[e].y = 0;
+                        color_add[e].z = 0;
+                        color_add[e].w = oma[e] * factor[e] * isaac_float(10);
+                        };
+                        color[e] = color[e] + color_add[e];
+                    }
+                #endif
+                if (!finish[e])
+                    ISAAC_SET_COLOR( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], color[e] )
+            }
         }
 #if ISAAC_ALPAKA == 1
     };
@@ -971,18 +1027,18 @@ struct IsaacFillRectKernelStruct
         };
         isaac_size2 grid_size=
         {
-            size_t((readback_viewport[2]+block_size.x-1)/block_size.x),
+            size_t((readback_viewport[2]+block_size.x-1)/block_size.x + ISAAC_VECTOR_ELEM - 1)/size_t(ISAAC_VECTOR_ELEM),
             size_t((readback_viewport[3]+block_size.y-1)/block_size.y)
         };
         #if ISAAC_ALPAKA == 1
             if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
             {
-                grid_size.x = size_t(readback_viewport[2]);
+                grid_size.x = size_t(readback_viewport[2] + ISAAC_VECTOR_ELEM - 1)/size_t(ISAAC_VECTOR_ELEM);
                 grid_size.y = size_t(readback_viewport[3]);
                 block_size.x = size_t(1);
-                block_size.y = size_t(1);                    
+                block_size.y = size_t(1);
             }
-            const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+            const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(ISAAC_VECTOR_ELEM));
             const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
             const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
             auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
@@ -1054,8 +1110,8 @@ struct IsaacFillRectKernelStruct
                     pointerArray, \
                     scale, \
                     clipping \
-                );            
-            
+                );
+
         #endif
         if (interpolation)
         {
@@ -1258,7 +1314,7 @@ template
                     #define ISAAC_PARAMETER_PARAM ,isaac_parameter_d
                 #else
                     #define ISAAC_PARAMETER_PARAM
-                #endif            
+                #endif
                 #if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
                     if (TSource::feature_dim == 1)
                         value = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chain_d[ nr ])( *(reinterpret_cast< isaac_float_dim<1>* >(&data)), nr ISAAC_PARAMETER_PARAM );
