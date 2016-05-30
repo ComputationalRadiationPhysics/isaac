@@ -54,19 +54,23 @@
 #define ISAAC_Z_FAR 100.0f
 
 #if ISAAC_ALPAKA == 1
-    #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC
+    #if __CUDACC__
+        #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC __forceinline__
+    #else
+        #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC inline
+    #endif
 #else
     #define ISAAC_HOST_DEVICE_INLINE __device__ __host__ __forceinline__
 #endif
 
 #if ISAAC_ALPAKA == 1
-    #define ISAAC_HOST_INLINE ALPAKA_FN_HOST
+    #define ISAAC_HOST_INLINE ALPAKA_FN_HOST inline
 #else
     #define ISAAC_HOST_INLINE __host__ __forceinline__
 #endif
 
 #if ISAAC_ALPAKA == 1
-    #define ISAAC_DEVICE_INLINE ALPAKA_FN_ACC_CUDA_ONLY
+    #define ISAAC_DEVICE_INLINE ISAAC_HOST_DEVICE_INLINE
 #else
     #define ISAAC_DEVICE_INLINE __device__ __forceinline__
 #endif
