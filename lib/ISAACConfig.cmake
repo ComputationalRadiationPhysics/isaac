@@ -64,6 +64,8 @@ if (ISAAC_JPEG)
         endif()
 endif (ISAAC_JPEG)
 
+set(ISAAC_VECTOR_ELEM "2" CACHE STRING "The amounts of elements used for vectorization. On GPU 1..2 should be fine, on CPU 4..16" )
+add_definitions(-DISAAC_VECTOR_ELEM=${ISAAC_VECTOR_ELEM})
 
 ###############################################################################
 # JANSSON LIB

@@ -130,11 +130,6 @@ example/CMakeLists.txt for an easy to adopt example.
   is used, this library is __not needed__:
   * _From Source_:
     * `git clone https://github.com/ComputationalRadiationPhysics/alpaka.git`
-    * As Alpaka is steady improved, the most recent version of Alpaka does not
-      work with isaac. You need to force git to use a specific (working)
-      version with:
-      * `cd alpaka`
-      * `git checkout e7b18db90cf4cf5fd6d6262adec9db176c3da8af`
     * It is an header only library and doesn't need to be installed. However
       the root directory of the libary has to be added to the CMake Variable
       `CMAKE_MODULE_PATH`, e.g. with

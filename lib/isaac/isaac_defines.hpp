@@ -17,6 +17,10 @@
 
 #include <boost/preprocessor.hpp>
 
+#ifndef ISAAC_VECTOR_ELEM
+    #define ISAAC_VECTOR_ELEM 2
+#endif
+
 #ifndef ISAAC_MAX_DIFFERENCE
     #define ISAAC_MAX_DIFFERENCE 4
 #endif
@@ -50,19 +54,23 @@
 #define ISAAC_Z_FAR 100.0f
 
 #if ISAAC_ALPAKA == 1
-    #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC
+    #if __CUDACC__
+        #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC __forceinline__
+    #else
+        #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC inline
+    #endif
 #else
     #define ISAAC_HOST_DEVICE_INLINE __device__ __host__ __forceinline__
 #endif
 
 #if ISAAC_ALPAKA == 1
-    #define ISAAC_HOST_INLINE ALPAKA_FN_HOST
+    #define ISAAC_HOST_INLINE ALPAKA_FN_HOST inline
 #else
     #define ISAAC_HOST_INLINE __host__ __forceinline__
 #endif
 
 #if ISAAC_ALPAKA == 1
-    #define ISAAC_DEVICE_INLINE ALPAKA_FN_ACC_CUDA_ONLY
+    #define ISAAC_DEVICE_INLINE ISAAC_HOST_DEVICE_INLINE
 #else
     #define ISAAC_DEVICE_INLINE __device__ __forceinline__
 #endif
@@ -77,4 +85,22 @@
     #define ISAAC_NO_HOST_DEVICE_WARNING _Pragma("hd_warning_disable")
 #else
     #define ISAAC_NO_HOST_DEVICE_WARNING
+#endif
+
+#define ISAAC_ELEM_ITERATE( NAME ) for (isaac_uint NAME = 0; NAME < isaac_uint(ISAAC_VECTOR_ELEM); NAME++)
+
+#define ISAAC_ELEM_ALL_TRUE_RETURN( NAME ) \
+{ \
+    bool all_true = true; \
+    for (isaac_uint e = 0; e < isaac_uint(ISAAC_VECTOR_ELEM); e++) \
+        if (NAME[e] == false) \
+            all_true = false; \
+    if (all_true) \
+        return; \
+}
+
+#if ISAAC_ALPAKA == 1
+    #define ISAAC_CONSTANT ALPAKA_STATIC_DEV_MEM_CONSTANT
+#else
+    #define ISAAC_CONSTANT __constant__
 #endif

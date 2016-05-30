@@ -175,6 +175,7 @@ int main(int argc, char **argv)
 		using AccDim = alpaka::dim::DimInt<3>;
 		using SimDim = alpaka::dim::DimInt<3>;
 		using DatDim = alpaka::dim::DimInt<1>;
+
 		//using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
 		//using Stream  = alpaka::stream::StreamCudaRtSync;
 		using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
@@ -184,9 +185,11 @@ int main(int argc, char **argv)
 
 		using DevAcc = alpaka::dev::Dev<Acc>;
 		using DevHost = alpaka::dev::DevCpu;
+		using PltfHost = alpaka::pltf::Pltf<DevHost>;
+		using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
 
-		DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(rank % alpaka::dev::DevMan<Acc>::getDevCount()));
-		DevHost devHost (alpaka::dev::cpu::getDev());
+		DevAcc  devAcc  (alpaka::pltf::getDevByIdx<PltfAcc>(rank % alpaka::pltf::getDevCount<PltfAcc>()));
+		DevHost devHost (alpaka::pltf::getDevByIdx<PltfHost>(0u));
 		Stream  stream  (devAcc);
 
 		const alpaka::Vec<SimDim, size_t> global_size(d[0]*VOLUME_X,d[1]*VOLUME_Y,d[2]*VOLUME_Z);
