@@ -451,7 +451,7 @@ int main(int argc, char **argv)
 				json_t* js;
 				if ( js = json_object_get(meta, "interval") )
 				{
-					interval = max( int(1), int( json_integer_value ( js ) ) );
+					interval = std::max( int(1), int( json_integer_value ( js ) ) );
 					//Feedback for other clients than the changing one
 					if (rank == 0)
 						json_object_set_new( visualization->getJsonMetaRoot(), "interval", json_integer( interval ) );

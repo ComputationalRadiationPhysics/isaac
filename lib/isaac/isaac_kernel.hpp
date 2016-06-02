@@ -594,8 +594,8 @@ template <
                 ISAAC_SWITCH_IF_SMALLER( count_end[e].z, count_start[e].z )
 
                 //calc intersection of all three super planes and save in [count_start.x ; count_end.x]
-                count_start[e].x = max( max( count_start[e].x, count_start[e].y ), count_start[e].z );
-                  count_end[e].x = min( min(   count_end[e].x,   count_end[e].y ),   count_end[e].z );
+                count_start[e].x = ISAAC_MAX( ISAAC_MAX( count_start[e].x, count_start[e].y ), count_start[e].z );
+                  count_end[e].x = ISAAC_MIN( ISAAC_MIN(   count_end[e].x,   count_end[e].y ),   count_end[e].z );
                 if ( count_start[e].x > count_end[e].x)
                 {
                     if (!finish[e])
@@ -693,8 +693,8 @@ template <
             ISAAC_ELEM_ITERATE(e)
             {
                 //Starting the main loop
-                min_size[e] = min(
-                    int(isaac_size_d[0].global_size.value.x), min (
+                min_size[e] = ISAAC_MIN(
+                    int(isaac_size_d[0].global_size.value.x), ISAAC_MIN (
                     int(isaac_size_d[0].global_size.value.y),
                     int(isaac_size_d[0].global_size.value.z) ) );
                 factor[e] = step / /*isaac_size_d[0].max_global_size*/ min_size[e] * isaac_float(2) * l[e]/l_scaled[e];
@@ -959,7 +959,9 @@ struct IsaacRenderKernelCaller
             size_t((readback_viewport[3]+block_size.y-1)/block_size.y)
         };
         #if ISAAC_ALPAKA == 1
+#if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
             if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+#endif
             {
                 grid_size.x = size_t(readback_viewport[2] + ISAAC_VECTOR_ELEM - 1)/size_t(ISAAC_VECTOR_ELEM);
                 grid_size.y = size_t(readback_viewport[3]);

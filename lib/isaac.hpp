@@ -245,7 +245,9 @@ class IsaacVisualization
                     };
                     isaac_int3 local_size_array = { isaac_int(local_size[0]), isaac_int(local_size[1]), isaac_int(local_size[2]) };
                     #if ISAAC_ALPAKA == 1
+#if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                         if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+#endif
                         {
                             grid_size.x = size_t(local_size[0] + ISAAC_GUARD_SIZE * 2);
                             grid_size.y = size_t(local_size[0] + ISAAC_GUARD_SIZE * 2);
@@ -320,7 +322,9 @@ class IsaacVisualization
                 isaac_int3 local_size_array = { isaac_int(local_size[0]), isaac_int(local_size[1]), isaac_int(local_size[2]) };
                 minmax_struct local_minmax_array_h[ local_size_array.x * local_size_array.y ];
                 #if ISAAC_ALPAKA == 1
+#if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                     if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+#endif
                     {
                         grid_size.x = size_t(local_size[0]);
                         grid_size.y = size_t(local_size[0]);
@@ -515,12 +519,12 @@ class IsaacVisualization
             }
             updateTransfer();
 
-            max_size = max(uint32_t(global_size[0]),uint32_t(global_size[1]));
+            max_size = ISAAC_MAX(uint32_t(global_size[0]),uint32_t(global_size[1]));
             if (TSimDim::value > 2)
-                max_size = max(uint32_t(global_size[2]),uint32_t(max_size));
-            max_size_scaled = max(uint32_t(global_size_scaled[0]),uint32_t(global_size_scaled[1]));
+                max_size = ISAAC_MAX(uint32_t(global_size[2]),uint32_t(max_size));
+            max_size_scaled = ISAAC_MAX(uint32_t(global_size_scaled[0]),uint32_t(global_size_scaled[1]));
             if (TSimDim::value > 2)
-                max_size_scaled = max(uint32_t(global_size_scaled[2]),uint32_t(max_size_scaled));
+                max_size_scaled = ISAAC_MAX(uint32_t(global_size_scaled[2]),uint32_t(max_size_scaled));
 
             //ICET:
             IceTCommunicator icetComm;
@@ -1399,7 +1403,7 @@ class IsaacVisualization
             size_h[0].local_size.value.y = myself->local_size[1];
             if (TSimDim::value > 2)
                 size_h[0].local_size.value.z = myself->local_size[2];
-            size_h[0].max_global_size = static_cast<float>(max(max(uint32_t(myself->global_size[0]),uint32_t(myself->global_size[1])),uint32_t(myself->global_size[2])));
+            size_h[0].max_global_size = static_cast<float>(ISAAC_MAX(ISAAC_MAX(uint32_t(myself->global_size[0]),uint32_t(myself->global_size[1])),uint32_t(myself->global_size[2])));
 
             size_h[0].global_size_scaled.value.x = myself->global_size_scaled[0];
             size_h[0].global_size_scaled.value.y = myself->global_size_scaled[1];
@@ -1413,7 +1417,7 @@ class IsaacVisualization
             size_h[0].local_size_scaled.value.y = myself->local_size_scaled[1];
             if (TSimDim::value > 2)
                 size_h[0].local_size_scaled.value.z = myself->local_size_scaled[2];
-            size_h[0].max_global_size_scaled = static_cast<float>(max(max(uint32_t(myself->global_size_scaled[0]),uint32_t(myself->global_size_scaled[1])),uint32_t(myself->global_size_scaled[2])));
+            size_h[0].max_global_size_scaled = static_cast<float>(ISAAC_MAX(ISAAC_MAX(uint32_t(myself->global_size_scaled[0]),uint32_t(myself->global_size_scaled[1])),uint32_t(myself->global_size_scaled[2])));
 
             isaac_float3 isaac_scale =
             {
