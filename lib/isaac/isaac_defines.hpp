@@ -54,7 +54,7 @@
 #define ISAAC_Z_FAR 100.0f
 
 #if ISAAC_ALPAKA == 1
-    #if __CUDACC__
+    #ifdef __CUDACC__
         #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC __forceinline__
     #else
         #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC inline
@@ -105,7 +105,7 @@
     #define ISAAC_CONSTANT __constant__
 #endif
 
-#if __CUDACC_ == 1
+#ifdef __CUDACC__
     #define ISAAC_MAX max
     #define ISAAC_MIN min
 #else
