@@ -542,7 +542,10 @@ template <
                   end[e] =   end[e] * max_size;
 
                 for (isaac_int i = 0; i < input_clipping.count; i++)
+                {
                     clipping[e].elem[i].position = input_clipping.elem[i].position * max_size;
+                    clipping[e].elem[i].normal   = input_clipping.elem[i].normal;
+                }
 
                 //move to local (scaled) grid
                 move[e].x = isaac_int(isaac_size_d[0].global_size_scaled.value.x) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.x);
