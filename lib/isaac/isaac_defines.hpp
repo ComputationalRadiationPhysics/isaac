@@ -104,3 +104,11 @@
 #else
     #define ISAAC_CONSTANT __constant__
 #endif
+
+#if __CUDACC_ == 1
+    #define ISAAC_MAX max
+    #define ISAAC_MIN min
+#else
+    #define ISAAC_MAX std::max
+    #define ISAAC_MIN std::min
+#endif
