@@ -67,6 +67,11 @@ endif (ISAAC_JPEG)
 set(ISAAC_VECTOR_ELEM "1" CACHE STRING "The amounts of elements used for vectorization. On GPU 1 should be fine, on CPU 4..32, depending on the vectorization capabilities" )
 add_definitions(-DISAAC_VECTOR_ELEM=${ISAAC_VECTOR_ELEM})
 
+option(ISAAC_SPECULAR "Add the specular light component." ON)
+if (ISAAC_SPECULAR)
+  add_definitions(-DISAAC_SPECULAR)
+endif ()
+
 ###############################################################################
 # JANSSON LIB
 ###############################################################################
