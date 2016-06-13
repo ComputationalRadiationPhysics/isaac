@@ -1245,7 +1245,6 @@ class IsaacVisualization
                 }
             }
 
-            IceTImage image[TController::pass_count];
             for (int pass = 0; pass < TController::pass_count; pass++)
                 image[pass].opaque_internals = NULL;
 
@@ -1320,9 +1319,9 @@ class IsaacVisualization
             }
 
             #ifdef ISAAC_THREADING
-                pthread_create(&visualizationThread,NULL,visualizationFunction,image);
+                pthread_create(&visualizationThread,NULL,visualizationFunction,NULL);
             #else
-                visualizationFunction(image);
+                visualizationFunction(NULL);
             #endif
             return metadata;
         }
@@ -1532,7 +1531,6 @@ class IsaacVisualization
 
         static void* visualizationFunction(void* dummy)
         {
-            IceTImage* image = (IceTImage*)dummy;
             //Message sending
             if (myself->rank == myself->master)
             {
@@ -1663,8 +1661,8 @@ class IsaacVisualization
             ISAAC_START_TIME_MEASUREMENT( video_send, myself->getTicksUs() )
             if (myself->communicator)
             {
-                if (image[0].opaque_internals)
-                    myself->communicator->serverSendFrame(myself->compositor.doCompositing(image),myself->compbuffer_size.x,myself->compbuffer_size.y,4);
+                if (myself->image[0].opaque_internals)
+                    myself->communicator->serverSendFrame(myself->compositor.doCompositing(myself->image),myself->compbuffer_size.x,myself->compbuffer_size.y,4);
                 else
                 {
                     myself->communicator->serverSend(NULL,false,true);
@@ -1796,6 +1794,7 @@ class IsaacVisualization
         isaac_float3 clipping_saved_normals[ISAAC_MAX_CLIPPING];
         TController controller;
         TCompositor compositor;
+        IceTImage image[TController::pass_count];
 };
 
 #if ISAAC_ALPAKA == 1
