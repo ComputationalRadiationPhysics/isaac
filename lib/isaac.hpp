@@ -613,11 +613,13 @@ class IsaacVisualization
         }
         void setJpegQuality(isaac_uint jpeg_quality)
         {
+            ISAAC_WAIT_VISUALIZATION
             if (communicator)
                 communicator->setJpegQuality(jpeg_quality);
         }
         bool editClipping(isaac_uint nr,isaac_float px,isaac_float py,isaac_float pz,isaac_float nx,isaac_float ny,isaac_float nz)
         {
+            ISAAC_WAIT_VISUALIZATION
             if (nr >= ISAAC_MAX_CLIPPING)
                 return false;
             isaac_float nx_s = nx * scale[0];
@@ -647,6 +649,7 @@ class IsaacVisualization
         }
         void removeClipping(isaac_uint nr)
         {
+            ISAAC_WAIT_VISUALIZATION
             if (nr >= clipping.count)
                 return;
             clipping.count--;
@@ -658,6 +661,7 @@ class IsaacVisualization
         }
         void updateBounding()
         {
+            ISAAC_WAIT_VISUALIZATION
             for (int pass = 0; pass < TController::pass_count; pass++)
             {
                 icetSetContext( icetContext[pass] );
@@ -681,18 +685,21 @@ class IsaacVisualization
         }
         void updatePosition( const TDomainSize position )
         {
+            ISAAC_WAIT_VISUALIZATION
             this->position = position;
             for (int i = 0; i < 3; i++)
                 position_scaled[i] = isaac_int( (isaac_float) position[i] * (isaac_float)scale[i] );
         }
         void updateLocalSize( const TDomainSize local_size )
         {
+            ISAAC_WAIT_VISUALIZATION
             this->local_size = local_size;
             for (int i = 0; i < 3; i++)
                 local_size_scaled[i] = isaac_int( (isaac_float) local_size[i] * (isaac_float)scale[i] );
         }
         void updateFunctions()
         {
+            ISAAC_WAIT_VISUALIZATION
             IsaacFunctorPool functors;
             isaac_float4 isaac_parameter_h[boost::mpl::size< TSourceList >::type::value * ISAAC_MAX_FUNCTORS];
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
@@ -820,6 +827,7 @@ class IsaacVisualization
         }
         void updateTransfer()
         {
+            ISAAC_WAIT_VISUALIZATION
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
                 auto next = transfer_h.description[i].begin();
