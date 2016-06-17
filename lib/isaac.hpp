@@ -513,7 +513,7 @@ class IsaacVisualization
             //Transfer func memory:
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
-                source_weight.value[i] = isaac_float(1);
+                source_weight.value[i] = ISAAC_DEFAULT_WEIGHT;
                 #if ISAAC_ALPAKA == 1
                     transfer_d_buf.push_back( alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>( acc, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
                     transfer_h_buf.push_back( alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );

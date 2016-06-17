@@ -49,6 +49,10 @@
     #define ISAAC_MAX_CLIPPING 16
 #endif
 
+#ifndef ISAAC_DEFAULT_WEIGHT
+    #define ISAAC_DEFAULT_WEIGHT isaac_float( 2 )
+#endif
+
 #define ISAAC_MAX_RECEIVE 262144 //256kb
 #define ISAAC_Z_NEAR 1.0f
 #define ISAAC_Z_FAR 100.0f
