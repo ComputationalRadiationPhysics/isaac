@@ -439,6 +439,7 @@ class IsaacVisualization
                 //debugging reasons let's alloc 4 extra bytes for valgrind:
                 json_set_alloc_funcs(extra_malloc, extra_free);
             #endif
+            json_object_seed(0);
             for (int i = 0; i < 3; i++)
             {
                 global_size_scaled.push_back( isaac_int( (isaac_float)global_size[i] * (isaac_float)scale[i] ) );
