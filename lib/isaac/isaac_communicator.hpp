@@ -18,7 +18,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <netdb.h> 
+#include <netdb.h>
 #include <unistd.h>
 
 #if ISAAC_JPEG == 1
@@ -190,7 +190,7 @@ class IsaacCommunicator
 						6,
 						8
 					>
-				> 
+				>
 				base64_text; // compose all the above operations in to a new iterator
 
 			std::copy(
@@ -198,7 +198,7 @@ class IsaacCommunicator
 				base64_text( (char*)ptr + count),
 				boost::archive::iterators::ostream_iterator<char>(payload)
 			);
-			
+
 			#if ISAAC_JPEG == 1
 				char header[] = "{\"payload\": \"data:image/jpeg;base64,";
 			#else
@@ -208,7 +208,11 @@ class IsaacCommunicator
 			int hl = strlen(header);
 			int pl = payload.str().length();
 			int fl = strlen(footer);
-			char* message = (char*)malloc(hl+pl+fl+1);
+			//Allocating one letter more for \0 and 4 letter more because of
+			//strlen (of glib) always reading 4 aligned bytes - even after \0.
+			//It should never crash because of the missing 4 bytes - but
+			//valgrind does complain nevertheless.
+			char* message = (char*)malloc(hl+pl+fl+1+4);
 			memcpy(  message        ,header,hl);
 			memcpy(&(message[hl   ]),payload.str().c_str(),pl);
 			memcpy(&(message[hl+pl]),footer,fl+1); //with 0
