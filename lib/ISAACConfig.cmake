@@ -72,6 +72,11 @@ if (ISAAC_SPECULAR)
   add_definitions(-DISAAC_SPECULAR)
 endif ()
 
+option(ISAAC_VALGRIND_TWEAKS "Activates some tweaks, so that valgrind doesn't complain about some false founds" OFF)
+if (ISAAC_VALGRIND_TWEAKS)
+  add_definitions(-DISAAC_VALGRIND_TWEAKS)
+endif ()
+
 ###############################################################################
 # JANSSON LIB
 ###############################################################################

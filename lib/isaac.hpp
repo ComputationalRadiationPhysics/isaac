@@ -431,6 +431,14 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaMalloc((isaac_functor_chain_pointer_N**)&functor_chain_choose_d, sizeof(isaac_functor_chain_pointer_N) * boost::mpl::size< TSourceList >::type::value));
                 ISAAC_CUDA_CHECK(cudaMalloc((minmax_struct**)&local_minmax_array_d, sizeof(minmax_struct) * local_size[0] * local_size[1]));
             #endif
+            #if ISAAC_VALGRIND_TWEAKS == 1
+                //Jansson has some optimizations for 2 and 4 byte aligned
+                //memory. However valgrind complains then sometimes about reads
+                //in not allocated memory. Valgrind is right, but nevertheless
+                //reads will never crash and be much faster. But for
+                //debugging reasons let's alloc 4 extra bytes for valgrind:
+                json_set_alloc_funcs(extra_malloc, extra_free);
+            #endif
             for (int i = 0; i < 3; i++)
             {
                 global_size_scaled.push_back( isaac_int( (isaac_float)global_size[i] * (isaac_float)scale[i] ) );
