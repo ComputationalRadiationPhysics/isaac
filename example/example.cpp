@@ -100,7 +100,7 @@ class TestSource2
 
 		ISAAC_HOST_INLINE static std::string getName()
 		{
-			return std::string("Test Source 1");
+			return std::string("Test Source 2");
 		}
 
 		ISAAC_HOST_INLINE void update(bool enabled, void* pointer) {}
@@ -130,6 +130,7 @@ int main(int argc, char **argv)
 	//Settings the parameters for the example
 	char __server[] = "localhost";
 	char* server = __server;
+	char* filename = NULL;
 	//If existend first parameter is the server. Default: "localhost"
 	if (argc > 1)
 		server = argv[1];
@@ -137,6 +138,8 @@ int main(int argc, char **argv)
 	//If existend second parameter is the port. Default: 2460
 	if (argc > 2)
 		port = atoi(argv[2]);
+	if (argc > 3)
+		filename = argv[3];
 
 	//MPI Init
 	int rank,numProc;
@@ -270,10 +273,18 @@ int main(int argc, char **argv)
 
 	SourceList sources( testSource1, testSource2 );
 
+	#if ISAAC_NO_SIMULATION == 1
+		if (!filename)
+			update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, 0.0f,local_size,position,global_size);
+	#endif
+	int s_x,s_y,s_z;
+	if (filename)
+		read_vtk_to_memory(filename,stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, 0.0f,local_size,position,global_size,s_x,s_y,s_z);
+
 	std::vector<float> scaling;
-		scaling.push_back(1);
-		scaling.push_back(1);
-		scaling.push_back(1);
+		scaling.push_back(s_x);
+		scaling.push_back(s_y);
+		scaling.push_back(s_z);
 
 	///////////////////////////////////////
 	// Create isaac visualization object //
@@ -373,9 +384,6 @@ int main(int argc, char **argv)
 	///////////////
 	// Main loop //
 	///////////////
-	#if ISAAC_NO_SIMULATION == 1
-		update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
-	#endif
 	while (!force_exit)
 	{
 		//////////////////
@@ -386,7 +394,8 @@ int main(int argc, char **argv)
 			a += 0.01f;
 			int start_simulation = visualization->getTicksUs();
 			#if ISAAC_NO_SIMULATION == 0
-				update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
+				if (!filename)
+					update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
 			#endif
 			simulation_time +=visualization->getTicksUs() - start_simulation;
 		}
