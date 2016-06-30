@@ -277,7 +277,7 @@ int main(int argc, char **argv)
 		if (!filename)
 			update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, 0.0f,local_size,position,global_size);
 	#endif
-	int s_x,s_y,s_z;
+	int s_x = 1,s_y = 1,s_z = 1;
 	if (filename)
 		read_vtk_to_memory(filename,stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, 0.0f,local_size,position,global_size,s_x,s_y,s_z);
 
