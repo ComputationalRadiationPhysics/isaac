@@ -1,0 +1,24 @@
+<map id="server/InsituConnector.hpp" name="server/InsituConnector.hpp">
+<area shape="rect" id="node2" href="$InsituConnectorMaster_8hpp.html" title="server/InsituConnectorMaster.hpp" alt="" coords="541,80,760,107"/>
+<area shape="rect" id="node23" href="$InsituConnector_8cpp.html" title="server/InsituConnector.cpp" alt="" coords="784,80,963,107"/>
+<area shape="rect" id="node3" href="$Broker_8hpp.html" title="server/Broker.hpp" alt="" coords="491,155,616,181"/>
+<area shape="rect" id="node22" href="$InsituConnectorMaster_8cpp.html" title="server/InsituConnectorMaster.cpp" alt="" coords="640,155,859,181"/>
+<area shape="rect" id="node4" href="$Broker_8cpp.html" title="server/Broker.cpp" alt="" coords="5,229,131,256"/>
+<area shape="rect" id="node5" href="$MetaDataConnector_8hpp.html" title="server/MetaDataConnector.hpp" alt="" coords="451,229,655,256"/>
+<area shape="rect" id="node7" href="$isaac_8cpp.html" title="server/isaac.cpp" alt="" coords="109,379,227,405"/>
+<area shape="rect" id="node12" href="$ImageConnector_8hpp.html" title="server/ImageConnector.hpp" alt="" coords="1175,229,1357,256"/>
+<area shape="rect" id="node6" href="$WebSocketDataConnector_8hpp.html" title="server/WebSocketDataConnector.hpp" alt="" coords="432,304,675,331"/>
+<area shape="rect" id="node9" href="$TCPDataConnector_8hpp.html" title="server/TCPDataConnector.hpp" alt="" coords="205,304,408,331"/>
+<area shape="rect" id="node11" href="$MetaDataConnector_8cpp.html" title="server/MetaDataConnector.cpp" alt="" coords="699,304,903,331"/>
+<area shape="rect" id="node8" href="$WebSocketDataConnector_8cpp.html" title="server/WebSocketDataConnector.cpp" alt="" coords="479,379,721,405"/>
+<area shape="rect" id="node10" href="$TCPDataConnector_8cpp.html" title="server/TCPDataConnector.cpp" alt="" coords="252,379,455,405"/>
+<area shape="rect" id="node13" href="$ImageConnector_8cpp.html" title="server/ImageConnector.cpp" alt="" coords="1447,304,1629,331"/>
+<area shape="rect" id="node14" href="$RTMPImageConnector_8hpp.html" title="server/RTMPImageConnector.hpp" alt="" coords="1347,379,1568,405"/>
+<area shape="rect" id="node16" href="$RTPImageConnector_8hpp.html" title="server/RTPImageConnector.hpp" alt="" coords="1161,304,1371,331"/>
+<area shape="rect" id="node18" href="$SDLImageConnector_8hpp.html" title="server/SDLImageConnector.hpp" alt="" coords="927,304,1136,331"/>
+<area shape="rect" id="node20" href="$URIImageConnector_8hpp.html" title="server/URIImageConnector.hpp" alt="" coords="1654,304,1860,331"/>
+<area shape="rect" id="node15" href="$RTMPImageConnector_8cpp.html" title="server/RTMPImageConnector.cpp" alt="" coords="1347,453,1568,480"/>
+<area shape="rect" id="node17" href="$RTPImageConnector_8cpp.html" title="server/RTPImageConnector.cpp" alt="" coords="1112,379,1321,405"/>
+<area shape="rect" id="node19" href="$SDLImageConnector_8cpp.html" title="server/SDLImageConnector.cpp" alt="" coords="878,379,1087,405"/>
+<area shape="rect" id="node21" href="$URIImageConnector_8cpp.html" title="server/URIImageConnector.cpp" alt="" coords="1654,379,1860,405"/>
+</map>
