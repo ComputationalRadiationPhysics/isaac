@@ -3,4 +3,49 @@
 	<meta charset="utf-8">
 	<title>ISAAC - In Situ Animation of Accelerated Computations</title>
 </head>
+<body style="max-width: 1280px;margin: auto;">
+<font face="arial" size="4">
+
+<font size="6">
+<img src="isaac.svg" alt="ISAAC" height="100" align="middle" style="float:left;"/><a href="./index.html">Description</a> :: <a href="./doc/library/index.html">Library Documentation</a> :: <a href="./doc/server/index.html">Server Documentation</a>
+</font>
+
+<h1>In Situ Animation of Accelerated Computations</h1>
+<img src="image1.png" alt="Sample rendering of ISAAC" style="float:right;"/>
+<p>
+<a href="https://github.com/ComputationalRadiationPhysics/isaac"><b>ISAAC</b></a> is an open source (LGPL) C++ template library for live in situ visualization and steering of highly distributed simulations or data analysis processes running on HPC systems. The goals of ISAAC are
+<ul>
+	<li>to render the images as fast as possible while interupting the simulation as few as possbile,</li>
+	<li>not to copy any simulation data, but working on the original data itself - even if a hardware accelerators like Nvidia® GPUs or an Intel® Xeon Phi™ accelerators are used,</li>
+	<li>but still give the ability to explore the data live as free as possible.</li>
+</ul>
+</p>
+<p>
+To achieve these goals ISAAC uses <a href="https://github.com/ComputationalRadiationPhysics/alpaka"><b>Alpaka</b></a> to abstract arbitrary hardware accelerators, which the simulation may use. This does not only include CUDA® programmable Nvidia® GPUs but also Thread building blocks for Intel® Xeon Phi™ accelerators or even OpenMP for using classical multicore CPUs the same way like a hardware accelerator. However as especially existing CUDA® programs may have problems to use Alpaka beside CUDA® ISAAC also supports native CUDA®.
+</p>
+<p>
+To not make any assumptions about the structure of the simulation data, ISAAC does not define, how data structures need to look like, but how to access these data. For every field of the simulation which shall be visualized a C++ class needs to be defined, which tells ISAAC about it's properties and how to get a datum. At the moment ISAAC only supports ray casting of volume data to create a rendering as glowing gas or as iso surface. While stepping through the volume ISAAC uses the defined classes to directly access the data without knowing, what the background data structure looks like - or even whether it exists at all.
+</p>
+<p>
+As pure simulation data - independently how they are stored - may not be suited for a direct visualization or it may not be obvious which part of the data is interesting (e.g. which dimension in a vector field) before running the simulation, ISAAC implements so called <b>Functor Chains</b> for transforming the data before they are using the the raycasting algorithm. So the data is read from a position in the volume, transfered using the Functor Chain, classified using a classical transfer function and then shown as glowing gas or iso surface.
+</p>
+<img src="image2.png" alt="Sample rendering of ISAAC" style="float:left;"/>
+<h2>Design overview</h2>
+<p>
+ISAAC consists of 3 parts: The in situ library, a central server and a client.
+</p>
+<p>
+The in situ library is compiled (not linked!) with the simulation as it is compiled itself. As it is licensed under the 3rd version of the LGPL it is also possible for closed source applications to use ISAAC without the need to release any simulation code (of course except for any changes made in ISAAC itself) as open source. As much informations as possible are given as template parameters at compile time. With this the compiler is able to optimize the raycasting very simulation and data structure specific without the need of ISAAC to know the structures itself. The ISAAC library does the volume rendering, but is also used for sending and receiving messages from and to steering clients.
+</p>
+<p>
+Unfortunately most of the time it is not directly possible for a client to connect to a simulation running on a high performance cluster. Among others this is one reason, that ISAAC also consists of a central server, which is installed on a computer, which is accessable from inside and outside the cluster (most of the times the head or login node). But the server does not only forward messages and images between the simulations and clients, it also multiplies the data if more than one client is watchting the same visualization and it creates stream (e.g. h264). The server also has rudimentary functions to stream visualization output directly to RTMP services like Twitch™ or Youtube™.
+</p>
+<p>
+In fact ISAAC has no official client, but a reference implementation of an HTML5 Client, which shall be used to addapt it to the very different demands of simulations. The ISAAC server has at the moment two ways to receive connections from clients: Direct TCP or websockets. The first can be used to directly connect with telnet to the ISAAC Server to get the raw JSON data. Every data transfer (except streams) between any part of ISAAC uses JSON encapsulated data. This makes it easy to implement alternative clients and to send data to the visualization or simulation. The HTML5 client uses websockets to receive the messages from the server, which are converted to real Javascript objects automaticly.
+</p>
+<p>The whole design of ISAAC can be seen in the picture below.</p>
+<center><img src="design.svg" alt="Whole ISAAC design" width="1024px"/></center>
+
+</font>
+</body>
 </html>
