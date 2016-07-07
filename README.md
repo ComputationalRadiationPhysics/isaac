@@ -33,6 +33,7 @@ Please see in [INSTALL.md](./INSTALL.md) for installing, building and
 using ISAAC.
 If you need to install ISAAC on a server not accessible from the outside
 you need to [tunnel the connections](./TUNNEL.md) of the clients.
+A documentation can be [found here](http://computationalradiationphysics.github.io/isaac).
 
 Known issues
 ------------
