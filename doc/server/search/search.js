@@ -16,7 +16,8 @@ var indexSectionsWithContent =
   6: "im",
   7: "cefgimnoprsu",
   8: "bi",
-  9: "gimr"
+  9: "gimr",
+  10: "i"
 };
 
 var indexSectionNames =
@@ -30,7 +31,8 @@ var indexSectionNames =
   6: "enums",
   7: "enumvalues",
   8: "related",
-  9: "defines"
+  9: "defines",
+  10: "pages"
 };
 
 function convertToId(search)
