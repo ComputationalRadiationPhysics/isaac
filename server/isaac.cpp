@@ -138,9 +138,9 @@ int main(int argc, char **argv)
 		}
 		nr++;
 	}
-	
+
 	printf("Using web_port=%i, tcp_port=%i and sim_port=%i\n",web_port,tcp_port,sim_port);
-	
+
 	printf("\n");
 	Broker broker(name,sim_port);
 	WebSocketDataConnector* webSocketDataConnector = new WebSocketDataConnector();
