@@ -1,0 +1,455 @@
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>ISAAC - In Situ Animation of Accelerated Computations</title>
+	<style>
+		table, th, td {
+			border: 1px solid black;
+			border-collapse: collapse;
+			padding: 5px;
+			margin: 5px;
+	}
+	</style>
+</head>
+<body style="max-width: 1280px;margin: auto;">
+<font face="arial" size="4">
+
+<font size="6">
+<img src="../../isaac.svg" alt="ISAAC" height="100" align="middle" style="float:left;"/><a href="../../index.html">Overview</a> :: <a href="../library/index.html">Library Doc</a> :: <a href="../server/index.html">Server Doc</a> :: <a href="../json/index.html">JSON Commands</a>
+</font>
+
+<h1>JSON Commands</h1>
+
+This page documents the JSON messages a client can send and receive from and to the server/visualization. All messages have in common, that they have a type, which is called likewise "type".
+
+<h2>Incoming messages</h2>
+<center>
+<table>
+<tr>
+	<th>Message type</th>
+	<th>Meaning</th>
+</tr>
+<tr>
+	<td><pre>"hello"</pre></td>
+	<td>The first message the server sends to a connecting client telling about the capabilites of it. The message also contains
+		<center><table>
+		<tr>
+			<th>Variable name</th>
+			<th>Meaning</th>
+		</tr>
+		<tr>
+			<td><pre>"name"</pre></td>
+			<td>The name of the server.</td>
+		</tr>
+		<tr>
+			<td><pre>"streams"</pre></td>
+			<td>A list with available streams and their names.</td>
+		</tr>
+		</table></center>
+	</td>
+</tr>
+<tr>
+	<td><pre>"register"</pre></td>
+	<td>Everytime a visualization connects to the server a register-message is sent to all clients. If a client connects to a server with already connected visualizations the server resends all register messages to the new client. The server also updates the register messages while the visualization is running. Furthermore it contains:
+		<center><table>
+		<tr>
+			<th>Variable name</th>
+			<th>Meaning</th>
+		</tr>
+		<tr>
+			<td><pre>"name"</pre></td>
+			<td>The name of the simulation/visualization.</td>
+		</tr>
+		<tr>
+			<td><pre>"id"</pre></td>
+			<td>The unique id of this simulation. Important for observing!</td>
+		</tr>
+		<tr>
+			<td><pre>"nodes"</pre></td>
+			<td>The number of nodes ( = mpi ranks) the simulation is running at.</td>
+		</tr>
+		<tr>
+			<td><pre>"framebuffer width"</pre> and <pre>"framebuffer height"</pre></td>
+			<td>The width and height of the image the client will receive.</td>
+		</tr>
+		<tr>
+			<td><pre>"max functors"</pre></td>
+			<td>The maximal number of functor per functor chain.</td>
+		</tr>
+		<tr>
+			<td><pre>"functors"</pre></td>
+			<td>A list of available functors and short descriptions, what they do.</td>
+		</tr>
+		<tr>
+			<td><pre>"projection count"</pre></td>
+			<td>Number of projection matrizes used in the visualization. Atm projection count > 1 means, that stereoscopic rendering is active.</td>
+		</tr>
+		<tr>
+			<td><pre>"projection"</pre></td>
+			<td>An array of floating point numbers, where always 16 numbers form one projection matrix. The number of elements should be projection count multiplied with 16.</td>
+		</tr>
+		<tr>
+			<td><pre>"position"</pre></td>
+			<td>Three numbers giving you the position of the camera focus point.</td>
+		</tr>
+		<tr>
+			<td><pre>"rotation"</pre></td>
+			<td>Nine numbers giving you a 3x3 rotation matrix about the rotation of the camera around the focus point.</td>
+		</tr>
+		<tr>
+			<td><pre>"distance"</pre></td>
+			<td>A number representing the distance of the focus point from the camera</td>
+		</tr>
+		<tr>
+			<td><pre>"sources"</pre></td>
+			<td>The names and descriptions of the sources the simulation defined for ISAAC.</td>
+		</tr>
+		<tr>
+			<td><pre>"interpolation"</pre></td>
+			<td>A bool, whether interpolation is activated.</td>
+		</tr>
+		<tr>
+			<td><pre>"iso surface"</pre></td>
+			<td>A bool, whether iso surface rendering is activated.</td>
+		</tr>
+		<tr>
+			<td><pre>"step"</pre></td>
+			<td>A number defining the step width for the raycasting. This is <b>not</b> the time step of the simulation. If you want to export this to the client use a variable in the later described "meta data" object.</td>
+		</tr>
+		<tr>
+			<td><pre>"width", "height" and "depth"</pre></td>
+			<td>The width, height and depth of the whole simulation / visualization volume</td>
+		</tr>
+		</table></center>
+	</td>
+</tr>
+<tr>
+	<td><pre>"period"</pre></td>
+	<td>A new time step from the simulation arived! The attributes "position", "rotation", "distance", "sources", "interpolation", "iso surface" or "step" (see "register") may appear if they changed.
+	Besides these the following attributes will appear all the time:
+		<center><table>
+		<tr>
+			<th>Variable name</th>
+			<th>Meaning</th>
+		</tr>
+		<tr>
+			<td><pre>"meta nr"</pre></td>
+			<td>A unique number of the frame. Don't use this as time step as the simulation could pause, but still sent new data increasing this counter.</td>
+		</tr>
+		<tr>
+			<td><pre>"metadata"</pre></td>
+			<td>The content of this attribute is full defined from the simulation using getJsonMetaRoot(). If it's empty the simulation did not sent any meta data.</td>
+		</tr>
+		</table></center>
+		From time to time these attributes can appear as well althought they do not appear while "register".
+		<center><table>
+		<tr>
+			<th>Variable name</th>
+			<th>Meaning</th>
+		</tr>
+		<tr>
+			<td><pre>"payload"</pre></td>
+			<td>The last rendered image as base64 string.</td>
+		</tr>
+		<tr>
+			<td><pre>"functions"</pre></td>
+			<td>An array with all transfer functions of the sources as strings.</td>
+		</tr>
+		<tr>
+			<td><pre>"transfer points"</pre></td>
+			<td>An array of objects, where each object has the attributes "value", "r", "g", "b", and "a", definining the colour and opacity for the given value. Value goes from 0…1.</td>
+		</tr>
+		<tr>
+			<td><pre>"transfer array"</pre></td>
+			<td>An array of arrays of 4-element-arrays definig the transfer function per source. The most inner 4-element-arrays are color and opacity values.</td>
+		</tr>
+		<tr>
+			<td><pre>"weight"</pre></td>
+			<td>An array with all weights of the sources as numbers.</td>
+		</tr>
+		<tr>
+			<td><pre>"background color"</pre></td>
+			<td>A string giving the background colour.</td>
+		</tr>
+		<tr>
+			<td><pre>"clipping"</pre></td>
+			<td>An array of 4-element-arrays, where each of these arrays defines a clipping plane.</td>
+		</tr>
+		<tr>
+			<td><pre>"minmax"</pre></td>
+			<td>An array of objects containing "min" and "max" attributes for every source of the simulation.</td>
+		</tr>
+		<tr>
+			<td><pre>"eye distance"</pre></td>
+			<td>A numbers giving you the distance of the eyes if stereoscopy is activated.</td>
+		</tr>
+		</table></center>
+	</td>
+</tr>
+<tr>
+	<td><pre>"exit"</pre></td>
+	<td>The simulation exited</td>
+</tr>
+</table>
+</center>
+
+<h2>Outgoing messages</h2>
+<center>
+<table>
+<tr>
+	<th>Message type</th>
+	<th>Meaning</th>
+</tr>
+<tr>
+	<td><pre>"observe"</pre></td>
+	<td>Means, that the client wants to get "period" messages from a given simulation/visualization. For this beside the type three attributes need to be sent:
+		<center><table>
+		<tr>
+			<th>Variable name</th>
+			<th>Meaning</th>
+		</tr>
+		<tr>
+			<td><pre>"stream"</pre></td>
+			<td>Number of the stream to get, you get the streams with the "hello" message of the server.</td>
+		</tr>
+		<tr>
+			<td><pre>"dropable"</pre></td>
+			<td>This is a bool, where you tell the server, whether it is okay for you not to get every update, e.g. if the network is too slow.</td>
+		</tr>
+		<tr>
+			<td><pre>"observe id"</pre></td>
+			<td>The id of the simulation you want to observe. You got this form the "register" message of the simulation.</td>
+		</tr>
+		</table></center>
+	</td>
+</tr>
+<tr>
+	<td><pre>"feedback"</pre></td>
+	<td>This is the most imporant kind of message, to directly speak with a observed visualization, but also the simulation itself. You can (but don't have to) send these attributes
+		<center><table>
+		<tr>
+			<th>Variable name</th>
+			<th>Meaning</th>
+		</tr>
+		<tr>
+			<td><pre>"rotation absolute"</pre></td>
+			<td>Sending an array of nine numbers to set a new rotation matrix. This will delete the old one. Send e.g [1,0,0,0,1,0,0,0,1] to reset the rotation.</td>
+		</tr>
+		<tr>
+			<td><pre>"rotation absolute"</pre></td>
+			<td>Sending an array of nine numbers to define a rotation matrix, which will get multiplied with the old one.</td>
+		</tr>
+		<tr>
+			<td><pre>"rotation axis"</pre></td>
+			<td>Sending an array of four numbers to rotate the camera around the vector defined by the first three numbers with an angle defined by the last number. [1,0,0,90] e.g. would rotate 90° around the X-axis.</td>
+		</tr>
+		<tr>
+			<td><pre>"position absolute"</pre></td>
+			<td>Sending an array of three numbers to set the absolute position of the focus point.</td>
+		</tr>
+		<tr>
+			<td><pre>"position relative"</pre></td>
+			<td>Sending an array of three numbers to change the position of the focus point relative to its old position.</td>
+		</tr>
+		<tr>
+			<td><pre>"distance absolute"</pre></td>
+			<td>Sending a number to set the absolute distance to the focus point.</td>
+		</tr>
+		<tr>
+			<td><pre>"distance relative"</pre></td>
+			<td>Sending a number to change the distance to the focus point relative to the old distance.</td>
+		</tr>
+		<tr>
+			<td><pre>"eye distance"</pre></td>
+			<td>Sending one number to change the distance of the eyes of stereoscopy is activated.</td>
+		</tr>
+		<tr>
+			<td><pre>"projection"</pre></td>
+			<td>Sending an array of floating point numbers, where always 16 numbers form one projection matrix. The number of elements have to be projection count (see "register") multiplied with 16.</td>
+		</tr>
+		<tr>
+			<td><pre>"modelview"</pre></td>
+			<td>Sending direct a modelview matrix as 16-element-matrix.</td>
+		</tr>
+		<tr>
+			<td><pre>"interpolation"</pre></td>
+			<td>Sending bool, whether interpolation is activated.</td>
+		</tr>
+		<tr>
+			<td><pre>"iso surface"</pre></td>
+			<td>Sending bool, whether iso surface rendering is activated.</td>
+		</tr>
+		<tr>
+			<td><pre>"step"</pre></td>
+			<td>Sending number defining the step width for the raycasting.</td>
+		</tr>
+		<tr>
+			<td><pre>"transfer points"</pre></td>
+			<td>Sending an array of objects, where each object has the attributes "value", "r", "g", "b", and "a", definining the colour and opacity for the given value. Value goes from 0…1.</td>
+		</tr>
+		<tr>
+			<td><pre>"functions"</pre></td>
+			<td>Sending an array with all transfer functions of the sources as strings.</td>
+		</tr>
+		<tr>
+			<td><pre>"weight"</pre></td>
+			<td>Sending an array with all weights of the sources as numbers.</td>
+		</tr>
+		<tr>
+			<td><pre>"background color"</pre></td>
+			<td>Sending a string with the background colour.</td>
+		</tr>
+		<tr>
+			<td><pre>"bounding box"</pre></td>
+			<td>It doesn't matter, what it sent, but if something is sent the bounding box of IceT is toggled to be on if it was off and off if it was on. This is a work around as long as the IceT bounding box is buggy.</td>
+		</tr>
+		<tr>
+			<td><pre>"clipping add"</pre></td>
+			<td>Adding a new clipping plane. This needs two further attribues
+			<center><table>
+				<tr>
+					<th>Variable name</th>
+					<th>Meaning</th>
+				</tr>
+				<tr>
+					<td><pre>"position"</pre></td>
+					<td>An 3-element array for the position of the plane.</td>
+				</tr>
+				<tr>
+					<td><pre>"normal"</pre></td>
+					<td>An 3-element array for the normal of the plane.</td>
+				</tr>
+			</table></center>
+			</td>
+		</tr>
+		<tr>
+			<td><pre>"clipping remove"</pre></td>
+			<td>Sending a number of the clipping plane, which shall be remove starting with 0.</td>
+		</tr>
+		<tr>
+			<td><pre>"clipping edit"</pre></td>
+			<td>Editing an existing clipping plane. This needs three further attribues
+			<center><table>
+				<tr>
+					<th>Variable name</th>
+					<th>Meaning</th>
+				</tr>
+				<tr>
+					<td><pre>"nr"</pre></td>
+					<td>The number of the clipping plane, which shall be edited starting with 0.</td>
+				</tr>
+				<tr>
+					<td><pre>"position"</pre></td>
+					<td>An 3-element array for the position of the plane.</td>
+				</tr>
+				<tr>
+					<td><pre>"normal"</pre></td>
+					<td>An 3-element array for the normal of the plane.</td>
+				</tr>
+			</table></center>
+			</td>
+		</tr>
+		<tr>
+			<td><pre>"metadata"</pre></td>
+			<td>Sending an arbitrary json object directly to the simulation, which will be able to read it with getJsonMetaRoot().</td>
+		</tr>
+		<tr>
+			<td><pre>"request"</pre></td>
+			<td>Sending a string to update some state or to redraw the image at all. The string can have the following values:
+			<center><table>
+				<tr>
+					<th>Value</th>
+					<th>Meaning</th>
+				</tr>
+				<tr>
+					<td><pre>"rotation"</pre></td>
+					<td>Resend the rotation.</td>
+				</tr>
+				<tr>
+					<td><pre>"position"</pre></td>
+					<td>Resend the position.</td>
+				</tr>
+				<tr>
+					<td><pre>"distance"</pre></td>
+					<td>Resend the distance.</td>
+				</tr>
+				<tr>
+					<td><pre>"projection"</pre></td>
+					<td>Resend the projection.</td>
+				</tr>
+				<tr>
+					<td><pre>"transfer"</pre></td>
+					<td>Resend the transfer function.</td>
+				</tr>
+				<tr>
+					<td><pre>"interpolation"</pre></td>
+					<td>Resend the interpolation flag.</td>
+				</tr>
+				<tr>
+					<td><pre>"step"</pre></td>
+					<td>Resend the step width.</td>
+				</tr>
+				<tr>
+					<td><pre>"iso surface"</pre></td>
+					<td>Resend the iso surface flag.</td>
+				</tr>
+				<tr>
+					<td><pre>"functions"</pre></td>
+					<td>Resend the functor chains.</td>
+				</tr>
+				<tr>
+					<td><pre>"weight"</pre></td>
+					<td>Resend the weights per source.</td>
+				</tr>
+				<tr>
+					<td><pre>"background color"</pre></td>
+					<td>Resend the background colour.</td>
+				</tr>
+				<tr>
+					<td><pre>"clipping"</pre></td>
+					<td>Resend the clipping planes.</td>
+				</tr>
+				<tr>
+					<td><pre>"controller"</pre></td>
+					<td>Resend the controller specific attributes. Atm this means resending "eye distance" if stereoscopy is activated.</td>
+				</tr>
+				<tr>
+					<td><pre>"redraw"</pre></td>
+					<td>Redraw the image even if nothing happend.</td>
+				</tr>
+				<tr>
+					<td><pre>"minmax"</pre></td>
+					<td>Sent the min-max array for every source.</td>
+				</tr>
+			</table></center>
+			</td>
+		</tr>
+		</table></center>
+	</td>
+</tr>
+<tr>
+	<td><pre>"stop"</pre></td>
+	<td>Means, that the client wants to stop getting "period" messages from a given simulation/visualization. For this beside the type one attribute need to be sent:
+		<center><table>
+		<tr>
+			<th>Variable name</th>
+			<th>Meaning</th>
+		</tr>
+		<tr>
+			<td><pre>"observe id"</pre></td>
+			<td>The id of the simulation you don't want to observe anymore. You got this form the "register" message of the simulation.</td>
+		</tr>
+		</table></center>
+	</td>
+</tr>
+<tr>
+	<td><pre>"closed"</pre></td>
+	<td>Means, that the client will disconnect.</td>
+</tr>
+</table>
+</center>
+
+
+</font>
+</body>
+</html>

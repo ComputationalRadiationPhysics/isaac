@@ -7,13 +7,13 @@
 <font face="arial" size="4">
 
 <font size="6">
-<img src="isaac.svg" alt="ISAAC" height="100" align="middle" style="float:left;"/><a href="./index.html">Description</a> :: <a href="./doc/library/index.html">Library Documentation</a> :: <a href="./doc/server/index.html">Server Documentation</a>
+<img src="isaac.svg" alt="ISAAC" height="100" align="middle" style="float:left;"/><a href="./index.html">Overview</a> :: <a href="./doc/library/index.html">Library Doc</a> :: <a href="./doc/server/index.html">Server Doc</a> :: <a href="./doc/json/index.html">JSON Commands</a>
 </font>
 
 <h1>In Situ Animation of Accelerated Computations</h1>
 <img src="image1.png" alt="Sample rendering of ISAAC" style="float:right;"/>
 <p>
-<a href="https://github.com/ComputationalRadiationPhysics/isaac"><b>ISAAC</b></a> is an open source (LGPL) C++ template library for live in situ visualization and steering of highly distributed simulations or data analysis processes running on HPC systems. The goals of ISAAC are
+<a href="https://github.com/ComputationalRadiationPhysics/isaac"><b>ISAAC</b></a> is an open source (LGPL) C++ template library for live in situ visualization and steering of highly distributed simulations or data analysis processes running on HPC systems made from the <a href="https://www.hzdr.de/db/Cms?pNid=2097"><b>Computational Radiation Physics group</b></a> of the <a href="http://www.hzdr.de"><b>Helmholtz-Zentrum Dresden &ndash; Rossedorf (HZDR)</b></a>. The goals of ISAAC are
 <ul>
 	<li>to render the images as fast as possible while interupting the simulation as few as possbile,</li>
 	<li>not to copy any simulation data, but working on the original data itself - even if a hardware accelerators like Nvidia® GPUs or an Intel® Xeon Phi™ accelerators are used,</li>
@@ -45,7 +45,48 @@ In fact ISAAC has no official client, but a reference implementation of an HTML5
 </p>
 <p>The whole design of ISAAC can be seen in the picture below.</p>
 <center><img src="design.svg" alt="Whole ISAAC design" width="1024px"/></center>
+<img src="image3.png" alt="Sample rendering of ISAAC" style="float:right;"/>
+<h2>Features of ISAAC</h2>
+<p>
+ISAAC is a very young project, created as result of a diploma thesis in the end of 2015 and still lacks a lot of features, but is already capable of
+<ul>
+<li>Live and real time rendering of arbitrary volume data of arbitrary simulations running on arbitrary hardware accelerators.</li>
+<li>Live steering of simulations on HPC systems.</li>
+<li>Live extraction of arbitrary meta data from simulations while they run.</li>
+<li>Raycasting volume rendering with
+	<ul>
+	<li>Rendering as glowing gas,</li>
+	<li>Rendering as iso surface,</li>
+	<li>Transfer functions,</li>
+	<li>Interpolation,</li>
+	<li>For an arbitrary amount of sources/fields, where each source can be weightend differently and</li>
+	<li>Optional stereoscopic rendering for side by side or anagylphic output (with colour-glases).</li>
+	</ul>
+<li>Full support for the exploration of arbitrary sources/fields with the introduced Functor Chains (see above).</li>
+<li>Easy to use and modern C++ interface.</li>
+<li>Fully Open Source and documented.</li>
+<li>Many streaming abilities with the easy possibility to add new ones.</li>
+</li>
+</ul>
+</p>
+<p>
+However there are even more features planed for the future:
+<ul>
+<li>Adding more rendering options than only raycasting.</li>
+<li>Supporting mesh data.</li>
+<li>Supporting heterogenous grids.</li>
+<li>Adding a RESTful API for easy requesting specific simulation states.</li>
+</ul>
+</p>
+<center>
+<p><font size="6">So give ISAAC a try right now:<br/><a href="https://github.com/ComputationalRadiationPhysics/isaac">github.com/ComputationalRadiationPhysics/isaac</a></font></p>
 
+<a href="https://www.hzdr.de"><img src="hzdr.png" alt="HDZR" align="middle"/></a>
+<a href="https://github.com/ComputationalRadiationPhysics/isaac"><img src="qr.png" alt="ISAAC" align="middle"/></a>
+<p>Copyright 2016 Alexander Matthes</p>
+<p>a.matthes<img src="at.png" alt="@"/>hzdr.de</p>
+</center>
 </font>
+
 </body>
 </html>
