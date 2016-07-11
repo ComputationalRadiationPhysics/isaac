@@ -23,7 +23,7 @@ be built yourself nevertheless or the distribution versions are outdated.
     * `tar -zxvf cmake-3.5.2.tar.gz`
     * `rm cmake-3.5.2.tar.gz`
     * `cd cmake-3.5.2`
-    * With root rights and no other version of cmake installed:
+    * With admin rights and no other version of cmake installed:
       * `./configure`
       * `make`
       * `sudo make install`
@@ -50,7 +50,7 @@ be built yourself nevertheless or the distribution versions are outdated.
     * `git clone https://github.com/akheron/jansson.git`
     * `cd jansson`
     * `mkdir build`
-    * With root rights and no other version of libjpeg installed:
+    * With admin rights and no other version of libjpeg installed:
       * `cd build`
       * `cmake ..`
       * `make`
@@ -64,7 +64,7 @@ be built yourself nevertheless or the distribution versions are outdated.
         the Jansson root folder. Later while compiling an application using
         Jansson (including the ISAAC server and the ISAAC examples) add
         `-DJansson_DIR=$JANSSON/install/lib/cmake/jansson`, where `$JANSSON` is
-        the root folder of the Jansson (the directory `git clone …` created).
+        the root folder of the Jansson source (the directory `git clone …` created).
 * __Boost__ (at least 1.56) is needed, but only template libraries, so no
   system wide installation or static linking is needed here:
   * _Debian/Ubuntu_:
@@ -74,7 +74,7 @@ be built yourself nevertheless or the distribution versions are outdated.
     * `tar -zxvf boost_1_56_0.tar.gz`
     * `rm boost_1_56_0.tar.gz`
     * `cd boost_1_56_0`
-    * With root rights and no other version of boost installed:
+    * With admin rights and no other version of boost installed:
       * `./bootstrap.sh`
       * `./b2`
       * `sudo ./b2 install`
@@ -97,7 +97,7 @@ be built yourself nevertheless or the distribution versions are outdated.
     * `git clone https://github.com/warmcat/libwebsockets.git`
     * `cd libwebsockets`
     * `mkdir build`
-    * With root rights and no other version of libwebsockets installed:
+    * With admin rights and no other version of libwebsockets installed:
       * `cd build`
       * `cmake ..`
       * `make`
@@ -111,9 +111,9 @@ be built yourself nevertheless or the distribution versions are outdated.
         directory in the libwebsockets root folder. Later while compiling the
         ISAAC server using libwebsockets add
         `-DLibwebsockets_DIR=$LIBWEBSOCKETS/install/lib/cmake/libwebsockets`, where
-        `$LIBWEBSOCKETS` is the root folder of the libwebsockets (the directory
+        `$LIBWEBSOCKETS` is the root folder of the libwebsockets source (the directory
         `git clone …` created).
-* __gStreamer__ is needed, if streaming over RTP or the Twitch plugin shall
+* __gStreamer__ is only needed, if streaming over RTP or the Twitch plugin shall
   be used. It shall be possible to build gStreamer yourself, but it
   is strongly adviced - even from the gStreamer team themself - to use
   the prebuilt version of your distribution. The HML5 Client can show
@@ -136,7 +136,7 @@ example/CMakeLists.txt for an easy to adopt example.
       * `set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/alpaka/" CACHE STRING  "The location of the alpaka library")`
       * `set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")`
 * __CUDA__ for Nvidia accelerators. At least version 7.0 is needed for ISAAC, if
-  CUDA acceleration is needed at all. If only OpenMP and TBT is via Alpaka is needed,
+  CUDA acceleration is needed at all. If only OpenMP or TBB via Alpaka are needed,
   CUDA is not needed:
   * _Debian/Ubuntu_ (official repositories, at least Ubuntu 16.04 for CUDA 7.0):
     * `sudo apt-get install nvidia-cuda-dev`
@@ -156,7 +156,7 @@ example/CMakeLists.txt for an easy to adopt example.
     * `git clone git://public.kitware.com/IceT.git`
     * `cd IceT`
     * `mkdir build`
-    * With root rights and no other version of IceT installed:
+    * With admin rights and no other version of IceT installed:
       * `cd build`
       * `cmake ..`
       * `make`
@@ -167,8 +167,8 @@ example/CMakeLists.txt for an easy to adopt example.
       * `cmake .. -DCMAKE_INSTALL_PREFIX=../install`
       * `make install`
       * Now a local version of IceT is installed in the install
-        directory in the IceT root folder. Later while compiling the
-       an application using ISAAC (including the examples) add
+        directory in the IceT root folder. Later while compiling
+        an application using ISAAC (including the examples) add
         `-DIceT_DIR=$ICET/install/lib`, where
         `$ICET` is the root folder of IceT (the directory
         `git clone …` created).
@@ -181,7 +181,7 @@ example/CMakeLists.txt for an easy to adopt example.
     * `git clone https://github.com/open-mpi/ompi.git`
     * `cd ompi`
     * `./autogen.pl`
-    * With root rights and no other version of OpenMPI installed:
+    * With admin rights and no other version of OpenMPI installed:
       * `./configure`
       * `make`
       * `sudo make install`
@@ -213,7 +213,8 @@ The server uses CMake. Best practice is to create a new directory (like
 
 Installation of the server is not implemented yet, but you get
 a single executable `isaac`, which can be run with `./isaac`.
-For more informations about parameters use `./isaac --help`.
+For more informations about parameters use `./isaac --help` or have
+a look in the __[server documentation](http://computationalradiationphysics.github.io/isaac/doc/server/index.html)__.
 
 ### The example
 
@@ -230,13 +231,13 @@ isaac (`cd isaac`) do:
 * `make`
 
 Afterwards you get executables `example_cuda`, `example_alpaka` or both.
-Best practise is to use `ccmake ..` to change the building options,
+Best practise is to use `ccmake ..` or `cmake-gui ..` to change the building options,
 especially:
 
 * `ISAAC_ALPAKA`, which enables using ALPAKA
 * `ISAAC_CUDA`, which enables using CUDA
 
-The used accelerator of Alpaka can be changed inside the file `example.cu`.
+The used accelerator of Alpaka can be changed inside the file `example.cpp`.
 At default OpenMP version 2 is used as Accelerator.
 
 ### Testing
@@ -248,8 +249,8 @@ set to `JPEG Stream (html5 only)`) and
 start an example with `./example_cuda` or `./example_alpaka`. It should
 connect to the server running on localhost and be observable and
 steerable. You can run multiple instances of the example with
-`mpirun -c N ./example_KIND` with the number of instances N and KIND
-being cuda or alpaka. To exit the example use the client or Ctrl+C.
+`mpirun -c N ./example_KIND` with the number of instances `N` and `KIND`
+being `cuda` or `alpaka`. To exit the example use the client or Ctrl+C.
 
 
 How to use in own application

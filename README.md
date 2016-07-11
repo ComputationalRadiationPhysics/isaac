@@ -16,9 +16,9 @@ to the host while using the high computation speed of the accelerator.
 
 ISAAC insists of two parts: The server and the insitu library.
 Furthermore there needs to be a client, which is able to show the
-transfered stream and meta data. An example HTML5 client is provided,
+transfered stream and meta data. A reference HTML5 client is provided,
 but needs to be adapted to specific simulations and is not part of ISAAC
-itself.
+itself (but still in the repository).
 
 Simulation code has just to add some calls and settings to the insitu
 template library. After that the server will notice when a simulation
@@ -33,7 +33,8 @@ Please see in [INSTALL.md](./INSTALL.md) for installing, building and
 using ISAAC.
 If you need to install ISAAC on a server not accessible from the outside
 you need to [tunnel the connections](./TUNNEL.md) of the clients.
-A documentation can be [found here](http://computationalradiationphysics.github.io/isaac).
+A more detailed __documentation__ about using ISAAC __can be
+[found here](http://computationalradiationphysics.github.io/isaac)__.
 
 Known issues
 ------------
