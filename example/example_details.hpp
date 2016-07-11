@@ -13,6 +13,10 @@
  * You should have received a copy of the GNU General Lesser Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
+#include <fstream>
+#include <sstream>
+#include <string>
+
 typedef float float3_t[3];
 
 template <
@@ -63,7 +67,7 @@ void update_data(
 				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][2] = intensity;
 				alpaka::mem::view::getPtrNative(hostBuffer2)[pos] =  (2.0f - l)*(2.0f - l) / 4.0f;
 			}
-	const alpaka::Vec<alpaka::dim::DimInt<1>, size_t> data_size(size_t(local_size[0]) * size_t(local_size[0]) * size_t(local_size[0]));
+	const alpaka::Vec<alpaka::dim::DimInt<1>, size_t> data_size(size_t(local_size[0]) * size_t(local_size[1]) * size_t(local_size[2]));
 	alpaka::mem::view::copy(stream, deviceBuffer1, hostBuffer1, data_size);
 	alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, data_size);
 #else
@@ -112,4 +116,147 @@ void recursive_kgv(size_t* d,int number,int test)
 	}
 	else
 		recursive_kgv(d,number,test+1);
+}
+
+template <
+	typename TStream,
+	typename THost1,
+	typename TDev1,
+	typename THost2,
+	typename TDev2,
+	typename TLoc,
+	typename TPos,
+	typename TGlo
+>
+void read_vtk_to_memory(
+	char* filename,
+	TStream stream,
+	THost1 hostBuffer1,
+	TDev1 deviceBuffer1,
+	THost2 hostBuffer2,
+	TDev2 deviceBuffer2,
+	size_t prod,
+	float pos,
+	TLoc& local_size,
+	TPos& position,
+	TGlo& global_size,
+	int& s_x,
+	int& s_y,
+	int& s_z)
+{
+	//Set first default values
+	update_data(stream,hostBuffer1,deviceBuffer1,hostBuffer2,deviceBuffer2,prod,pos,local_size,position,global_size);
+	std::ifstream infile( filename );
+	std::string line;
+	//Format
+	std::getline(infile, line);
+	//Name
+	std::getline(infile, line);
+	printf("Reading data set %s\n",line.c_str());
+	//Format
+	std::getline(infile, line);
+	if ( line.compare(std::string("ASCII")) != 0)
+	{
+		printf("Only ASCII supported yet!\n");
+		return;
+	}
+	//dataset
+	std::getline(infile, line);
+	if ( line.compare(std::string("DATASET STRUCTURED_POINTS")) != 0)
+	{
+		printf("Only DATASET STRUCTURED_POINTS supported yet!\n");
+		return;
+	}
+	//dimensions
+	std::getline(infile, line);
+	const char* buffer = line.c_str();
+	int x,y,z;
+	int i = strlen("DIMENSIONS ");
+	x = atoi(&buffer[i]);
+	while (buffer[i] && buffer[i] != ' ' )
+		i++;
+	i++;
+	y = atoi(&buffer[i]);
+	while (buffer[i] && buffer[i] != ' ' )
+		i++;
+	i++;
+	z = atoi(&buffer[i]);
+	printf("Dimensions: %i %i %i\n",x,y,z);
+	//Spacing
+	std::getline(infile, line);
+	buffer = line.c_str();
+	i = strlen("SPACING ");
+	s_x = atoi(&buffer[i]);
+	while (buffer[i] && buffer[i] != ' ' )
+		i++;
+	i++;
+	s_y = atoi(&buffer[i]);
+	while (buffer[i] && buffer[i] != ' ' )
+		i++;
+	i++;
+	s_z = atoi(&buffer[i]);
+	printf("Spacing: %i %i %i\n",s_x,s_y,s_z);
+	if (size_t(x) != global_size[0])
+	{
+		printf("Width needs to be %lu instead of %i!\n",global_size[0],x);
+		return;
+	}
+	if (size_t(y) != global_size[1])
+	{
+		printf("Width needs to be %lu instead of %i!\n",global_size[1],y);
+		return;
+	}
+	if (size_t(z) != global_size[2])
+	{
+		printf("Width needs to be %lu instead of %i!\n",global_size[2],z);
+		return;
+	}
+	//ORIGIN, POINT_DATA, SCALARS, LOOKUP_TABLE
+	std::getline(infile, line);
+	std::getline(infile, line);
+	std::getline(infile, line);
+	std::getline(infile, line);
+	x = 0;
+	y = 0;
+	z = 0;
+	while (std::getline(infile, line))
+	{
+		char* buffer = const_cast<char*>(line.c_str());
+		while (buffer[0] && buffer[0] != '\n')
+		{
+			int value = strtol (buffer,&buffer,0);;
+			int t_x = x - position[0];
+			int t_y = y - position[1];
+			int t_z = z - position[2];
+			if (t_x >= 0 && size_t(t_x) < local_size[0] &&
+				t_y >= 0 && size_t(t_y) < local_size[1] &&
+				t_z >= 0 && size_t(t_z) < local_size[2])
+			{
+				size_t pos = t_x + t_y * local_size[0] + t_z * local_size[0] * local_size[1];
+				#if ISAAC_ALPAKA == 1
+					alpaka::mem::view::getPtrNative(hostBuffer2)[pos] = (float)value;
+				#else
+					hostBuffer2[pos] = (float)value;
+				#endif
+			}
+			x++;
+			if (size_t(x) >= global_size[0])
+			{
+				x = 0;
+				y++;
+				if (size_t(y) >= global_size[1])
+				{
+					y = 0;
+					z++;
+				}
+			}
+		}
+	}
+
+#if ISAAC_ALPAKA == 1
+	const alpaka::Vec<alpaka::dim::DimInt<1>, size_t> data_size(size_t(local_size[0]) * size_t(local_size[1]) * size_t(local_size[2]));
+	alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, data_size);
+#else
+	cudaMemcpy(deviceBuffer2, hostBuffer2, sizeof(float)*prod, cudaMemcpyHostToDevice);
+#endif
 }

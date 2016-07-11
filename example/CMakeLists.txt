@@ -29,13 +29,14 @@ endif()
 
 
 if (ISAAC_ALPAKA)
-	ALPAKA_ADD_EXECUTABLE(example_alpaka ${CMAKE_SOURCE_DIR}/example.cu)
+	ALPAKA_ADD_EXECUTABLE(example_alpaka ${CMAKE_SOURCE_DIR}/example.cpp)
 	target_link_libraries(example_alpaka ${ISAAC_LIBRARIES})
 endif()
 
 if (ISAAC_CUDA)
 	REMOVE_DEFINITIONS(REMOVE_ITEM "-DISAAC_ALPAKA")
 	set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" -std=c++11)
-	CUDA_ADD_EXECUTABLE(example_cuda ${CMAKE_SOURCE_DIR}/example.cu)
+	SET_SOURCE_FILES_PROPERTIES(${CMAKE_SOURCE_DIR}/example.cpp PROPERTIES CUDA_SOURCE_PROPERTY_FORMAT OBJ)
+	CUDA_ADD_EXECUTABLE(example_cuda ${CMAKE_SOURCE_DIR}/example.cpp)
 	target_link_libraries(example_cuda ${ISAAC_LIBRARIES})
 endif()

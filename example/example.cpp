@@ -100,7 +100,7 @@ class TestSource2
 
 		ISAAC_HOST_INLINE static std::string getName()
 		{
-			return std::string("Test Source 1");
+			return std::string("Test Source 2");
 		}
 
 		ISAAC_HOST_INLINE void update(bool enabled, void* pointer) {}
@@ -130,6 +130,7 @@ int main(int argc, char **argv)
 	//Settings the parameters for the example
 	char __server[] = "localhost";
 	char* server = __server;
+	char* filename = NULL;
 	//If existend first parameter is the server. Default: "localhost"
 	if (argc > 1)
 		server = argv[1];
@@ -137,6 +138,8 @@ int main(int argc, char **argv)
 	//If existend second parameter is the port. Default: 2460
 	if (argc > 2)
 		port = atoi(argv[2]);
+	if (argc > 3)
+		filename = argv[3];
 
 	//MPI Init
 	int rank,numProc;
@@ -175,6 +178,7 @@ int main(int argc, char **argv)
 		using AccDim = alpaka::dim::DimInt<3>;
 		using SimDim = alpaka::dim::DimInt<3>;
 		using DatDim = alpaka::dim::DimInt<1>;
+
 		//using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
 		//using Stream  = alpaka::stream::StreamCudaRtSync;
 		using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
@@ -184,9 +188,11 @@ int main(int argc, char **argv)
 
 		using DevAcc = alpaka::dev::Dev<Acc>;
 		using DevHost = alpaka::dev::DevCpu;
+		using PltfHost = alpaka::pltf::Pltf<DevHost>;
+		using PltfAcc = alpaka::pltf::Pltf<DevAcc>;
 
-		DevAcc  devAcc  (alpaka::dev::DevMan<Acc>::getDevByIdx(rank % alpaka::dev::DevMan<Acc>::getDevCount()));
-		DevHost devHost (alpaka::dev::cpu::getDev());
+		DevAcc  devAcc  (alpaka::pltf::getDevByIdx<PltfAcc>(rank % alpaka::pltf::getDevCount<PltfAcc>()));
+		DevHost devHost (alpaka::pltf::getDevByIdx<PltfHost>(0u));
 		Stream  stream  (devAcc);
 
 		const alpaka::Vec<SimDim, size_t> global_size(d[0]*VOLUME_X,d[1]*VOLUME_Y,d[2]*VOLUME_Z);
@@ -267,10 +273,18 @@ int main(int argc, char **argv)
 
 	SourceList sources( testSource1, testSource2 );
 
+	#if ISAAC_NO_SIMULATION == 1
+		if (!filename)
+			update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, 0.0f,local_size,position,global_size);
+	#endif
+	int s_x = 1,s_y = 1,s_z = 1;
+	if (filename)
+		read_vtk_to_memory(filename,stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, 0.0f,local_size,position,global_size,s_x,s_y,s_z);
+
 	std::vector<float> scaling;
-		scaling.push_back(1);
-		scaling.push_back(1);
-		scaling.push_back(1);
+		scaling.push_back(s_x);
+		scaling.push_back(s_y);
+		scaling.push_back(s_z);
 
 	///////////////////////////////////////
 	// Create isaac visualization object //
@@ -370,9 +384,6 @@ int main(int argc, char **argv)
 	///////////////
 	// Main loop //
 	///////////////
-	#if ISAAC_NO_SIMULATION == 1
-		update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
-	#endif
 	while (!force_exit)
 	{
 		//////////////////
@@ -383,7 +394,8 @@ int main(int argc, char **argv)
 			a += 0.01f;
 			int start_simulation = visualization->getTicksUs();
 			#if ISAAC_NO_SIMULATION == 0
-				update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
+				if (!filename)
+					update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
 			#endif
 			simulation_time +=visualization->getTicksUs() - start_simulation;
 		}
@@ -448,7 +460,7 @@ int main(int argc, char **argv)
 				json_t* js;
 				if ( js = json_object_get(meta, "interval") )
 				{
-					interval = max( int(1), int( json_integer_value ( js ) ) );
+					interval = std::max( int(1), int( json_integer_value ( js ) ) );
 					//Feedback for other clients than the changing one
 					if (rank == 0)
 						json_object_set_new( visualization->getJsonMetaRoot(), "interval", json_integer( interval ) );

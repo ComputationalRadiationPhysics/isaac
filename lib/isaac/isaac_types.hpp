@@ -96,7 +96,7 @@ BOOST_PP_REPEAT(4, ISAAC_SIZE_DEF, ~)
     result. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) ) = BOOST_PP_ARRAY_ELEM( 1, OP ) \
     left. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) );
 
-//macro for the any operator for isaac_{type}[2,3,4]. 
+//macro for the any operator for isaac_{type}[2,3,4].
 #define ISAAC_OVERLOAD_OPERATOR_DEF(Z, I, OP) \
     ISAAC_HOST_DEVICE_INLINE BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) operator BOOST_PP_ARRAY_ELEM( 1, OP ) ( \
     const BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) & left, \
@@ -166,7 +166,7 @@ ISAAC_OVERLOAD_OPERATOR_CREATE(size)
     struct BOOST_PP_CAT( isaac_, BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES_DIM ) ) \
     < size_t( BOOST_PP_INC(J) ) > { \
     BOOST_PP_CAT( isaac_, BOOST_PP_CAT( BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES ) , BOOST_PP_INC(J) ) ) value; };
-    
+
 #define ISAAC_DIM_DEF(Z, I, unused) \
     template < size_t > \
     struct BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES_DIM ) ); \
@@ -240,7 +240,7 @@ struct minmax_array_struct
 
 struct clipping_struct
 {
-    inline clipping_struct() :
+    ISAAC_HOST_DEVICE_INLINE clipping_struct() :
         count(0)
     {}
     isaac_uint count;

@@ -64,6 +64,18 @@ if (ISAAC_JPEG)
         endif()
 endif (ISAAC_JPEG)
 
+set(ISAAC_VECTOR_ELEM "1" CACHE STRING "The amounts of elements used for vectorization. On GPU 1 should be fine, on CPU 4..32, depending on the vectorization capabilities" )
+add_definitions(-DISAAC_VECTOR_ELEM=${ISAAC_VECTOR_ELEM})
+
+option(ISAAC_SPECULAR "Add the specular light component." ON)
+if (ISAAC_SPECULAR)
+  add_definitions(-DISAAC_SPECULAR)
+endif ()
+
+option(ISAAC_VALGRIND_TWEAKS "Activates some tweaks, so that valgrind doesn't complain about some false founds" OFF)
+if (ISAAC_VALGRIND_TWEAKS)
+  add_definitions(-DISAAC_VALGRIND_TWEAKS)
+endif ()
 
 ###############################################################################
 # JANSSON LIB

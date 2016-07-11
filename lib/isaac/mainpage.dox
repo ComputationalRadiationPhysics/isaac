@@ -1,0 +1,122 @@
+/**
+\mainpage ISAAC Library Documentation
+
+This documentation is mainly for using the library than for exteding it. However there are some class diagrams and class documentations to get some deeper insight to ISAAC nevertheless.
+
+\section install_sec Installation
+
+For hints how to install the library please have a look the <a href="https://github.com/ComputationalRadiationPhysics/isaac/blob/master/INSTALL.md">INSTALL.MD</a> documentation. This also explains the requirements to use the ISAAC library.
+
+\section using_isaac_sec Using ISAAC
+
+After you managed to add ISAAC to your build process (easiest with using <A HREF="https://cmake.org/">CMake</A>) first you need to include ISAAC with
+\code{.cpp}
+#include <isaac.hpp>
+\endcode
+
+ISAAC is a template libary, which compiles supports for your fields (called "sources" in ISAAC) direct into its render kernel. This has the benefit, that the access of your simulation data is high optimized. However you can't add sources later, but add as many as you want and deactivate them at runtime if not needed. ISAAC is very metaprogramming based. That means, that you need to define your fields as classes and to add them to a metaprogramming list, which can be evaluated at compile time. It should not be a barrir if you never worked with C++ metaprogramming before. Most of the commands used in the interface are easy to understand resp. to copy and paste.
+
+For every source an own class needs to be defined. This class has to implement this following things:
+<ul>
+<li><KBD>static const size_t feature_dim</KBD>: containing the feature dimension of the source. For a vector field this would be e.g. most probably 3, for a scalar field 1.</li>
+<li><KBD>static const bool has_guard</KBD> determines, whether the source has a guard for access of data outside the later defined local dimensions.</li>
+<li><KBD>static const bool persistent</KBD> determines, whether ths source is persistent or needs to be copied after calling the update function.</li>
+<li>Speaking of it. Every source class needs an update function <KBD>ISAAC_HOST_INLINE void update(bool enabled)</KBD>. The definition has to look exactly like this. This function is called right before the rendering and before update is called for the next source the data will be copied for non persistent sources. <KBD>enabled</KBD> tells you, whether the source will be drawn at all. It is up to you to not update arrays in that case. Non persistent sources will be not accessed at all in that case.</li>
+<li><KBD>ISAAC_HOST_INLINE static std::string getName()</KBD> has to return the name of the source</li>.
+<li>An overload of the <KBD>[]</KBD> operator, which looks like this:
+\code{.cpp}
+ISAAC_NO_HOST_DEVICE_WARNING ISAAC_HOST_DEVICE_INLINE isaac_float_dim< feature_dim > operator[] (const isaac_int3 nIndex) const
+{
+    ...
+}
+\endcode
+This function has to return the value at the position <KBD>nIndex</KBD> in the ISAAC data format <KBD>isaac_float_dim</KBD>, which is an struct like this:
+\code{.cpp}
+template <int N>
+struct
+{
+    isaac_floatN value;
+};
+\endcode
+where <KBD>value</KBD> has the members <KBD>.x</KBD>, <KBD>.y</KBD>, <KBD>.z</KBD> and/or <KBD>.w</KBD> depending on the feature dimension of your source.</li>
+</ul>
+
+Everything else in the class is up to you, but keep in mind, it may be copied from time to time, so be careful with memory in constructors and destructors.
+
+For a working example of such classes have a look at the <A HREF="https://github.com/ComputationalRadiationPhysics/isaac/blob/dev/example/example.cpp">example.cpp</A>. If you are using CUDA™, you can ignore all <KBD>ISAAC_ALPAKA</KBD> ifdefs and only look at the CUDA™ else branch. I will continue explaining using the CUDA™ example code. If you are using Alpaka you should understand the Alpaka specific differences yourself.
+
+Now you need a <KBD>boost::fusion::list</KBD> with all your classes like
+\code{.cpp}
+TestSource1 testSource1;
+TestSource2 testSource2;
+
+using SourceList = boost::fusion::list
+<
+    TestSource1,
+    TestSource2
+>;
+
+SourceList sources( testSource1, testSource2 );
+\endcode
+
+<KBD>sources</KBD> is needed for the initialization of ISAAC, which is happening now with the creation of an instance of isaac::IsaacVisualization.
+\code{.cpp}
+auto visualization = new isaac::IsaacVisualization <
+    SimDim,
+    SourceList,
+    std::vector<size_t>,
+    1024,
+    std::vector<float>,
+    isaac::DefaultController,
+    isaac::DefaultCompositor
+> (
+    name,
+    0,
+    server,
+    port,
+    framebuffer_size,
+    global_size,
+    local_size,
+    position,
+    sources,
+    scaling
+);
+\endcode
+
+with the template parameters
+<ul>
+<li><KBD>SimDim</KBD> is an integral type containing the dimension of the simulation, e.g. <KBD>boost::mpl::int_<3></KBD>.</li>
+<li><KBD>SourceList</KBD> is the type we defined earlier containing a boost fusion list of source classes.</li>
+<li><KBD>std::vector<size_t></KBD> is the type used for storing the dimension of the global and local volume and the position of the second in the first.</li>
+<li><KBD>1024</KBD> is the size of the transfer function used for every source.</li>
+<li><KBD>std::vector<float></KBD> is a user defined type of scaling.</li>
+<li><KBD>isaac::DefaultController</KBD> is a trait for setting up the projection, may be changed for stereoscopy.</li>
+<li><KBD>isaac::DefaultCompositor</KBD> is a trait for combining or postprocessing the rendered image(s), may be changed for stereoscopy.</li>
+</ul>
+and the contructor parameters
+<ul>
+<li><KBD>name</KBD>: The name of the vizualisation.</li>
+<li><KBD>0</KBD>: The rank, which will communicate with the ISAAC server.</li>
+<li><KBD>server</KBD>: the url of the server.</li>
+<li><KBD>port</KBD>: the port of the server.</li>
+<li><KBD>framebuffer_size</KBD>: A vector containing the width and height of the rendered image.</li>
+<li><KBD>global_size</KBD>: The size of the whole volume.</li>
+<li><KBD>local_size</KBD>: The size of the local subvolume.</li>
+<li><KBD>position</KBD>: The position of the local subvolume in the global volume.</li>
+<li><KBD>sources</KBD>: The just created runtime instance of the SourceList.</li>
+<li><KBD>scaling</KBD>: An optional scaling of the simulation data.</li>
+</ul>
+Now it is possible to define and describe some metadata the client shall see. It doesn't need to be defined at this point, but every here defined datum will be shown in the list of available simulations. <KBD>visualization->getJsonMetaRoot()</KBD> returns an instance of <KBD>json_t*</KBD>, a json root , where you can add more members. See the example and <A HREF="https://jansson.readthedocs.org/">the Jansson documentation</A> for more details.
+
+After defining the metadata we can now connect to the ISAAC server with <KBD>visualization->init()</KBD>. If 0 is returned the connection is established.
+
+Everytime you want to send a rendered view of your data (e.g. after ever time step of your simulation) call <KBD>visualization->doVisualization(META_MASTER);</KBD> <KBD>META_MASTER means</KBD>, that only the master rank (in most cases rank 0) will send meta data. If you choose <KBD>META_MERGE</KBD> the meta data of every rank is merged via MPI before. To add meta data just use <KBD>visualization->getJsonMetaRoot()</KBD> again before calling the isaac::IsaacVisualization::doVisualization method. After this function call the returned json root from <KBD>getJsonMetaRoot</KBD> is empty again.
+
+<KBD>doVisualization</KBD> itself returns a <KBD>json_t*</KBD> root, too. Every data put into <KBD>"metadata"</KBD> from the client will be forwarded to every application rank. You have to call <KBD>json_decref</KBD> to the result of this function! Even if you don't want to use the meta data, call it at least this way:
+\code{.cpp}
+json_decref( visualization->doVisualization( META_MASTER ) );
+\endcode
+Otherwise you will open a memory leak.
+
+At the end of the simulation just delete the visualization object. The connection will close and the simulation will disappear for every client of the ISAAC server.
+*/

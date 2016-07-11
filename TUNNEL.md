@@ -94,5 +94,5 @@ Finishing the tunneling
 
 If you close the connection to login node (at best with Ctrl+D) the tunnel
 will be closed, too. However if a tunnel connection is already established
-ssh will not return (and the window not close) until the last client closes
-it's connection to the ISAAC server.
+ssh will not return (and the window will not close) until the last client
+closes its connection to the ISAAC server.
