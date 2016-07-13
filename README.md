@@ -43,6 +43,7 @@ Inside the client directory lay three files:
 * interface.htm
 * interface_vlc.htm
 * interface_presentation.htm
+
 The very first uses direct JSON injection, but no real streaming protocol
 like RTP. The second can use RTP, but needs the (free) vlc browser plugin
 installed to work. Furthermore the server most be able to directly send
