@@ -36,6 +36,25 @@ you need to [tunnel the connections](./TUNNEL.md) of the clients.
 A more detailed __documentation__ about using ISAAC __can be
 [found here](http://computationalradiationphysics.github.io/isaac)__.
 
+Client
+------
+
+Inside the client directory lay three files:
+* interface.htm
+* interface_vlc.htm
+* interface_presentation.htm
+The very first uses direct JSON injection, but no real streaming protocol
+like RTP. The second can use RTP, but needs the (free) vlc browser plugin
+installed to work. Furthermore the server most be able to directly send
+UDP packages to you, which are blocked by most firewalls. Last but not
+least this adds some latency for the h264 encoding. However the stream itself
+will use way less bandwidth. The last client version is for presentation
+purposes, the table with meta data values is not shown, but some are shown
+directly in the stream box. E.g. if you visualize
+__[PIConGPU](https://github.com/ComputationalRadiationPhysics/picongpu)__
+with ISAAC enabled this will show you the count of particles and cells
+used.
+
 Known issues
 ------------
 
