@@ -25,6 +25,13 @@
 	<br/><input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()"> Show video and control in one window
 	<br/><input type="checkbox" id="wireframe_checkbox" checked onchange="wireframe_checkbox_click()"> Show wireframe bounding box
 	<br/><input type="checkbox" id="dropable_checkbox" onchange="dropable_checkbox_click()"> Meta data can be dropped (Select before observing!)
+	<br/><select id="stream_select" onchange="stream_select_click()">
+		<option value="h264_vlc">H264 Stream (with vlc)</option>
+		<option value="jpeg_vlc">JPEG Stream (with vlc)</option>
+		<option value="h264_url">H264 Stream (only url)</option>
+		<option value="jpeg_url">JPEG Stream (only url)</option>
+		<option value="jpeg_raw">JPEG Stream (html5 only)</option>
+	</select> Select stream (before observing!)
 </form>
 <div id="status">Status: Not connected</div>
 </p>
@@ -34,7 +41,7 @@
 	<!--canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas-->
 	<div id="video_container_div" style="position: relative;">
 		<div id="video_div" style="position: relative; top: 0; left: 0;">
-			<canvas id="video" width="512" height="512"></canvas>
+			<embed type="application/x-vlc-plugin" id="video" width="512" height="512" autoplay="no" controls="false" windowless="true"/>
 			<div id="url_div" style="display:none;"></div><br/>
 			<form>
 				<input type="button" value="Pause" id="pause">
@@ -111,7 +118,9 @@ var plugins = new Array();
 var one_window = document.getElementById("one_window_checkbox").checked;
 var wireframe = document.getElementById("wireframe_checkbox").checked;
 var dropable = document.getElementById("dropable_checkbox").checked;
-document.getElementById("preview_div").style.opacity = '1.0';
+var stream = document.getElementById("stream_select").selectedIndex;
+if (stream == 4)
+	document.getElementById("preview_div").style.opacity = '1.0';
 const default_image_src = "data:image/gif;base64,R0lGODlhXAFpAIQQAAABAAELEwEVJSAQAgkZAAAkQD8dBAA4Yxs/AGQuBwBFewBZnphGBshdED2RAPFwF////////////////////////////////////////////////////////////////yH5BAEKABAALAAAAABcAWkAAAX+ICCOZGmeaKqubOu+cCzPdG3f+D0wRu7/wKBwSCwabQSE0sFUIggwA4OROFqv2Kx2yy0lmeCwGNGSThmDrnrNbruvCLF87iCndudp+s3v+/+AcXSDTFAneWdVgIuMjY5CgoR0diQJiGiPmZqbnCgEkoOUAHiJnaanqIugdIYAiD2psbKzWpGrYCKkPLS8vb4/trdklme/xsfILZ+3uHmwydDRycGSCHnS2Nm+y6AIZlPa4eKpX3JKI8RU4+vsvHmKWwHy8/T19lcCBQUHBwr+CgsCCvTHr4AAN/YSKly4EAvDhxATvhmQgFiDBnkuXpxScQ8RgAJDihwZkEg+kCT+U5JUcKBAAC4HVMqcqfLAFZo4cy44yIUigwYPggoNmnGoUSoef+gkCSRAAZRLcSoooCWqVZE2jxS4ynWnFopAjYp9cHHs2AYJkt7oqsDH065RD7zUCtdqViNQ6+LkacVAWLOAA4vFdENA17s0AsTUa5WqkcWMcSIeEiCyTr5FEvwVzLkzPBpbuTqmAdnyUgVzh5iWTHf1TMxC/HaeTbuBWhilo8J+Ydj11d05QvtOOVlI3uEhgftgQLs57Wcxjuskjfzq6B/SqxdvWj2l8huynYvnDP0F2xnZu7/mrh7r4/Yiv9dIML4++RiVuW5XESA9fJWp4SDcf/v54N9w8s3+QJ99DJrVQAy9WRfdf1a1ZSCFARWIQ4QUJhjDgg2GeBQMA0Z1HQsHYkjSiTRwSGARucHn4QsgimhjUOWpEKNOAa6wo4ozWXjDj91puBaQM5Zx45JBPehCiirxBuRvOExpZA0u/pfkCgNsxqSIOaJw3pNT2lWYlUQQ2d2WKnj5ZYgMtJClTleKUGKZUg2JpmpTsolCjW/a2MKdOrEoJp5WHQlknTIQKiMOgX4ZZglqrseCo4jK5CcJmKrH6IR93sBcpEt+hgKUKfV4qmUt6SPAq/pUqlsNsiL3KQx4bkrCAG+WxWScK8DlAmMHeCgAqjMZOmyZt7rQqXq6jjBqiGj+lQeWjU6qMOYKz9LUbLc0KXspns22gKxv0YogImEpAFpftijMmVOdtaokrgrgynSvCue6Vu4K+ZWZrrviTWqCASJy29W+IvQbkpAyOJzcDAFHlVC+7gGBcUhy2SNxum42ZxsMBDvnY1czwpVuvd7NsLFA272cYRAfn1DzDLwyaHAKIa4gcUksyJsnlsKiJ6EJMi8A8YZcrWpVtCXPZqoL09YXbFeDHmZDxVEt7YLQM6GQtNc2sMyx0ybSEPJs8EbBYNslcH1a1vptrbUMZg8k9lVk1yAa2ksxjILONbytAtgz0bvtDIjrO8PfJ+QdUN+MN31oYzMg/K4NDAK7N+T+J2NdQ9JAQ2h55Hz/ILnSKYBOsn1Tw8Bg7COsHtCMtt9OK1eU65g6Cqv3HoPrJRBPtX23yW7fzj8v4ELurNOA8uNHo16hW6efYHwLDN7Qvba8P1/Xv7YLHy9Xqtb+Ow7Bg495DDmP5znO9s1vgtx0il+XAmw2DuAM7UuBxMy3rPedAH84EVwJNDce2rkgfuJxIABItwAFUjBjLoiIRKR3FQ0NMDjoSwECwyWDqN1nPsjzHVeS5L9CpY8NpJPPB3Eww/NV7wVVc07ycLg5fnXlhdpbTbH68DOfra8GI0zc4ba3grV15gZOFIwEAVA0MvmmJW1IokyMFL4bxHCJN3T+gX3gFoMUuu96L7igVIbIhS+ecW43KCK+mHiH+tnAhIGxnwlaSJJm/Ycl6YpY9i7XtTN1UGFhZAEeAzPFJtZnhyOgoALVhyE2FkGLNWFBF3dHpTkmcgU5bM7OVrBIB7Egd5tiViBVaMDWHZF6VxnXJ1UQStrUAII6RJHoTFemqRhnkAfcZOUOichWtiCKgSGjC9JxiWa+owVVjAH0GMO/H/BRJObDZEoImALbMcybZayPHt+gzW1yEk+TDJ0xT3DNh9lgl6xM2wsYKJ5xuqGdZztnL3Pww6AJMwakIyA4aQS7RUjSi5niZgrwOTk5/RM3dCTBQI9Xn1GqAZVMQ5T+Qq23zhME1G8h1OUsUYDMwDCiearTKEivAkROPdRZL7VZRE0wRkYsbkPTHJ/LYoo0nhpxpCX42SRx2Rx7ZvFuTcnp9EBlJrqhET9LFWlHUUBP5zSyCwc1iVILCYNykiRJH22UT4s300oUFBC5SydomtdJmAKzm2MF3FI+tTAePnIRuWtpEASwVSW+4GefKp8MvDqSLdXVBSUFjE3hmQW+VkehhFXRRkXQV99MsqaLuOkWHOubNGZKJpOl4mft5YKqFnURDJ2ZG95iGgWyVT2TTe1/FFhKs1y1jYd9w7EsIzjZ/keaoyVtC2o5G4t2AaN+2K1eFBfclQyvuSui6Hj+IMmG5un1osuFJnSZIqXtikSBiTULFDVC3vKadyNXeys7X8Xe9rr3vdeFK1yu5NvfvqCyw1EgZmlgWtoYFQCRdac/61YDtl4Jv8PBlXcxqAKi1sYGxPUMGIlZzKm6lcBvXLDzLqzhBdSpv7P5LwvCO5adZVWdT1MUhT/X4dJJtcN1qu1YRKwCEM8GxbN6cY4LjFS5ajiDLYbZcO1IgwhzRpkjQKl2VxjH3BKyxRyG8ZB7KAMH+ze9sVwyUM0VVY8GWSBWDHKdjCwYJINydvzR7JO5ulKW+vDLGwYYnD085bt+qEHUpWCdAhyf0UXzfnOOczxbXCcSzzgGNmYbjgP+51C4hFYEvu2dGjGkZTEfs0G3BYCMATNF5K6gvkqLLwnq68HDvPfU773ggFeI6la/qnljDlEjdyAi6gJAySzgcx/jq1yVLRQuoi6Bb0+p5hbkLtbUSkCOfGIjGhcb0KYpiHv38dqQDBqOMhg2li380xWngMzj8RWTRilbugaazq4sK4uz/Ot+Gg3DKtg0qY4syy2ToNoY+o5vo6Xqa+vk0Q3rcQoSPW/nWDSt9w1073IH8An+2QRwUeu9Bc6zgsOJyyF16pflM18/M7YEF0wXrBFrcTxXOipdnbOGQu5x9QY8rhme6zJLflY5w3ziX24pW8v28BHoWrUchHeDaS7+v69RvMIa3lfH9Zmodae4zU2tM9E7Y2aQOznMCzYSy5mOch8vRcVRZ4GVpy6Wkemvrd3Nuo67zvWvB/PoChb6mcmeTFsH1d0AVbvN5Q7cj9vJ1++EewoMPW+zm8fvZw9unS4o8bsjfud2EzwKxj51GkP7lX0fbZIgbwPOj3rpSAT9C7pEd6E0wLg95TuJPvupSNOw59Br/OclfwfC34hdeVc3wPCtn2ADIPav93tdMqp6qVsc93jrsg16DR+5yKAuvl8z20fgekMWvwW0LvgumuzyxPSjSNGqPtibLtGIE9/bONPMm9ThA1e7f5UipDarDHKDALzf1dGP1/1bvccr/aO6/f4HXz9wLQ1CBajnC/a3D/3gHwQhbe3wgDgwAAZgEWuzEQZodzYQAgA7";
 var stream_img = new Image;
 stream_img.src = default_image_src;
@@ -174,6 +183,13 @@ function mulMatrix( matrix1 , matrix2)
 			              + matrix1[y+2*4] * matrix2[2+x*4]
 			              + matrix1[y+3*4] * matrix2[3+x*4];
 	return result;
+}
+
+function stream_is_raw( number )
+{
+	if (number >= 2 && number <=3)
+		return true;
+	return false;
 }
 
 function mulMatrix4(matrix,p)
@@ -285,18 +301,16 @@ function redraw()
 		0, 0, distance, 1
 	];
 	modelview = mulMatrix( distance_m, mulMatrix( rotation_m, position_m ) );
-	if (preview.clientWidth != stream_img.width || preview.clientHeight != stream_img.height)
-	{
-		p_ctx.beginPath();
-		p_ctx.rect(0, 0, preview.clientWidth, preview.clientHeight);
-		p_ctx.fillStyle = "#000000";
-		p_ctx.fill();
-	}
-	p_ctx.drawImage(stream_img,(parseInt(preview.clientWidth)-parseInt(stream_img.width))/2,(parseInt(preview.clientHeight)-parseInt(stream_img.height))/2);
+
+	if (stream == 4)
+		p_ctx.drawImage(stream_img,(parseInt(preview.clientWidth)-parseInt(stream_img.width))/2,(parseInt(preview.clientHeight)-parseInt(stream_img.height))/2);
+	else
+		p_ctx.clearRect(0, 0, preview.clientWidth, preview.clientHeight);
 	p_ctx.fillStyle = "#000000";
-	if (one_window)
+	if (one_window && !stream_is_raw( stream ))
 	{
-		p_ctx.globalAlpha=0.5;
+		if (stream == 4)
+			p_ctx.globalAlpha=0.5;
 		p_ctx.strokeStyle = wireframe_color;
 	}
 	else
@@ -431,14 +445,17 @@ function stopObserverSimulation()
 	while (transfer_form.firstChild) {
 		transfer_form.removeChild(transfer_form.firstChild);
 	}
-	stream_img.src = default_image_src;
 }
 
 function observeSimulation(id)
 {
 	stopObserverSimulation();
 	observe_id = id;
-	var connector_id = 2; //jpeg uri
+	var connector_id = 0; //h264 rtp
+	if (stream == 1 || stream == 3)
+		connector_id = 1; //jpeg rtp
+	if (stream == 4)
+		connector_id = 2; //jpeg uri
 	var obj =
 	{
 		"type" : "observe",
@@ -794,10 +811,23 @@ document.getElementById("connect").onclick = function()
 						preview.height = obj["framebuffer height"];
 						video.width = obj["framebuffer width"];
 						video.height = obj["framebuffer height"];
+						if (!stream_is_raw( stream ))
+							video.playlist.items.clear();
 						observeSimulation(obj["id"]);
 						redraw();
 					};
 					observeCell.appendChild(button);
+				}
+				if (obj["type"] == "register video")
+				{
+					var url = "http://" + document.getElementById("url").value + ":" + document.getElementById("port").value + "/" + obj["connector"] + "/" + obj["name"] + "/" + obj["reference"];
+					if (stream_is_raw( stream ))
+						document.getElementById("url_div").textContent =  url;
+					else
+					{
+						video.playlist.add( url, "Visualization", ["--network-caching 1", "--live-caching 1", "--disk-caching 1", "--file-caching 1"] );
+						video.playlist.play();
+					}
 				}
 				if (obj["type"] == "period" || obj["type"] == "update")
 				{
@@ -1185,6 +1215,7 @@ document.getElementById("connect").onclick = function()
 					{
 						document.getElementById("video_td").style.display = 'none';
 						document.getElementById("preview_td").style.display = 'none';
+						video.playlist.stop();
 					}
 					stream_img.src = default_image_src;
 				}
@@ -1316,6 +1347,29 @@ function iso_surface_checkbox_click()
 {
 	var status = document.getElementById("iso_surface_checkbox").checked;
 	sendFeedback( "iso surface", status );
+};
+
+function stream_select_click()
+{
+	stream = document.getElementById("stream_select").selectedIndex;
+	if ( stream_is_raw( stream ) )
+	{
+		document.getElementById("video").style.display = 'none';
+		document.getElementById("url_div").style.display = 'inline';
+		document.getElementById("preview_div").style.position = 'static';
+	}
+	else
+	{
+		document.getElementById("video").style.display = 'inline';
+		document.getElementById("url_div").style.display = 'none';
+		document.getElementById("preview_div").style.position = 'absolute';
+		document.getElementById("preview_div").style.top = '0';
+		document.getElementById("preview_div").style.left = '0';
+		if (stream == 4)
+			document.getElementById("preview_div").style.opacity = '1.0';
+		else
+			document.getElementById("preview_div").style.opacity = '0.5';
+	}
 };
 
 </script>
