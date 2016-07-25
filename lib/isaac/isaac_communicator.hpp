@@ -134,7 +134,6 @@ class IsaacCommunicator
 			int n = 0;
 			if (starting)
 			{
-				printf("<---- %i %i\n",id,server_id);
 				int c = 0;
 				while (id > server_id + ISAAC_MAX_DIFFERENCE)
 				{
@@ -146,7 +145,6 @@ class IsaacCommunicator
 						break;
 					}
 				}
-				printf("---->\n");
 				char id_string[32];
 				sprintf(id_string,"{\"uid\": %i",id);
 				int add = send(sockfd,id_string,strlen(id_string),MSG_MORE | MSG_NOSIGNAL);
