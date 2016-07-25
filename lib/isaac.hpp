@@ -856,20 +856,18 @@ class IsaacVisualization
             ISAAC_WAIT_VISUALIZATION
             return json_meta_root;
         }
-        int init()
+        int init(CommunicatorSetting communicatorBehaviour)
         {
             int failed = 0;
-            if (communicator && communicator->serverConnect())
+            if (communicator && (communicator->serverConnect(communicatorBehaviour) < 0))
                 failed = 1;
             MPI_Bcast(&failed,1, MPI_INT, master, mpi_world);
             if (failed)
                 return -1;
             if (rank == master)
             {
-                char* buffer = json_dumps( json_root, 0 );
-                communicator->serverSend(buffer,true,true);
-                free(buffer);
-                json_decref( json_root );
+                json_init_root = json_root;
+                communicator->serverSendRegister(&json_init_root);
                 recreateJSON();
             }
             return 0;
@@ -1371,6 +1369,7 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaFree( local_minmax_array_d ) );
             #endif
             delete communicator;
+            json_decref(json_init_root);
         }
         uint64_t getTicksUs()
         {
@@ -1551,6 +1550,8 @@ class IsaacVisualization
             //Message sending
             if (myself->rank == myself->master)
             {
+                bool send_init_json = false;
+
                 json_object_set_new( myself->json_root, "type", json_string( "period" ) );
                 json_object_set_new( myself->json_root, "meta nr", json_integer( myself->metaNr ) );
 
@@ -1559,19 +1560,29 @@ class IsaacVisualization
                 {
                     json_object_set_new( myself->json_root, "projection", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix,myself->projection,16 * TController::pass_count)
+                    json_object_set( myself->json_init_root, "projection", matrix );
+                    send_init_json = true;
                 }
                 if ( myself->send_look_at )
                 {
                     json_object_set_new( myself->json_root, "position", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix,myself->look_at,3)
+                    json_object_set( myself->json_init_root, "position", matrix );
+                    send_init_json = true;
                 }
                 if ( myself->send_rotation )
                 {
                     json_object_set_new( myself->json_root, "rotation", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix, myself->rotation,9)
+                    json_object_set( myself->json_init_root, "rotation", matrix );
+                    send_init_json = true;
                 }
                 if ( myself->send_distance )
+                {
                     json_object_set_new( myself->json_root, "distance", json_real( myself->distance ) );
+                    json_object_set_new( myself->json_init_root, "distance", json_real( myself->distance ) );
+                    send_init_json = true;
+                }
                 if ( myself->send_transfer )
                 {
                     json_object_set_new( myself->json_root, "transfer array", matrix = json_array() );
@@ -1624,11 +1635,23 @@ class IsaacVisualization
                         json_array_append_new( matrix, json_real( myself->source_weight.value[i] ) );
                 }
                 if ( myself->send_interpolation )
+                {
                     json_object_set_new( myself->json_root, "interpolation", json_boolean( myself->interpolation ) );
+                    json_object_set_new( myself->json_init_root, "interpolation", json_boolean( myself->interpolation ) );
+                    send_init_json = true;
+                }
                 if ( myself->send_step )
+                {
                     json_object_set_new( myself->json_root, "step", json_real( myself->step ) );
+                    json_object_set_new( myself->json_init_root, "step", json_boolean( myself->step ) );
+                    send_init_json = true;
+                }
                 if ( myself->send_iso_surface )
+                {
                     json_object_set_new( myself->json_root, "iso surface", json_boolean( myself->iso_surface ) );
+                    json_object_set_new( myself->json_init_root, "iso surface", json_boolean( myself->iso_surface ) );
+                    send_init_json = true;
+                }
                 if ( myself->send_minmax )
                 {
                     json_object_set_new( myself->json_root, "minmax", matrix = json_array() );
@@ -1645,6 +1668,8 @@ class IsaacVisualization
                     json_object_set_new( myself->json_root, "background color", matrix = json_array() );
                     for (size_t i = 0; i < 3; i++)
                         json_array_append_new( matrix, json_real( myself->background_color[i] ) );
+                    json_object_set( myself->json_init_root, "background color", matrix );
+                    send_init_json = true;
                 }
                 if ( myself->send_clipping )
                 {
@@ -1666,11 +1691,12 @@ class IsaacVisualization
                     }
                 }
                 myself->controller.sendFeedback( myself->json_root, myself->send_controller );
+                if ( send_init_json )
+                    json_object_set( myself->json_root,"register",myself->json_init_root );
                 char* buffer = json_dumps( myself->json_root, 0 );
                 myself->communicator->serverSend(buffer);
                 free(buffer);
             }
-
             json_decref( myself->json_root );
             myself->recreateJSON();
 
@@ -1686,7 +1712,6 @@ class IsaacVisualization
                 }
             }
             ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
-
             myself->metaNr++;
             return 0;
         }
@@ -1781,6 +1806,7 @@ class IsaacVisualization
         IceTDouble modelview[16];
         IsaacCommunicator* communicator;
         json_t *json_root;
+        json_t *json_init_root;
         json_t *json_meta_root;
         isaac_int rank;
         isaac_int master;

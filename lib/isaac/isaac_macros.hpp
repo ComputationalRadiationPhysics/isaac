@@ -112,3 +112,12 @@
 #else
     #define ISAAC_WAIT_VISUALIZATION {}
 #endif
+
+#define ISAAC_HANDLE_EPIPE(add,n,sockfd,readThread) \
+    if (add < 0) \
+    { \
+        pthread_join(readThread,NULL); \
+        readThread = 0; \
+        sockfd = 0; \
+        return n; \
+    }

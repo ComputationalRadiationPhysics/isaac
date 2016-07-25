@@ -35,6 +35,12 @@
 namespace isaac
 {
 
+enum CommunicatorSetting
+{
+	ReturnAtError = 0,
+	RetryEverySend = 1
+};
+
 class IsaacCommunicator
 {
 	public:
@@ -44,7 +50,8 @@ class IsaacCommunicator
 			url(url),
 			port(port),
 			sockfd(0),
-			jpeg_quality(90)
+			jpeg_quality(90),
+			registerMessage(NULL)
 		{
 			pthread_mutex_init (&deleteMessageMutex, NULL);
 		}
@@ -60,20 +67,36 @@ class IsaacCommunicator
 			pthread_mutex_unlock(&deleteMessageMutex);
 			return result;
 		}
-		isaac_int serverConnect()
+		isaac_int serverConnect(CommunicatorSetting setting)
 		{
 			struct hostent *server;
 			server = gethostbyname(url.c_str());
 			if (!server)
 			{
-				fprintf(stderr,"Could not resolve %s.\n",url.c_str());
-				return -1;
+				if (setting == ReturnAtError)
+				{
+					fprintf(stderr,"Could not resolve %s.\n",url.c_str());
+					return -1;
+				}
+				else
+				{
+					sockfd = 0;
+					return 1;
+				}
 			}
 			sockfd = socket(AF_INET, SOCK_STREAM, 0);
 			if (sockfd < 0)
 			{
-				fprintf(stderr,"Could not create socket.\n");
-				return -2;
+				if (setting == ReturnAtError)
+				{
+					fprintf(stderr,"Could not create socket.\n");
+					return -2;
+				}
+				else
+				{
+					sockfd = 0;
+					return 1;
+				}
 			}
 			struct sockaddr_in serv_addr;
 			memset(&serv_addr,0, sizeof(serv_addr));
@@ -83,8 +106,16 @@ class IsaacCommunicator
 			if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0)
 			{
 				close(sockfd);
-				fprintf(stderr,"Could not connect to %s.\n",url.c_str());
-				return -3;
+				if (setting == ReturnAtError)
+				{
+					fprintf(stderr,"Could not connect to %s.\n",url.c_str());
+					return -3;
+				}
+				else
+				{
+					sockfd = 0;
+					return 1;
+				}
 			}
 			pthread_create(&readThread,NULL,run_readAndSetMessages,this);
 			return 0;
@@ -92,14 +123,35 @@ class IsaacCommunicator
 
 		isaac_int serverSend(char * content, bool starting = true, bool finishing = false)
 		{
+			if (sockfd == 0) //Connection lost or never established
+			{
+				if (serverConnect(RetryEverySend))
+					return 0;
+				char* content = json_dumps( *registerMessage, 0 );
+				isaac_int result = serverSend(content,true,true);
+				free(content);
+			}
 			int n = 0;
 			if (starting)
 			{
+				printf("<---- %i %i\n",id,server_id);
+				int c = 0;
 				while (id > server_id + ISAAC_MAX_DIFFERENCE)
+				{
 					usleep(1000);
+					c++;
+					if (c > 1000) //1s!
+					{
+						id = server_id-1;
+						break;
+					}
+				}
+				printf("---->\n");
 				char id_string[32];
 				sprintf(id_string,"{\"uid\": %i",id);
-				n = send(sockfd,id_string,strlen(id_string),MSG_MORE);
+				int add = send(sockfd,id_string,strlen(id_string),MSG_MORE | MSG_NOSIGNAL);
+				ISAAC_HANDLE_EPIPE(add,n,sockfd,readThread)
+				n += add;
 				id++;
 			}
 			if (content)
@@ -111,17 +163,36 @@ class IsaacCommunicator
 				for (int i = 0; i < amount; i++)
 				{
 					if (i == amount - 1)
-						n += send(sockfd,&content[i*4096],l - i * 4096,MSG_MORE);
+					{
+						int add = send(sockfd,&content[i*4096],l - i * 4096,MSG_MORE | MSG_NOSIGNAL);
+						ISAAC_HANDLE_EPIPE(add,n,sockfd,readThread)
+						n += add;
+					}
 					else
-						n += send(sockfd,&content[i*4096],4096,MSG_MORE);
+					{
+						int add = send(sockfd,&content[i*4096],4096,MSG_MORE | MSG_NOSIGNAL);
+						ISAAC_HANDLE_EPIPE(add,n,sockfd,readThread)
+						n += add;
+					}
 				}
 			}
 			if (finishing)
 			{
 				char finisher[] = "} ";
-				n += send(sockfd,finisher,2,0);
+				int add = send(sockfd,finisher,2,MSG_NOSIGNAL);
+				ISAAC_HANDLE_EPIPE(add,n,sockfd,readThread)
+				n += add;
 			}
 			return n;
+		}
+
+		isaac_int serverSendRegister(json_t** registerMessage)
+		{
+			this->registerMessage = registerMessage;
+			char* content = json_dumps( *registerMessage, 0 );
+			isaac_int result = serverSend(content,true,true);
+			free(content);
+			return result;
 		}
 
 		#if ISAAC_JPEG == 1
@@ -275,6 +346,7 @@ class IsaacCommunicator
 		std::list<json_t*> messageList;
 		pthread_mutex_t deleteMessageMutex;
 		pthread_t readThread;
+		json_t** registerMessage;
 };
 
 } //namespace isaac;
