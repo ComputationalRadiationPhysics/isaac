@@ -18,7 +18,7 @@ be built yourself nevertheless or the distribution versions are outdated.
 * __CMake__ for building everything:
   * _Debian/Ubuntu_:
     * `sudo apt-get install cmake cmake-curses-gui`
-  * _From Source_ (As at least Version 3.1 is needed for the in-situ library):
+  * _From Source_ (As at least Version 3.3 is needed for the in-situ library):
     * `wget https://cmake.org/files/v3.5/cmake-3.5.2.tar.gz`
     * `tar -zxvf cmake-3.5.2.tar.gz`
     * `rm cmake-3.5.2.tar.gz`
@@ -114,7 +114,7 @@ be built yourself nevertheless or the distribution versions are outdated.
         `$LIBWEBSOCKETS` is the root folder of the libwebsockets source (the directory
         `git clone …` created).
 * __gStreamer__ is only needed, if streaming over RTP or the Twitch plugin shall
-  be used. It shall be possible to build gStreamer yourself, but it
+  be used. It should be possible to build gStreamer yourself, but it
   is strongly adviced - even from the gStreamer team themself - to use
   the prebuilt version of your distribution. The HML5 Client can show
   streams of a server without gStreamer.
@@ -124,7 +124,7 @@ be built yourself nevertheless or the distribution versions are outdated.
 ### Requirements for the in situ library and the examples using it
 
 The ISAACConfig.cmake searches for these requirements. See
-example/CMakeLists.txt for an easy to adopt example.
+`example/CMakeLists.txt` for an easy to adopt example.
 
 * __Alpaka__ for the abstraction of the acceleration device. If only CUDA
   is used, this library is __not needed__:
@@ -135,9 +135,9 @@ example/CMakeLists.txt for an easy to adopt example.
       `CMAKE_MODULE_PATH`, e.g. with
       * `set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/alpaka/" CACHE STRING  "The location of the alpaka library")`
       * `set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")`
-* __CUDA__ for Nvidia accelerators. At least version 7.0 is needed for ISAAC, if
-  CUDA acceleration is needed at all. If only OpenMP or TBB via Alpaka are needed,
-  CUDA is not needed:
+* __CUDA__ for Nvidia accelerators. At least version 7.0 is needed for ISAAC (if
+  CUDA acceleration is needed at all). If only OpenMP or TBB via Alpaka are used,
+  CUDA is not needed.
   * _Debian/Ubuntu_ (official repositories, at least Ubuntu 16.04 for CUDA 7.0):
     * `sudo apt-get install nvidia-cuda-dev`
   * _Debian/Ubuntu_ (directly from NVidia):
@@ -149,7 +149,7 @@ example/CMakeLists.txt for an easy to adopt example.
         check what you downloaded)
       * `sudo apt-get update`
       * `sudo apt-get install cuda`
-* __IceT__ for combining the visualization created from the in situ plugin.
+* __IceT__ for combining the visualization created by the in situ plugin.
   * _Debian/Ubuntu_ (as part of Paraview):
     * `sudo apt-get install paraview-dev`
   * _From Source_:
@@ -219,7 +219,7 @@ a look in the __[server documentation](http://computationalradiationphysics.gith
 ### The example
 
 The building of the examples works similar, but the root directory of
-the examples is the folder "example", so after changing directory to
+the examples is the folder `example`, so after changing directory to
 isaac (`cd isaac`) do:
 
 * `cd example`
@@ -230,7 +230,7 @@ isaac (`cd isaac`) do:
   `cmake -DIceT_DIR=$ICET/install/lib ..`)
 * `make`
 
-Afterwards you get executables `example_cuda`, `example_alpaka` or both.
+Afterwards you get the executables `example_cuda`, `example_alpaka` or both.
 Best practise is to use `ccmake ..` or `cmake-gui ..` to change the building options,
 especially:
 
@@ -244,8 +244,7 @@ At default OpenMP version 2 is used as Accelerator.
 
 To test the server and an example, just start the server with `./isaac`,
 connect to it with one of the HTML clients in the directory `client` (best
-is `interface_novlc.htm` with `Select stream (before observing!)`
-set to `JPEG Stream (html5 only)`) and
+is `interface.htm`) and
 start an example with `./example_cuda` or `./example_alpaka`. It should
 connect to the server running on localhost and be observable and
 steerable. You can run multiple instances of the example with
