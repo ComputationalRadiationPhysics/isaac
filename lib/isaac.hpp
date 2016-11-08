@@ -856,7 +856,7 @@ class IsaacVisualization
             ISAAC_WAIT_VISUALIZATION
             return json_meta_root;
         }
-        int init(CommunicatorSetting communicatorBehaviour)
+        int init(CommunicatorSetting communicatorBehaviour = ReturnAtError)
         {
             int failed = 0;
             if (communicator && (communicator->serverConnect(communicatorBehaviour) < 0))
