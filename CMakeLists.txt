@@ -30,7 +30,7 @@ set(HDRS
 	${CMAKE_SOURCE_DIR}/server/MessageAble.hpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataClient.hpp
 	${CMAKE_SOURCE_DIR}/server/TCPDataConnector.hpp
-	${CMAKE_SOURCE_DIR}/server/NetworkInterfaces.cpp
+	${CMAKE_SOURCE_DIR}/server/NetworkInterfaces.hpp
 )
 
 option(ISAAC_SDL "Build SDL ImageConnector" OFF)
