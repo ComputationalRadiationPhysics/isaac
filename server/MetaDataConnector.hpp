@@ -30,7 +30,7 @@ class MetaDataConnector : public Runable, public MessageAble<MessageContainer>
 {
 	public:
 		//To be overwritten
-		virtual errorCode init(int port) = 0;
+		virtual errorCode init(int port,std::string interface) = 0;
 		virtual errorCode run() = 0;
 		virtual std::string getName() = 0;
 

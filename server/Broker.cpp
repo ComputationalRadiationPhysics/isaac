@@ -42,10 +42,11 @@ void* delete_pointer_later(void* ptr)
 	delete( (Type*)ptr );
 }
 
-Broker::Broker(std::string name,int inner_port)
+Broker::Broker(std::string name,int inner_port,std::string interface)
 {
 	this->name = name;
 	this->inner_port = inner_port;
+	this->inner_interface = interface;
 	this->insituThread = 0;
 	masterHello = json_object();
 	json_object_set_new( masterHello, "type", json_string( "hello" ) );
@@ -277,7 +278,7 @@ errorCode Broker::run()
 	printf("Running ISAAC Master\n");
 	signal(SIGINT, sighandler);
 	printf("Starting insitu plugin listener\n");
-	if (insituMaster.init(inner_port))
+	if (insituMaster.init(inner_port,inner_interface))
 	{
 		fprintf(stderr,"Error while starting insitu plugin listener\n");
 		signal(SIGINT, SIG_DFL);

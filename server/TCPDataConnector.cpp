@@ -15,6 +15,7 @@
 
 #include "TCPDataConnector.hpp"
 #include "MetaDataClient.hpp"
+#include "NetworkInterfaces.hpp"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -30,7 +31,7 @@ std::string TCPDataConnector::getName()
 	return "TCPDataConnector";
 }
 
-errorCode TCPDataConnector::init(int port)
+errorCode TCPDataConnector::init(int port,std::string interface)
 {
 	sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	if (sockfd < 0)
@@ -40,7 +41,7 @@ errorCode TCPDataConnector::init(int port)
 	struct sockaddr_in serv_addr;
 	memset(&serv_addr,0, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	NetworkInterfaces::bindInterface(serv_addr.sin_addr.s_addr,interface);
 	serv_addr.sin_port = htons(port);
 	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
 	{
