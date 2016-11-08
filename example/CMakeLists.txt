@@ -1,6 +1,9 @@
 cmake_minimum_required (VERSION 3.3)
 project (example)
 
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 11)
+
 set(ISAAC_DIR "${CMAKE_CURRENT_LIST_DIR}/../lib")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${ISAAC_DIR})
 set(ALPAKA_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../alpaka/" CACHE STRING  "The location of the alpaka library")

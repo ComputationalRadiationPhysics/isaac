@@ -15,16 +15,11 @@
 ###############################################################################
 # ISAAC
 ###############################################################################
-cmake_minimum_required (VERSION 3.1.0)
+cmake_minimum_required (VERSION 3.3.0)
 cmake_policy(SET CMP0048 OLD)
 
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}")
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}/isaac")
-
-set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-std=c++11")
-set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-march=native")
-set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-mtune=native")
-
 
 ###############################################################################
 # MODULES
@@ -37,12 +32,12 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ISAAC_DIR}/Modules")
 ###############################################################################
 option(ISAAC_THREADING "Do the video and metadata transmission transport in background." ON)
 if (ISAAC_THREADING)
-  add_definitions(-DISAAC_THREADING)
+  set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_THREADING)
 endif ()
 
 option(ISAAC_SHOWBORDER "Debug and presentation mode, in which the sub volume borders are shown in black" OFF)
 if (ISAAC_SHOWBORDER)
-  add_definitions(-DISAAC_SHOWBORDER)
+  set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_SHOWBORDER)
 endif ()
 
 option(ISAAC_CUDA "Using CUDA" ON)
@@ -65,16 +60,16 @@ if (ISAAC_JPEG)
 endif (ISAAC_JPEG)
 
 set(ISAAC_VECTOR_ELEM "1" CACHE STRING "The amounts of elements used for vectorization. On GPU 1 should be fine, on CPU 4..32, depending on the vectorization capabilities" )
-add_definitions(-DISAAC_VECTOR_ELEM=${ISAAC_VECTOR_ELEM})
+set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_VECTOR_ELEM=${ISAAC_VECTOR_ELEM})
 
 option(ISAAC_SPECULAR "Add the specular light component." ON)
 if (ISAAC_SPECULAR)
-  add_definitions(-DISAAC_SPECULAR)
+  set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_SPECULAR)
 endif ()
 
 option(ISAAC_VALGRIND_TWEAKS "Activates some tweaks, so that valgrind doesn't complain about some false founds" OFF)
 if (ISAAC_VALGRIND_TWEAKS)
-  add_definitions(-DISAAC_VALGRIND_TWEAKS)
+  set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_VALGRIND_TWEAKS)
 endif ()
 
 ###############################################################################
@@ -116,7 +111,7 @@ set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${ICET_INCLUDE_DIRS})
 ################################################################################
 find_package(Boost 1.56.0 MODULE)
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${Boost_INCLUDE_DIR})
-add_definitions(-DBOOST_ALL_NO_LIB)
+set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DBOOST_ALL_NO_LIB)
 
 set(ISAAC_PRIVATE_FOUND true)
 
@@ -151,6 +146,10 @@ if (ISAAC_ALPAKA)
 endif()
 
 list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
+
+if (CMAKE_CXX_STANDARD EQUAL 98)
+    message( STATUS "At least C++ standard 11 must be enabled!" )
+endif()
 
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(ISAAC
                                   REQUIRED_VARS ISAAC_LIBRARIES ISAAC_INCLUDE_DIRS JANSSON_LIBRARIES JANSSON_INCLUDE_DIRS CMAKE_THREAD_LIBS_INIT MPI_CXX_FOUND ICET_CORE_LIBS ICET_MPI_LIBS ICET_INCLUDE_DIRS Boost_FOUND ISAAC_PRIVATE_FOUND)
