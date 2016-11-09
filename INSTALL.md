@@ -230,8 +230,20 @@ The server uses CMake. Best practice is to create a new directory (like
       xserver installed.
 * `make`
 
-Installation of the server is not implemented yet, but you get
-a single executable `isaac`, which can be run with `./isaac`.
+If you want to install the server type
+
+* `make install` (orobably as root)
+
+Change the installation directory with adding
+
+* `-DCMAKE_INSTALL_PREFIX=/your/path`
+
+while the initial `cmake ..`
+
+However, ISAAC doesn't need to be installed and can also directly be called with
+
+* `./isaac`
+
 For more informations about parameters use `./isaac --help` or have
 a look in the __[server documentation](http://computationalradiationphysics.github.io/isaac/doc/server/index.html)__.
 

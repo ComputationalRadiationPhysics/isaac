@@ -104,3 +104,8 @@ add_definitions(-DBOOST_ALL_NO_LIB)
 
 include_directories(isaac ${INCLUDE})
 target_link_libraries(isaac ${LIBS})
+
+install( TARGETS isaac DESTINATION bin )
+install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/lib/isaac.hpp" DESTINATION "include" )
+install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib/isaac" DESTINATION "include" )
+install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/lib/ISAACConfig.cmake" DESTINATION "lib/cmake/isaac" )
