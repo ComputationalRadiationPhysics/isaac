@@ -327,6 +327,8 @@ errorCode Broker::run()
 						{
 							json_decref( insitu->t->group->initData );
 							insitu->t->group->initData = js;
+							json_incref( js );
+							json_object_del( message->json_root, "init" );
 						}
 						//Filter payload
 						json_t* payload = json_object_get( message->json_root, "payload" );

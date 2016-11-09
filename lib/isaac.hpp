@@ -904,6 +904,7 @@ class IsaacVisualization
             send_background_color = false;
             send_clipping = false;
             send_controller = false;
+            send_init_json = false;
 
             //Handle messages
             json_t* message;
@@ -949,6 +950,8 @@ class IsaacVisualization
                             send_clipping = true;
                         if ( strcmp( target, "controller" ) == 0 )
                             send_controller = true;
+                        if ( strcmp( target, "init" ) == 0 )
+                            send_init_json = true;
                     }
                     //Search for scene changes
                     if (json_array_size( js = json_object_get(last, "rotation absolute") ) == 9)
@@ -1550,8 +1553,6 @@ class IsaacVisualization
             //Message sending
             if (myself->rank == myself->master)
             {
-                bool send_init_json = false;
-
                 json_object_set_new( myself->json_root, "type", json_string( "period" ) );
                 json_object_set_new( myself->json_root, "meta nr", json_integer( myself->metaNr ) );
 
@@ -1561,27 +1562,27 @@ class IsaacVisualization
                     json_object_set_new( myself->json_root, "projection", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix,myself->projection,16 * TController::pass_count)
                     json_object_set( myself->json_init_root, "projection", matrix );
-                    send_init_json = true;
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_look_at )
                 {
                     json_object_set_new( myself->json_root, "position", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix,myself->look_at,3)
                     json_object_set( myself->json_init_root, "position", matrix );
-                    send_init_json = true;
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_rotation )
                 {
                     json_object_set_new( myself->json_root, "rotation", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix, myself->rotation,9)
                     json_object_set( myself->json_init_root, "rotation", matrix );
-                    send_init_json = true;
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_distance )
                 {
                     json_object_set_new( myself->json_root, "distance", json_real( myself->distance ) );
                     json_object_set_new( myself->json_init_root, "distance", json_real( myself->distance ) );
-                    send_init_json = true;
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_transfer )
                 {
@@ -1638,19 +1639,19 @@ class IsaacVisualization
                 {
                     json_object_set_new( myself->json_root, "interpolation", json_boolean( myself->interpolation ) );
                     json_object_set_new( myself->json_init_root, "interpolation", json_boolean( myself->interpolation ) );
-                    send_init_json = true;
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_step )
                 {
                     json_object_set_new( myself->json_root, "step", json_real( myself->step ) );
                     json_object_set_new( myself->json_init_root, "step", json_boolean( myself->step ) );
-                    send_init_json = true;
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_iso_surface )
                 {
                     json_object_set_new( myself->json_root, "iso surface", json_boolean( myself->iso_surface ) );
                     json_object_set_new( myself->json_init_root, "iso surface", json_boolean( myself->iso_surface ) );
-                    send_init_json = true;
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_minmax )
                 {
@@ -1669,7 +1670,7 @@ class IsaacVisualization
                     for (size_t i = 0; i < 3; i++)
                         json_array_append_new( matrix, json_real( myself->background_color[i] ) );
                     json_object_set( myself->json_init_root, "background color", matrix );
-                    send_init_json = true;
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_clipping )
                 {
@@ -1691,8 +1692,8 @@ class IsaacVisualization
                     }
                 }
                 myself->controller.sendFeedback( myself->json_root, myself->send_controller );
-                if ( send_init_json )
-                    json_object_set( myself->json_root,"register",myself->json_init_root );
+                if ( myself->send_init_json )
+                    json_object_set( myself->json_root,"init",myself->json_init_root );
                 char* buffer = json_dumps( myself->json_root, 0 );
                 myself->communicator->serverSend(buffer);
                 free(buffer);
@@ -1799,6 +1800,7 @@ class IsaacVisualization
         bool send_background_color;
         bool send_clipping;
         bool send_controller;
+        bool send_init_json;
         bool interpolation;
         bool iso_surface;
         bool icet_bounding_box;
