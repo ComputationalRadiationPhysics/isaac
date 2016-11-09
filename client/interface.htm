@@ -39,6 +39,7 @@
 			<form>
 				<input type="button" value="Pause" id="pause">
 				<input type="button" value="Stop observing" id="stop">
+				<input type="button" value="Reset view" id="panic">
 				<input type="button" value="Stop simulation" id="exit">
 				<input type="button" value="Toogle bounding box" id="bounding">
 				Background color: <input id="background_color" class="jscolor" value="000000" size="6">
@@ -320,7 +321,7 @@ var sources = null;
 function sendFeedback(name,feedback)
 {
 	var d = new Date();
-		last_feedback_send = d.getTime();
+	last_feedback_send = d.getTime();
 	var obj =
 	{
 		"type" : "feedback",
@@ -560,31 +561,21 @@ document.getElementById("interval_range").oninput = function()
 
 document.getElementById("interval_change").onclick = function()
 {
-	var obj =
+	var metadata =
 	{
-		"type" : "feedback",
-		"observe id" : observe_id,
-		"metadata" :
-		{
-			"interval" : parseInt(document.getElementById("interval_range").value)
-		}
+		"interval" : parseInt(document.getElementById("interval_range").value)
 	};
-	socket.send(JSON.stringify(obj));
+	sendFeedback("metadata", metadata);
 };
 
 document.getElementById("clip_add").onclick = function()
 {
-	var obj =
+	var clipping_add =
 	{
-		"type" : "feedback",
-		"observe id" : observe_id,
-		"clipping add" :
-		{
-			"position" : [ parseFloat(document.getElementById("clip_px").value), parseFloat(document.getElementById("clip_py").value), parseFloat(document.getElementById("clip_pz").value) ],
-			"normal"   : [ parseFloat(document.getElementById("clip_nx").value), parseFloat(document.getElementById("clip_ny").value), parseFloat(document.getElementById("clip_nz").value) ]
-		}
+		"position" : [ parseFloat(document.getElementById("clip_px").value), parseFloat(document.getElementById("clip_py").value), parseFloat(document.getElementById("clip_pz").value) ],
+		"normal"   : [ parseFloat(document.getElementById("clip_nx").value), parseFloat(document.getElementById("clip_ny").value), parseFloat(document.getElementById("clip_nz").value) ]
 	};
-	socket.send(JSON.stringify(obj));
+	sendFeedback("clipping add", clipping_add);
 };
 
 document.getElementById("clip_bx").onclick = function()
@@ -620,18 +611,13 @@ function createEditClippingFeedback( c )
 {
 	return function()
 	{
-		var obj =
+		var clipping_edit =
 		{
-			"type" : "feedback",
-			"observe id" : observe_id,
-			"clipping edit" :
-			{
-				"nr"       : parseInt(c),
-				"position" : [ parseFloat(document.getElementById("clip_" + c + "_px").value), parseFloat(document.getElementById("clip_" + c + "_py").value), parseFloat(document.getElementById("clip_" + c + "_pz").value) ],
-				"normal"   : [ parseFloat(document.getElementById("clip_" + c + "_nx").value), parseFloat(document.getElementById("clip_" + c + "_ny").value), parseFloat(document.getElementById("clip_" + c + "_nz").value) ]
-			}
+			"nr"       : parseInt(c),
+			"position" : [ parseFloat(document.getElementById("clip_" + c + "_px").value), parseFloat(document.getElementById("clip_" + c + "_py").value), parseFloat(document.getElementById("clip_" + c + "_pz").value) ],
+			"normal"   : [ parseFloat(document.getElementById("clip_" + c + "_nx").value), parseFloat(document.getElementById("clip_" + c + "_ny").value), parseFloat(document.getElementById("clip_" + c + "_nz").value) ]
 		};
-		socket.send(JSON.stringify(obj));
+		sendFeedback("clipping edit", clipping_edit);
 	};
 };
 
@@ -1219,42 +1205,42 @@ document.getElementById("stop").onclick = function()
 
 document.getElementById("pause").onclick = function()
 {
-	var obj =
+	var metadata =
 	{
-		"type" : "feedback",
-		"observe id" : observe_id,
-		"metadata" :
-		{
-			"pause" : true
-		}
+		"pause" : true
 	};
-	socket.send(JSON.stringify(obj));
+	sendFeedback("metadata", metadata);
 }
 
 document.getElementById("exit").onclick = function()
 {
-	var obj =
+	if (confirm("Do you really want to stop the simulation?"))
 	{
-		"type" : "feedback",
-		"observe id" : observe_id,
-		"metadata" :
+		var metadata =
 		{
 			"exit" : 1
-		}
-	};
-	socket.send(JSON.stringify(obj));
-	document.getElementById("stop").onclick();
+		};
+		sendFeedback("metadata", metadata);
+		document.getElementById("stop").onclick();
+	}
+}
+
+document.getElementById("panic").onclick = function()
+{
+	if (confirm("Do you really want to reset the view?"))
+	{
+		position = [0, 0, 0];
+		distance = -4.5;
+		rotation = [1, 0, 0, 0, 1, 0, 0, 0, 1]
+		sendFeedback("position absolute",position);
+		sendFeedback("distance absolute",distance);
+		sendFeedback("rotation absolute",rotation);
+	}
 }
 
 document.getElementById("bounding").onclick = function()
 {
-	var obj =
-	{
-		"type" : "feedback",
-		"observe id" : observe_id,
-		"bounding box" : true
-	};
-	socket.send(JSON.stringify(obj));
+	sendFeedback("bounding box",true);
 }
 
 document.getElementById("background_change").onclick = function()
@@ -1263,13 +1249,7 @@ document.getElementById("background_change").onclick = function()
 	background_color[0] = document.getElementById("background_color").jscolor.rgb[0]/255;
 	background_color[1] = document.getElementById("background_color").jscolor.rgb[1]/255;
 	background_color[2] = document.getElementById("background_color").jscolor.rgb[2]/255;
-	var obj =
-	{
-		"type" : "feedback",
-		"observe id" : observe_id,
-		"background color" : background_color
-	};
-	socket.send(JSON.stringify(obj));
+	sendFeedback("background color",background_color);
 }
 
 function one_window_checkbox_click()
