@@ -45,7 +45,13 @@ endif (ISAAC_SDL)
 
 find_package (PkgConfig REQUIRED)
 
-option(ISAAC_GST "Use Gstreamer" ON)
+set(GST_INITIAL_OPTION OFF)
+pkg_search_module(GST gstreamer-1.0)
+if (GST_FOUND)
+	set(GST_INITIAL_OPTION ON)
+endif(GST_FOUND)
+
+option(ISAAC_GST "Use Gstreamer" ${GST_INITIAL_OPTION})
 if (ISAAC_GST)
 	pkg_search_module(GST REQUIRED gstreamer-1.0)
 	set(LIBS ${LIBS} ${GST_LIBRARIES} )

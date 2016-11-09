@@ -100,12 +100,19 @@ be built yourself nevertheless or the distribution versions are outdated.
     * With admin rights and no other version of libwebsockets installed:
       * `cd build`
       * `cmake ..`
+        * `cmake ..` may fail if OpenSSL is not availabale. ISAAC itself does
+          not support HTTPS connections at the moment anyway, thus it can be
+          disabled with: `cmake -DLWS_WITH_SSL=OFF ..`
       * `make`
       * `sudo make install`
     * Otherwise:
       * `mkdir install`
       * `cd build`
-      * `cmake .. -DCMAKE_INSTALL_PREFIX=../install`
+      * `cmake -DCMAKE_INSTALL_PREFIX=../install ..`
+        * `cmake -DCMAKE_INSTALL_PREFIX=../install ..` may fail if OpenSSL
+          is not availabale. ISAAC itself does not support HTTPS connections at
+          the moment anyway, thus it can be disabled with:
+          `cmake -DLWS_WITH_SSL=OFF -DCMAKE_INSTALL_PREFIX=../install ..`
       * `make install`
       * Now a local version of libwebsockets is installed in the install
         directory in the libwebsockets root folder. Later while compiling the
@@ -202,13 +209,25 @@ Building
 
 The server uses CMake. Best practice is to create a new directory (like
 `build`) in the isaac root directory and change to it:
+
 * `git clone https://github.com/ComputationalRadiationPhysics/isaac.git`
 * `cd isaac`
 * `mkdir build`
 * `cd build`
-* `cmake ..` (Don't forget the maybe needed `-DLIB_DIR=…` parameters
-  needed for local installed libraries. E.g.
-  `cmake -DLibwebsockets_DIR=$LIBWEBSOCKETS/install/lib/cmake/libwebsockets ..`)
+* `cmake ..`
+  * Don't forget the maybe needed `-DLIB_DIR=…` parameters
+    needed for local installed libraries. E.g.
+    `cmake -DLibwebsockets_DIR=$LIBWEBSOCKETS/install/lib/cmake/libwebsockets ..`
+  * There are some options to (de)activate features of ISAAC if they are not needed
+    or not available on the system (like Gstreamer), which you can change with
+    theese lines before `..` (in `cmake ..`):
+    * `-DISAAC_GST=OFF` → Deactivates GStreamer
+    * `-DISAAC_JPEG=OFF` → Deactivates JPEG compression. As already mentioned: This is not advised
+      and will most probably leave ISAAC in an unusable state in the end.
+    * `-DISAAC_SDL=ON` → Activates a plugin for showing the oldest not yet finished
+      visualization in an extra window using `libSDL`. Of course this option does not
+      make much sense for most servers as they don't have a screen or even an
+      xserver installed.
 * `make`
 
 Installation of the server is not implemented yet, but you get
