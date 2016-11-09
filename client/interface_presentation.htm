@@ -323,7 +323,7 @@ function redraw()
 	if (preview.clientWidth == stream_img.width && preview.clientHeight == stream_img.height)
 	{
 		p_ctx.font = "30px Arial";
-		p_ctx.fillStyle = "#ffffff";
+		p_ctx.fillStyle = wireframe_color;
 		p_ctx.textAlign = "right";
 		p_ctx.fillText( parseInt(Math.round(particle_count/1000000)) + " Mio. Particles",parseInt(preview.clientWidth)-10,parseInt(32));
 		p_ctx.fillText( parseInt(Math.round(cell_count/1000000)) + " Mio. Cells",parseInt(preview.clientWidth)-10,parseInt(57));
