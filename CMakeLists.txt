@@ -14,6 +14,7 @@ set(SRCS
 	${CMAKE_SOURCE_DIR}/server/MessageAble.cpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataClient.cpp
 	${CMAKE_SOURCE_DIR}/server/TCPDataConnector.cpp
+	${CMAKE_SOURCE_DIR}/server/NetworkInterfaces.cpp
 )
 
 set(HDRS
@@ -29,6 +30,7 @@ set(HDRS
 	${CMAKE_SOURCE_DIR}/server/MessageAble.hpp
 	${CMAKE_SOURCE_DIR}/server/MetaDataClient.hpp
 	${CMAKE_SOURCE_DIR}/server/TCPDataConnector.hpp
+	${CMAKE_SOURCE_DIR}/server/NetworkInterfaces.hpp
 )
 
 option(ISAAC_SDL "Build SDL ImageConnector" OFF)
@@ -43,7 +45,13 @@ endif (ISAAC_SDL)
 
 find_package (PkgConfig REQUIRED)
 
-option(ISAAC_GST "Use Gstreamer" ON)
+set(GST_INITIAL_OPTION OFF)
+pkg_search_module(GST gstreamer-1.0)
+if (GST_FOUND)
+	set(GST_INITIAL_OPTION ON)
+endif(GST_FOUND)
+
+option(ISAAC_GST "Use Gstreamer" ${GST_INITIAL_OPTION})
 if (ISAAC_GST)
 	pkg_search_module(GST REQUIRED gstreamer-1.0)
 	set(LIBS ${LIBS} ${GST_LIBRARIES} )
@@ -96,3 +104,8 @@ add_definitions(-DBOOST_ALL_NO_LIB)
 
 include_directories(isaac ${INCLUDE})
 target_link_libraries(isaac ${LIBS})
+
+install( TARGETS isaac DESTINATION bin )
+install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/lib/isaac.hpp" DESTINATION "include" )
+install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib/isaac" DESTINATION "include" )
+install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/lib/ISAACConfig.cmake" DESTINATION "lib/cmake/isaac" )

@@ -42,10 +42,11 @@ void* delete_pointer_later(void* ptr)
 	delete( (Type*)ptr );
 }
 
-Broker::Broker(std::string name,int inner_port)
+Broker::Broker(std::string name,int inner_port,std::string interface)
 {
 	this->name = name;
 	this->inner_port = inner_port;
+	this->inner_interface = interface;
 	this->insituThread = 0;
 	masterHello = json_object();
 	json_object_set_new( masterHello, "type", json_string( "hello" ) );
@@ -154,16 +155,16 @@ void Broker::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char
 	comma++;
 	int whole_length = strlen(comma);
 	comma[whole_length-1] = 0;
-	
+
 	bool jpeg = false;
 	if (strcmp(colon, "image/jpeg") == 0)
 		jpeg = true;
-	
+
 	uint8_t* temp_buffer = video_buffer;
 	if (jpeg)
 		temp_buffer = (uint8_t*)malloc(strlen(comma)+4); //Should always be enough
-	
-	//base64 -> binary data	
+
+	//base64 -> binary data
 	using namespace boost::archive::iterators;
 	typedef
 		transform_width
@@ -174,7 +175,7 @@ void Broker::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char
 			>,
 			8,
 			6
-		> 
+		>
 		base64_dec;
 
 	try
@@ -189,7 +190,7 @@ void Broker::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char
 	catch (dataflow_exception&)
 	{
 	}
-	
+
 	if (jpeg)
 	{
 		#if ISAAC_JPEG == 1
@@ -231,7 +232,7 @@ void Broker::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char
 				}
 			}
 			(void) jpeg_finish_decompress(&cinfo);
-			jpeg_destroy_decompress(&cinfo);		
+			jpeg_destroy_decompress(&cinfo);
 			free(temp_buffer);
 		#else
 			memset( video_buffer, rand()%255, group->video_buffer_size );
@@ -277,14 +278,14 @@ errorCode Broker::run()
 	printf("Running ISAAC Master\n");
 	signal(SIGINT, sighandler);
 	printf("Starting insitu plugin listener\n");
-	if (insituMaster.init(inner_port))
+	if (insituMaster.init(inner_port,inner_interface))
 	{
 		fprintf(stderr,"Error while starting insitu plugin listener\n");
 		signal(SIGINT, SIG_DFL);
 		return -1;
 	}
 	pthread_create(&insituThread,NULL,Runable::run_runable,&insituMaster);
-	
+
 	for (auto it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
 		printf("Launching %s\n",(*it).connector->getName().c_str());
@@ -322,22 +323,13 @@ errorCode Broker::run()
 					{
 						//Let's see, whether some options are broadcastet and change them in the initData
 						json_t* js;
-						if (json_array_size( js = json_object_get(message->json_root, "projection") ) == 16)
-							json_object_set( insitu->t->group->initData, "projection", js );
-						if (json_array_size( js = json_object_get(message->json_root, "rotation") ) == 9)
-							json_object_set( insitu->t->group->initData, "rotation", js );
-						if (json_array_size( js = json_object_get(message->json_root, "position") ) == 3)
-							json_object_set( insitu->t->group->initData, "position", js );
-						if ( js = json_object_get(message->json_root, "distance") )
-							json_object_set( insitu->t->group->initData, "distance", js );
-						if ( js = json_object_get(message->json_root, "interpolation") )
-							json_object_set( insitu->t->group->initData, "interpolation", js );
-						if ( js = json_object_get(message->json_root, "iso surface") )
-							json_object_set( insitu->t->group->initData, "iso surface", js );
-						if ( js = json_object_get(message->json_root, "step") )
-							json_object_set( insitu->t->group->initData, "step", js );
-						if ( js = json_object_get(message->json_root, "background color") )
-							json_object_set( insitu->t->group->initData, "background color", js );
+						if ( js = json_object_get(message->json_root, "init") )
+						{
+							json_decref( insitu->t->group->initData );
+							insitu->t->group->initData = js;
+							json_incref( js );
+							json_object_del( message->json_root, "init" );
+						}
 						//Filter payload
 						json_t* payload = json_object_get( message->json_root, "payload" );
 						if (payload)
@@ -405,7 +397,7 @@ errorCode Broker::run()
 							printf("New connection, giving id %i (control)\n",insitu->t->connector->getID());
 							break;
 					}
-					
+
 					group->master = insitu->t;
 					group->id = insitu->t->connector->getID();
 

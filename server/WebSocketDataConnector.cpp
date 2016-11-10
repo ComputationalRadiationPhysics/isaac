@@ -198,7 +198,7 @@ static struct lws_protocols protocols[] = {
 	{ NULL, NULL, 0, 0 } /* terminator */
 };
 
-errorCode WebSocketDataConnector::init(int port)
+errorCode WebSocketDataConnector::init(int port,std::string interface)
 {
 	setlogmask(LOG_UPTO (LOG_DEBUG));
 	openlog("lwsts", LOG_PID | LOG_PERROR, LOG_DAEMON);
@@ -213,7 +213,8 @@ errorCode WebSocketDataConnector::init(int port)
 	info.port = port;
 	info.gid = -1;
 	info.uid = -1;
-
+	if (interface.compare(std::string("*")) != 0)
+		info.iface = interface.c_str();
 	context = lws_create_context(&info);
 	if (context == NULL) {
 		lwsl_err("libwebsocket init failed\n");

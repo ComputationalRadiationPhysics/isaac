@@ -99,7 +99,7 @@ class InsituConnectorGroup
 class Broker
 {
 	public:
-		Broker(std::string name,int inner_port);
+		Broker(std::string name,int inner_port,std::string interface);
 		~Broker();
 		errorCode addDataConnector(MetaDataConnector *dataConnector);
 		errorCode addImageConnector(ImageConnector *imageConnector);
@@ -118,6 +118,7 @@ class Broker
 		ThreadList< InsituConnectorGroup* > insituConnectorGroupList;
 		ThreadList< MetaDataClient* > dataClientList;
 		int inner_port;
+		std::string inner_interface;
 		pthread_t insituThread;
 };
 

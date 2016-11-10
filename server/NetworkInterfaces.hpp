@@ -13,21 +13,20 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
-#pragma once
+#ifndef __NETWORKINTERFACES
+#define __NETWORKINTERFACES
 
-#include "MetaDataConnector.hpp"
+#include <sys/types.h>
+#include <ifaddrs.h>
+#include <string>
+#include <netinet/in.h>
 
-#include <libwebsockets.h>
-
-/** This class is used for the connection between the isaac server and
- * some frontend. It defines and abstract interface isaac will use.*/
-class WebSocketDataConnector : public MetaDataConnector
+class NetworkInterfaces
 {
 	public:
-		WebSocketDataConnector();
-		errorCode init(int port,std::string interface);
-		errorCode run();
-		std::string getName();
+		static void bindInterface(in_addr_t &s_addr,std::string interface, bool ipv6 = false);
+		static struct ifaddrs * ifaddr;
 	private:
-		struct lws_context *context;
+		static void initIfaddr();
 };
+#endif

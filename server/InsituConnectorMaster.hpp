@@ -35,7 +35,7 @@ class InsituConnectorMaster : public Runable
 {
 	public:
 		InsituConnectorMaster();
-		errorCode init(int port);
+		errorCode init(int port,std::string interface);
 		errorCode run();
 		~InsituConnectorMaster();
 		ThreadList< InsituConnectorContainer* > insituConnectorList;

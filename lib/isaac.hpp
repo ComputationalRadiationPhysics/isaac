@@ -856,20 +856,18 @@ class IsaacVisualization
             ISAAC_WAIT_VISUALIZATION
             return json_meta_root;
         }
-        int init()
+        int init(CommunicatorSetting communicatorBehaviour = ReturnAtError)
         {
             int failed = 0;
-            if (communicator && communicator->serverConnect())
+            if (communicator && (communicator->serverConnect(communicatorBehaviour) < 0))
                 failed = 1;
             MPI_Bcast(&failed,1, MPI_INT, master, mpi_world);
             if (failed)
                 return -1;
             if (rank == master)
             {
-                char* buffer = json_dumps( json_root, 0 );
-                communicator->serverSend(buffer,true,true);
-                free(buffer);
-                json_decref( json_root );
+                json_init_root = json_root;
+                communicator->serverSendRegister(&json_init_root);
                 recreateJSON();
             }
             return 0;
@@ -906,6 +904,7 @@ class IsaacVisualization
             send_background_color = false;
             send_clipping = false;
             send_controller = false;
+            send_init_json = false;
 
             //Handle messages
             json_t* message;
@@ -951,6 +950,8 @@ class IsaacVisualization
                             send_clipping = true;
                         if ( strcmp( target, "controller" ) == 0 )
                             send_controller = true;
+                        if ( strcmp( target, "init" ) == 0 )
+                            send_init_json = true;
                     }
                     //Search for scene changes
                     if (json_array_size( js = json_object_get(last, "rotation absolute") ) == 9)
@@ -1371,6 +1372,7 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaFree( local_minmax_array_d ) );
             #endif
             delete communicator;
+            json_decref(json_init_root);
         }
         uint64_t getTicksUs()
         {
@@ -1559,19 +1561,29 @@ class IsaacVisualization
                 {
                     json_object_set_new( myself->json_root, "projection", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix,myself->projection,16 * TController::pass_count)
+                    json_object_set( myself->json_init_root, "projection", matrix );
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_look_at )
                 {
                     json_object_set_new( myself->json_root, "position", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix,myself->look_at,3)
+                    json_object_set( myself->json_init_root, "position", matrix );
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_rotation )
                 {
                     json_object_set_new( myself->json_root, "rotation", matrix = json_array() );
                     ISAAC_JSON_ADD_MATRIX(matrix, myself->rotation,9)
+                    json_object_set( myself->json_init_root, "rotation", matrix );
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_distance )
+                {
                     json_object_set_new( myself->json_root, "distance", json_real( myself->distance ) );
+                    json_object_set_new( myself->json_init_root, "distance", json_real( myself->distance ) );
+                    myself->send_init_json = true;
+                }
                 if ( myself->send_transfer )
                 {
                     json_object_set_new( myself->json_root, "transfer array", matrix = json_array() );
@@ -1624,11 +1636,23 @@ class IsaacVisualization
                         json_array_append_new( matrix, json_real( myself->source_weight.value[i] ) );
                 }
                 if ( myself->send_interpolation )
+                {
                     json_object_set_new( myself->json_root, "interpolation", json_boolean( myself->interpolation ) );
+                    json_object_set_new( myself->json_init_root, "interpolation", json_boolean( myself->interpolation ) );
+                    myself->send_init_json = true;
+                }
                 if ( myself->send_step )
+                {
                     json_object_set_new( myself->json_root, "step", json_real( myself->step ) );
+                    json_object_set_new( myself->json_init_root, "step", json_boolean( myself->step ) );
+                    myself->send_init_json = true;
+                }
                 if ( myself->send_iso_surface )
+                {
                     json_object_set_new( myself->json_root, "iso surface", json_boolean( myself->iso_surface ) );
+                    json_object_set_new( myself->json_init_root, "iso surface", json_boolean( myself->iso_surface ) );
+                    myself->send_init_json = true;
+                }
                 if ( myself->send_minmax )
                 {
                     json_object_set_new( myself->json_root, "minmax", matrix = json_array() );
@@ -1645,6 +1669,8 @@ class IsaacVisualization
                     json_object_set_new( myself->json_root, "background color", matrix = json_array() );
                     for (size_t i = 0; i < 3; i++)
                         json_array_append_new( matrix, json_real( myself->background_color[i] ) );
+                    json_object_set( myself->json_init_root, "background color", matrix );
+                    myself->send_init_json = true;
                 }
                 if ( myself->send_clipping )
                 {
@@ -1666,11 +1692,12 @@ class IsaacVisualization
                     }
                 }
                 myself->controller.sendFeedback( myself->json_root, myself->send_controller );
+                if ( myself->send_init_json )
+                    json_object_set( myself->json_root,"init",myself->json_init_root );
                 char* buffer = json_dumps( myself->json_root, 0 );
                 myself->communicator->serverSend(buffer);
                 free(buffer);
             }
-
             json_decref( myself->json_root );
             myself->recreateJSON();
 
@@ -1686,7 +1713,6 @@ class IsaacVisualization
                 }
             }
             ISAAC_STOP_TIME_MEASUREMENT( myself->video_send_time, +=, video_send, myself->getTicksUs() )
-
             myself->metaNr++;
             return 0;
         }
@@ -1774,6 +1800,7 @@ class IsaacVisualization
         bool send_background_color;
         bool send_clipping;
         bool send_controller;
+        bool send_init_json;
         bool interpolation;
         bool iso_surface;
         bool icet_bounding_box;
@@ -1781,6 +1808,7 @@ class IsaacVisualization
         IceTDouble modelview[16];
         IsaacCommunicator* communicator;
         json_t *json_root;
+        json_t *json_init_root;
         json_t *json_meta_root;
         isaac_int rank;
         isaac_int master;

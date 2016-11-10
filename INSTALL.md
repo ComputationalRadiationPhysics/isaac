@@ -18,7 +18,7 @@ be built yourself nevertheless or the distribution versions are outdated.
 * __CMake__ for building everything:
   * _Debian/Ubuntu_:
     * `sudo apt-get install cmake cmake-curses-gui`
-  * _From Source_ (As at least Version 3.1 is needed for the in-situ library):
+  * _From Source_ (As at least Version 3.3 is needed for the in-situ library):
     * `wget https://cmake.org/files/v3.5/cmake-3.5.2.tar.gz`
     * `tar -zxvf cmake-3.5.2.tar.gz`
     * `rm cmake-3.5.2.tar.gz`
@@ -38,7 +38,7 @@ be built yourself nevertheless or the distribution versions are outdated.
         `$CMAKE/install/bin/cmake` instead of `cmake` and
         `$CMAKE/install/bin/ccmake` instead of `ccmake`, where `$CMAKE` is
         the path of the cmake-3.5.2 directory used above.
-* __libjpeg__ or __libjpeg-turbo__ for (de)compressing the rendered image for the
+* __libjpeg__ or __libjpeg-turbo__ for (de)compressing the rendered image of the
   transmission:
   * _Debian/Ubuntu_:
     * `sudo apt-get install libjpeg-dev`
@@ -91,7 +91,7 @@ be built yourself nevertheless or the distribution versions are outdated.
 
 ### Requirements for the server only
 
-* __libwebsockets__ for the connection between server and the HTML5 client.
+* __libwebsockets__ for the connection between server and an HTML5 client.
   It is in steady development and the most recent version should be used:
   * _From Source_:
     * `git clone https://github.com/warmcat/libwebsockets.git`
@@ -100,12 +100,19 @@ be built yourself nevertheless or the distribution versions are outdated.
     * With admin rights and no other version of libwebsockets installed:
       * `cd build`
       * `cmake ..`
+        * `cmake ..` may fail if OpenSSL is not available. ISAAC itself does
+          not support HTTPS connections at the moment anyway, thus it can be
+          disabled with: `cmake -DLWS_WITH_SSL=OFF ..`
       * `make`
       * `sudo make install`
     * Otherwise:
       * `mkdir install`
       * `cd build`
-      * `cmake .. -DCMAKE_INSTALL_PREFIX=../install`
+      * `cmake -DCMAKE_INSTALL_PREFIX=../install ..`
+        * `cmake -DCMAKE_INSTALL_PREFIX=../install ..` may fail if OpenSSL
+          is not available. ISAAC itself does not support HTTPS connections at
+          the moment anyway, thus it can be disabled with:
+          `cmake -DLWS_WITH_SSL=OFF -DCMAKE_INSTALL_PREFIX=../install ..`
       * `make install`
       * Now a local version of libwebsockets is installed in the install
         directory in the libwebsockets root folder. Later while compiling the
@@ -114,7 +121,7 @@ be built yourself nevertheless or the distribution versions are outdated.
         `$LIBWEBSOCKETS` is the root folder of the libwebsockets source (the directory
         `git clone …` created).
 * __gStreamer__ is only needed, if streaming over RTP or the Twitch plugin shall
-  be used. It shall be possible to build gStreamer yourself, but it
+  be used. It should be possible to build gStreamer yourself, but it
   is strongly adviced - even from the gStreamer team themself - to use
   the prebuilt version of your distribution. The HML5 Client can show
   streams of a server without gStreamer.
@@ -124,32 +131,32 @@ be built yourself nevertheless or the distribution versions are outdated.
 ### Requirements for the in situ library and the examples using it
 
 The ISAACConfig.cmake searches for these requirements. See
-example/CMakeLists.txt for an easy to adopt example.
+`example/CMakeLists.txt` for an easy to adopt example.
 
 * __Alpaka__ for the abstraction of the acceleration device. If only CUDA
   is used, this library is __not needed__:
   * _From Source_:
     * `git clone https://github.com/ComputationalRadiationPhysics/alpaka.git`
-    * It is an header only library and doesn't need to be installed. However
-      the root directory of the libary has to be added to the CMake Variable
+    * It is a header only library and doesn't need to be installed. However
+      the root directory of the libary has to be added to the CMake variable
       `CMAKE_MODULE_PATH`, e.g. with
       * `set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/alpaka/" CACHE STRING  "The location of the alpaka library")`
       * `set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")`
-* __CUDA__ for Nvidia accelerators. At least version 7.0 is needed for ISAAC, if
-  CUDA acceleration is needed at all. If only OpenMP or TBB via Alpaka are needed,
-  CUDA is not needed:
+* __CUDA__ for Nvidia accelerators. At least version 7.0 is needed for ISAAC (if
+  CUDA acceleration is needed at all). If only OpenMP or TBB via Alpaka are used,
+  CUDA is __not needed__.
   * _Debian/Ubuntu_ (official repositories, at least Ubuntu 16.04 for CUDA 7.0):
     * `sudo apt-get install nvidia-cuda-dev`
   * _Debian/Ubuntu_ (directly from NVidia):
     * Download the most recent CUDA toolkit from here
       `https://developer.nvidia.com/cuda-downloads`. Choose `deb (network)`
-      to download a package, which installes the NVidia Repository.
+      to download a package, which installs the NVidia repository.
     * In the download folder of the package above do:
       * `sudo dpkg -i cuda-repo-ubuntu1404_7.5-18_amd64.deb` (the name may differ,
         check what you downloaded)
       * `sudo apt-get update`
       * `sudo apt-get install cuda`
-* __IceT__ for combining the visualization created from the in situ plugin.
+* __IceT__ for combining the visualization created by the in situ plugin.
   * _Debian/Ubuntu_ (as part of Paraview):
     * `sudo apt-get install paraview-dev`
   * _From Source_:
@@ -173,8 +180,8 @@ example/CMakeLists.txt for an easy to adopt example.
         `$ICET` is the root folder of IceT (the directory
         `git clone …` created).
 * __MPI__ for the communication on the cluster. This should be available on
-  all clusters these days. However for a local testsystem a common used
-  version is OpenMPI:
+  all clusters these days. However for a local testsystem OpenMPI is a commonly used
+  version:
   * _Debian/Ubuntu_:
     * `sudo apt-get install libopenmpi-dev`
   * _From Source_:
@@ -202,24 +209,53 @@ Building
 
 The server uses CMake. Best practice is to create a new directory (like
 `build`) in the isaac root directory and change to it:
+
 * `git clone https://github.com/ComputationalRadiationPhysics/isaac.git`
 * `cd isaac`
 * `mkdir build`
 * `cd build`
-* `cmake ..` (Don't forget the maybe needed `-DLIB_DIR=…` parameters
-  needed for local installed libraries. E.g.
-  `cmake -DLibwebsockets_DIR=$LIBWEBSOCKETS/install/lib/cmake/libwebsockets ..`)
+* `cmake ..`
+  * Don't forget the maybe needed `-DLIB_DIR=…` parameters
+    needed for local installed libraries. E.g.
+    `cmake -DLibwebsockets_DIR=$LIBWEBSOCKETS/install/lib/cmake/libwebsockets ..`
+  * There are some options to (de)activate features of ISAAC if they are not needed
+    or not available on the system (like Gstreamer), which you can change with
+    theese lines before `..` (in `cmake ..`) or afterwards with `ccmake` or `cmake-gui`:
+    * `-DISAAC_GST=OFF` → Deactivates GStreamer.
+    * `-DISAAC_JPEG=OFF` → Deactivates JPEG compression. As already mentioned: This is not advised
+      and will most probably leave ISAAC in an unusable state in the end.
+    * `-DISAAC_SDL=ON` → Activates a plugin for showing the oldest not yet finished
+      visualization in an extra window using `libSDL`. Of course this option does not
+      make much sense for most servers as they don't have a screen or even an
+      X server installed.
+    * `-DISAAC_CUDA=OFF` →  Deactivates CUDA.
+    * `-DISAAC_ALPAKA=ON` → Activates ALPAKA. The used accelerator of Alpaka can be
+      changed inside the file `example.cpp`. At default OpenMP version 2 is used as
+      accelerator. At least CUDA or Alpaka need to be activated. 
+
 * `make`
 
-Installation of the server is not implemented yet, but you get
-a single executable `isaac`, which can be run with `./isaac`.
+If you want to install the server type
+
+* `make install` (probably as root)
+
+Change the installation directory with adding
+
+* `-DCMAKE_INSTALL_PREFIX=/your/path`
+
+in the initial `cmake ..`
+
+However, ISAAC doesn't need to be installed and can also directly be called with
+
+* `./isaac`
+
 For more informations about parameters use `./isaac --help` or have
 a look in the __[server documentation](http://computationalradiationphysics.github.io/isaac/doc/server/index.html)__.
 
 ### The example
 
 The building of the examples works similar, but the root directory of
-the examples is the folder "example", so after changing directory to
+the examples is the folder `example`, so after changing directory to
 isaac (`cd isaac`) do:
 
 * `cd example`
@@ -230,31 +266,21 @@ isaac (`cd isaac`) do:
   `cmake -DIceT_DIR=$ICET/install/lib ..`)
 * `make`
 
-Afterwards you get executables `example_cuda`, `example_alpaka` or both.
-Best practise is to use `ccmake ..` or `cmake-gui ..` to change the building options,
-especially:
-
-* `ISAAC_ALPAKA`, which enables using ALPAKA
-* `ISAAC_CUDA`, which enables using CUDA
-
-The used accelerator of Alpaka can be changed inside the file `example.cpp`.
-At default OpenMP version 2 is used as Accelerator.
+Afterwards you get the executables `example_cuda`, `example_alpaka` or both.
 
 ### Testing
 
 To test the server and an example, just start the server with `./isaac`,
 connect to it with one of the HTML clients in the directory `client` (best
-is `interface_novlc.htm` with `Select stream (before observing!)`
-set to `JPEG Stream (html5 only)`) and
-start an example with `./example_cuda` or `./example_alpaka`. It should
-connect to the server running on localhost and be observable and
-steerable. You can run multiple instances of the example with
+is `interface.htm`) and start an example with `./example_cuda` or
+`./example_alpaka`. It should connect to the server running on localhost and be
+observable and steerable. You can run multiple instances of the example with
 `mpirun -c N ./example_KIND` with the number of instances `N` and `KIND`
-being `cuda` or `alpaka`. To exit the example use the client or Ctrl+C.
+being `cuda` or `alpaka`. To exit the example, use the client or ctrl+C.
 
 
-How to use in own application
------------------------------
+How to use in an own application
+--------------------------------
 
-For a deeper insight how to use ISAAC in a new appliaction, have a look
+For a deeper insight how to use ISAAC in a new application, have a look
 at the [library documentation](http://computationalradiationphysics.github.io/isaac/doc/library/index.html).

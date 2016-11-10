@@ -350,7 +350,7 @@ int main(int argc, char **argv)
 	}
 
 	//finish init and sending the meta data scription to the isaac server
-	if (visualization->init())
+	if (visualization->init(RetryEverySend))
 	{
 		fprintf(stderr,"Isaac init failed.\n");
 		return -1;

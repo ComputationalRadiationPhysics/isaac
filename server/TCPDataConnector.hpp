@@ -23,7 +23,7 @@ class TCPDataConnector : public MetaDataConnector
 {
 	public:
 		TCPDataConnector();
-		errorCode init(int port);
+		errorCode init(int port,std::string interface);
 		errorCode run();
 		std::string getName();
 	private:

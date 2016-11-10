@@ -43,6 +43,12 @@ int main(int argc, char **argv)
 	int tcp_port = 2458;
 	int web_port = 2459;
 	int sim_port = 2460;
+	const char __tcp_interface[] = "*";
+	const char __web_interface[] = "*";
+	const char __sim_interface[] = "*";
+	const char* tcp_interface = __tcp_interface;
+	const char* web_interface = __web_interface;
+	const char* sim_interface = __sim_interface;
 	const char __name[] = "ISAAC Visualization server";
 	const char __url[] = "127.0.0.1";
 	const char* name = __name;
@@ -65,6 +71,9 @@ int main(int argc, char **argv)
 			printf("   --web_port: Set port for the websocket clients to connect. Default %i\n",web_port);
 			printf("   --tcp_port: Set port for the tcp clients to connect. Default %i\n",tcp_port);
 			printf("   --sim_port: Set port for the simulations to connect to. Default %i\n",sim_port);
+			printf("    --web_int: Set interface for the websocket clients to connect. Default %s\n",web_interface);
+			printf("    --tcp_int: Set interface for the tcp clients to connect. Default %s\n",tcp_interface);
+			printf("    --sim_int: Set interface for the simulations to connect. Default %s\n",sim_interface);
 			printf("        --url: Set the url to connect to from outside. Default 127.0.0.1\n");
 			printf("       --name: Set the name of the server.\n");
 			printf("    --version: Shows the version\n");
@@ -98,6 +107,24 @@ int main(int argc, char **argv)
 		{
 			ISAAC_INCREASE_NR_OR_DIE
 			sim_port = atoi(argv[nr]);
+		}
+		else
+		if (strcmp(argv[nr],"--web_int") == 0)
+		{
+			ISAAC_INCREASE_NR_OR_DIE
+			web_interface = argv[nr];
+		}
+		else
+		if (strcmp(argv[nr],"--tcp_int") == 0)
+		{
+			ISAAC_INCREASE_NR_OR_DIE
+			tcp_interface = argv[nr];
+		}
+		else
+		if (strcmp(argv[nr],"--sim_int") == 0)
+		{
+			ISAAC_INCREASE_NR_OR_DIE
+			sim_interface = argv[nr];
 		}
 		else
 		if (strcmp(argv[nr],"--url") == 0)
@@ -142,12 +169,12 @@ int main(int argc, char **argv)
 	printf("Using web_port=%i, tcp_port=%i and sim_port=%i\n",web_port,tcp_port,sim_port);
 
 	printf("\n");
-	Broker broker(name,sim_port);
+	Broker broker(name,sim_port,sim_interface);
 	WebSocketDataConnector* webSocketDataConnector = new WebSocketDataConnector();
-	if (webSocketDataConnector->init(web_port) == 0)
+	if (webSocketDataConnector->init(web_port,web_interface) == 0)
 		broker.addDataConnector(webSocketDataConnector);
 	TCPDataConnector* tCPDataConnector = new TCPDataConnector();
-	if (tCPDataConnector->init(tcp_port) == 0)
+	if (tCPDataConnector->init(tcp_port,tcp_interface) == 0)
 		broker.addDataConnector(tCPDataConnector);
 	#ifdef ISAAC_GST
 		RTPImageConnector* rTPImageConnector_h264 = new RTPImageConnector(url,false,false);
