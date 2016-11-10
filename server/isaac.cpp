@@ -25,6 +25,7 @@
 #endif
 #ifdef ISAAC_JPEG
 	#include "URIImageConnector.hpp"
+	#include "SaveFileImageConnector.hpp"
 #endif
 
 #define ISAAC_VERSION "1.0"
@@ -53,6 +54,7 @@ int main(int argc, char **argv)
 	const char __url[] = "127.0.0.1";
 	const char* name = __name;
 	const char* url = __url;
+	char* dump = NULL;
 	#ifdef ISAAC_GST
 		char* twitch_apikey = NULL;
 		char* twitch_url = NULL;
@@ -65,21 +67,24 @@ int main(int argc, char **argv)
 		{
 			printf("ISAAC - In Situ Animation of Accelerated Computations " ISAAC_VERSION"\n");
 			printf("Usage:\n");
-			printf("isaac [--help] [--web_port <X>] [--sim_port <X>] [--url <X>] [--name <X>]\n");
-			printf("      [--jpeg] [--version]\n");
-			printf("       --help: Shows this help\n");
-			printf("   --web_port: Set port for the websocket clients to connect. Default %i\n",web_port);
-			printf("   --tcp_port: Set port for the tcp clients to connect. Default %i\n",tcp_port);
-			printf("   --sim_port: Set port for the simulations to connect to. Default %i\n",sim_port);
-			printf("    --web_int: Set interface for the websocket clients to connect. Default %s\n",web_interface);
-			printf("    --tcp_int: Set interface for the tcp clients to connect. Default %s\n",tcp_interface);
-			printf("    --sim_int: Set interface for the simulations to connect. Default %s\n",sim_interface);
-			printf("        --url: Set the url to connect to from outside. Default 127.0.0.1\n");
-			printf("       --name: Set the name of the server.\n");
-			printf("    --version: Shows the version\n");
+			printf("isaac [--help] [--url <X>] [--name <X>] [--web_port <X>] [--tcp_port <X>]\n");
+			printf("      [--sim_port <X>] [--web_int <X>] [--tcp_int <X>] [--sim_int <X>]\n");
+			printf("      [--dump <X>] [--version]\n");
+			printf("Explanation:\n");
+			printf("      --help: Shows this help\n");
+			printf("       --url: Set the url to connect to from outside. Default 127.0.0.1\n");
+			printf("      --name: Set the name of the server.\n");
+			printf("  --web_port: Set port for the websocket clients to connect. Default %i\n",web_port);
+			printf("  --tcp_port: Set port for the tcp clients to connect. Default %i\n",tcp_port);
+			printf("  --sim_port: Set port for the simulations to connect to. Default %i\n",sim_port);
+			printf("   --web_int: Set interface for the websocket clients to connect. Default %s\n",web_interface);
+			printf("   --tcp_int: Set interface for the tcp clients to connect. Default %s\n",tcp_interface);
+			printf("   --sim_int: Set interface for the simulations to connect. Default %s\n",sim_interface);
+			printf("      --dump: Dump all received jpegs to the disk in the given folder\n");
+			printf("   --version: Shows the version\n");
 		#ifdef ISAAC_GST
-			printf("     --twitch: Set twitch apikey for twitch live streaming\n");
-			printf(" --twitch_url: Set twitch rtmp-url for ssh forwarding or another rtmp service\n");
+			printf("    --twitch: Set twitch apikey for twitch live streaming\n");
+			printf("--twitch_url: Set twitch rtmp-url for ssh forwarding or another rtmp service\n");
 			printf("--twitch_bitrate: Set twitch bitrate. Default 400\n");
 		#endif
 			return 0;
@@ -159,6 +164,12 @@ int main(int argc, char **argv)
 			}
 		#endif
 		else
+		if (strcmp(argv[nr],"--dump") == 0)
+		{
+			ISAAC_INCREASE_NR_OR_DIE
+			dump = argv[nr];
+		}
+		else
 		{
 			printf("Don't know argument %s\n",argv[nr]);
 			return 1;
@@ -206,6 +217,15 @@ int main(int argc, char **argv)
 		if (sDLImageConnector->init(0,0) == 0)
 			broker.addImageConnector(sDLImageConnector);
 	#endif
+	#ifdef ISAAC_JPEG
+		SaveFileImageConnector* saveFileImageConnector = NULL;
+		if (dump)
+		{
+			saveFileImageConnector = new SaveFileImageConnector(std::string(dump));
+			if (saveFileImageConnector->init(0,0) == 0)
+				broker.addImageConnector(saveFileImageConnector);
+		}
+	#endif
 	int return_code = 0;
 	if (broker.run())
 	{
@@ -225,6 +245,7 @@ int main(int argc, char **argv)
 	#endif
 	#ifdef ISAAC_SDL
 		delete sDLImageConnector;
+		delete saveFileImageConnector;
 	#endif
 	return return_code;
 }
