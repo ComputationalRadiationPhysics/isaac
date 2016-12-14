@@ -207,11 +207,13 @@ Building
 
 ### The server
 
-The server uses CMake. Best practice is to create a new directory (like
-`build`) in the isaac root directory and change to it:
+The server resides in the direcoty `server` and uses CMake. Best practice
+is to create a new directory (like `build`) in the `server` directory and
+change to it:
 
 * `git clone https://github.com/ComputationalRadiationPhysics/isaac.git`
 * `cd isaac`
+* `cd server`
 * `mkdir build`
 * `cd build`
 * `cmake ..`
@@ -255,6 +257,22 @@ However, ISAAC doesn't need to be installed and can also directly be called with
 
 For more informations about parameters use `./isaac --help` or have
 a look in the __[server documentation](http://computationalradiationphysics.github.io/isaac/doc/server/index.html)__.
+
+### Installing the library
+
+Even if you install the server, the library itself is not installed. To do
+this you need to go to directory `lib` inside the isaac root folder, create a folder like
+`build` and do the same cmake commands as for the server:
+
+* `cd isaac`
+* `cd lib`
+* `mkdir build`
+* `cd build`
+* `cmake ..`
+* (`sudo`) ` make install`
+
+You don't need to call `make` before `make install` as the template library does
+not need to be built ast
 
 ### The example
 

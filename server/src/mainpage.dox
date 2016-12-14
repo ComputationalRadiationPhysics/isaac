@@ -1,0 +1,145 @@
+/**
+\mainpage ISAAC Server Documentation
+
+This documentation is mainly for code documentation, especially to extent the server for your needs. However this main page will also give some hints how to use the server.
+
+\section install_sec Installation
+
+For hints how to install the server please have a look the <a href="https://github.com/ComputationalRadiationPhysics/isaac/blob/master/INSTALL.md">INSTALL.MD</a> documentation. This also explains the requirements to use the ISAAC server.
+
+\section using_sec Using the ISAAC server
+
+After building the ISAAC server you should have an "isaac" binary, which you can run with --help to get an overview of the possible options:
+<pre>
+$ ./isaac --help
+ISAAC - In Situ Animation of Accelerated Computations 1.0
+Usage:
+isaac [--help] [--web_port <X>] [--sim_port <X>] [--url <X>] [--name <X>]
+      [--jpeg] [--version]
+       --help: Shows this help
+   --web_port: Set port for the websocket clients to connect. Default 2459
+   --tcp_port: Set port for the tcp clients to connect. Default 2458
+   --sim_port: Set port for the simulations to connect to. Default 2460
+        --url: Set the url to connect to from outside. Default 127.0.0.1
+       --name: Set the name of the server.
+    --version: Shows the version
+     --twitch: Set twitch apikey for twitch live streaming
+ --twitch_url: Set twitch rtmp-url for ssh forwarding or another rtmp service
+--twitch_bitrate: Set twitch bitrate. Default 400
+</pre>
+
+<table>
+<caption>Server parameters</caption>
+<tr>
+	<th>Option</th>
+	<th>Comments</th>
+</tr>
+<tr>
+	<td><pre>--help</pre></td>
+	<td>Shows the help above</td>
+</tr>
+<tr>
+	<td><pre>--web_port</pre><pre>--tcp_port</pre><pre>--sim_port</pre></td>
+	<td>The server listens on three ports for incoming connections. The port given by web_port is the port the a websocket (html5) client is using. The tcp_port can be used for a future client using tcp instead of websockets. You can connect via telnet to this port and getting and sending json messages yourself "by hand". The sim_port is the port the simulation tries to connect to. It makes sense to change the default values if you need to run more than more instance of isaac on the same server for some reasons.</td>
+</tr>
+<tr>
+	<td><pre>--url</pre></td>
+	<td>The url, which is broadcastet for some kind of streams to the clients. So this should be an url, which resolves to the computer the server is running on.</td>
+</tr>
+<tr>
+	<td><pre>--name</pre></td>
+	<td>The name of the server, which is broadcastet to clients, too.</td>
+</tr>
+<tr>
+	<td><pre>--version</pre></td>
+	<td>Returns the version of ISAAC.</td>
+</tr>
+<tr>
+	<td><pre>--twitch</pre></td>
+	<td>Activates streaming to an RTMP service. The Twitch™ url is default and it was first introduced for Twitch™, but it does also work with other RTMP services like Youtube™. You need to pass your session/api key after this command!</td>
+</tr>
+<tr>
+	<td><pre>--twitch_url</pre></td>
+	<td>To use another RTMP service than Twitch™ or a more close Twitch™ server you can specify another one here. For Youtube™ you would e.g. use <KBD>--twitch_url a.rtmp.youtube.com/live2.</KBD></td>
+</tr>
+<tr>
+	<td><pre>--twitch_bitrate</pre></td>
+	<td>At default only a bitrate around 400 KBit/s is used, which is around the upstream speed of a 16 MBit DSL connection. However on high performance clusters the upstream is normally much higher, so a value around 2000 - or even more - creates way better streams.</td>
+</tr>
+</table>
+
+\section upgrade_sec Extending the ISAAC Server
+
+This section is interesting for people, who want to add a new streaming possibility to ISAAC or another way of connecting for clients.
+
+\subsection upgrade_connection_sec Adding a new meta data connection
+
+At the moment it is possible for websockets or pure tcp sockets to connect to the ISAAC Server. If you need another way of communicating, you just need to implement the abstract class MetaDataConnector. You need to overwrite three methods:
+<ul>
+<li>MetaDataConnector::init</li>
+<li>MetaDataConnector::run</li>
+<li>MetaDataConnector::getName</li>
+</ul>
+
+MetaDataConnector::init gets a port as parameter. If your connector is not network based you can ignore this parameter. This function is called once at the beginning in the <A HREF=isaac_8cpp_source.html><B>isaac.cpp</B></A>. However you need to add your connector in this file yourself, so that the server is able to connect to your class.
+
+MetaDataConnector::run is run as own thread in the background right after the init of the class. It is your tasks to wait for messages for connecting clients and to send them to them, but also to tell the ISAAC Server about new connections and incoming messages from them.
+
+MetaDataConnector::getName just needs to return a <KBD>std::string</KBD> with the name of the connector.
+
+MetaDataConnector inherits from MessageAble<MessageContainer> to be able to send and receive interprocess messages to and from the main thread (called Broker). It defines four methods, but you <B>have to</B> only use these:
+<ul>
+<li>MessageAble<MessageContainer>::clientGetMessage</li>
+<li>MessageAble<MessageContainer>::clientSendMessage</li>
+</ul>
+However at the moment, the server does not react to messages from a MetaDataConnector, so in fact only MessageAble<MessageContainer>::clientGetMessage is important for you.
+The run method needs to check for new messages from the server with <KBD>clientGetMessage</KBD> all the time. A MessageContainer is returned. This container has 3 attributs
+<ul>
+<li>MessageContainer::type from type MessageType shows the type of the message for fast reacting and without the need to parse every json package.</li>
+<li>MessageContainer::json_root is the body of the message from type <KBD>json_t*</KBD>. This is a Jansson object. Have a look at the <A HREF="https://jansson.readthedocs.org/">awesome Jansson documentation</A> for details how to access the json data.</li>
+<li>MessageContainer::drop_able tells you, whether it is okay to drop the message and not to send it to the client. This is useful if you noticed, that your used channel is full (e.g. too slow network connection).</li>
+</ul>
+At the moment the only important message type for you is <KBD>FORCE_EXIT</KBD>, which means you need to exit your run method. After parsing the message you <B>have to</B> delete the object!
+
+If you got a connection from a client you need to tell the ISAAC Broker to add a new client with <KBD>broker->addDataClient()</KBD>.
+You need to store the returned MetaDataClient* object yourself and to couple it with the just established client connection. Later if messages from the client arrive or you need to send messages to it, you need to use <KBD>client->clientGetMessage()</KBD> and <KBD>client->clientSendMessage( … )</KBD> which work the very same as your own <KBD>clientSendMessage</KBD> and <KBD>clientGetMessage methods</KBD> - they even use the same MessageContainer object. To create a new MessageContainer object to send it to the server just call the constructor with the three above mentioned attributes as parameters. The <KBD>json_t*</KBD> object you need to create yourself with the Jansson API. If you received and forwarded a message to a connected client it is <B>your task</B> to delete the MessageContainer* object!
+
+For a deeper insight have a look at the implementations of <A HREF=TCPDataConnector_8cpp_source.html><B>TCPDataConnector.cpp</B></A> and <A HREF=WebSocketDataConnector_8cpp_source.html><B>WebSocketDataConnector.cpp</B></A>.
+
+\subsection upgrade_image_sec Adding a new image connector
+
+This works quite the same as with the meta data connector, but you need to inherit from ImageConnector and instead of the MessageContainer a ImageBufferContainer is sent to and from your class. You still need to overwrite an <KBD>init</KBD>, <KBD>run</KBD> and <KBD>getName</KBD> method. However the <KBD>init</KBD> method now has two parameters <KBD>min_port</KBD> and <KBD>max_port</KBD>, which define the range, in which you may open connections to send data. Furthermore there is a new attribute ImageConnector::showClient, which tells ISAAC, whether a client should be told about your connector or not. The Twitch™ plugin uses this, as always the first connected visualization is broadcastet to an RTMP server - independent, what stream the client chose. You still need to add your class to <A HREF=isaac_8cpp_source.html><B>isaac.cpp</B></A> yourself.
+
+The attributes of ImageBufferContainer are
+<ul>
+<li>ImageBufferContainer::type, which works very much like MessageContainer::type, but defines different values.</li>
+<li>ImageBufferContainer::group, which is an unique identifier (pointer) to the visualization (called "group" because it consits of many distributed applications running on the high performance cluster). This is valid as long as the group was not told to be finished! Afterwards a new <B>different</B> group could get the same pointer.</li>
+<li>ImageBufferContainer::reference is a unique reference (pointer) to the client, to which you stream.</li>
+<li>ImageBufferContainer::target is where the stream should be send to. This is important for protocols like RTP, which send streams to an address without a back channel.</li>
+<li>ImageBufferContainer::image is an ImageBuffer * object, which contains the image itself to stream.</li>
+<li>ImageBufferContainer::ref_count is a reference count for the object. To not copy the images, one copy of ImageBufferContainer is used for all ImageConnector implementations. Not very important for a ImageConnector implementation.</li>
+<li>ImageBufferContainer::json and ImageBufferContainer::payload are two <KBD>json_t*</KBD> objects, which contain the general meta data for the image, but also the image self as base64 string in <KBD>payload</KBD>. Do not change these without the mutexes below!</li>
+<li>ImageBufferContainer::json_mutex and ImageBufferContainer::payload_mutex are <A HREF="https://computing.llnl.gov/tutorials/pthreads/">pthread</A> mutexes, which you <B>have to lock</B> if you want to read or write to the <KBD>json_t*</KBD> objects above. URIImageConnector uses this to add the image directly to the meta data package instead of streaming it on an extra channel. But you could also add some extra meta data of your stream or only extract meta data from the image and add it to the json object instead of creating a stream at all. The sky's the limit!</li>
+</ul>
+
+There are also some differences in the behaviour (besides the other container). You do not establish a client specific connection yourself, but get told from the server with <KBD>message->type == <B>GROUP_OBSERVED</B></KBD>, that a client chose your stream and wants to see something. If a client stopped observing you get a message from type <B><KBD>GROUP_OBSERVED_STOPPED</KBD></B> and if the visualization/simulation stopped you get <B><KBD>GROUP_FINISHED</KBD></B>. If you get <B><KBD>IMG_FORCE_EXIT</KBD></B> you need to exit your loop. Don't forget to close the streams before.
+
+The most interesting message is surely <B><KBD>UPDATE_BUFFER</KBD></B>, which means a new image is available. You can read it directly from the image object with <KBD>image->buffer</KBD>. It is RGBx formated byte-streams, which means 4 bytes are one pixel: the first byte is red, the second blue, the third green and the last one just reserved without useful data. To get the size of the image use ImageBufferContainer::group with <KBD>message->group->getFramebufferWidth()</KBD> and <KBD>message->group->getFramebufferHeight()</KBD>. The image object itself has a reference counter, too. You should not delete the image object at the end, but if you want to start an extra thread for processing the image, it may happen, that the image gets freed in the main thread while you access it. To avoid this you can increase the reference counter yourself with <KBD>image->incref();</KBD>, but afterwards you have to call <KBD>image->suicide();</KBD> in the <B>extra thread</B> processing the image to check the reference counter and to delete the image if it is not in use anymore. <B>Don't</B> call <KBD>delete image</KBD> yourself!
+
+Another important difference to the MetaDataConnector is, that you never delete received messages, but send them back to the Broker with <KBD>clientSendMessage( message );</KBD>. The flow of the ISAAC Server is:
+<ul>
+<li>Broker gets a message from a isaac lib instance in a visualization.</li>
+<li>Broker extracts the image and sends it to <B>every</B> ImageConnector.</li>
+<li>ImageConnector%s check, whether they need to handle the message, but send it back <B>in any case</B>, even if they didn't touch at all!</li>
+<li>Broker receives the "answers" from the ImageConnector%s, maybe the json object got new content. If all answers are received, a MessageContainer is send to all observing clients.</li>
+<li>MetaDataConnector%s check for new messages for their clients, get the message from the Broker and forward them.</li>
+</ul>
+
+For a deeper insight have a look at the implementations of
+<ul>
+<li><A HREF=RTPImageConnector_8cpp_source.html><B>RTPImageConnector.cpp</B></A>, which creates RTP streams,</li>
+<li><A HREF=RTMPImageConnector_8cpp_source.html><B>RTMPImageConnector.cpp</B></A>, which creates RTMP streams (e.g. for Twitch™ and Youtube™) for the very first visualization registered at the server,</li>
+<li><A HREF=SDLImageConnector_8cpp_source.html><B>SDLImageConnector.cpp</B></A>, which creates a window on the same server for the very first visualization registered at the server (mainly for debugging reasons),</li>
+<li><A HREF=URIImageConnector_8cpp_source.html><B>URIImageConnector.cpp</B></A>, which (re)adds the image as base64 string to the json object and sends it directly to the observing clients.</li>
+</ul>
+*/
