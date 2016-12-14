@@ -232,6 +232,10 @@ The server uses CMake. Best practice is to create a new directory (like
     * `-DISAAC_ALPAKA=ON` → Activates ALPAKA. The used accelerator of Alpaka can be
       changed inside the file `example.cpp`. At default OpenMP version 2 is used as
       accelerator. At least CUDA or Alpaka need to be activated. 
+    * `-DISAAC_INSTALL_LIBRARY=OFF` → Does not install the library files while installing
+      the server. This may be wanted if library and server are not used on the same system.
+    * `-DISAAC_BUILD_SERVER=OFF` → Does not build nor install the server at all. Use this,
+      if you want to install the library on a system, but not the server itself.
 
 * `make`
 
