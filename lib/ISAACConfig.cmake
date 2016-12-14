@@ -89,13 +89,6 @@ set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 
 ################################################################################
-# MPI LIB
-################################################################################
-find_package(MPI MODULE)
-set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${MPI_C_INCLUDE_PATH})
-set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${MPI_C_LIBRARIES})
-
-################################################################################
 # IceT LIB
 ################################################################################
 find_package (IceT CONFIG)
@@ -145,9 +138,32 @@ endif()
 
 list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
 
+
+################################################################################
+# MPI LIB
+################################################################################
+find_package(MPI MODULE)
+set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${MPI_C_INCLUDE_PATH})
+set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${MPI_C_LIBRARIES})
+if (ISAAC_PRIVATE_FOUND)
+    set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${MPI_CXX_LIBRARIES})
+    if (MPI_CXX_FOUND AND MPI_C_FOUND)
+        set(ISAAC_MPI_FOUND TRUE)
+    endif()
+else()
+    set(ISAAC_MPI_FOUND ${MPI_C_FOUND})
+endif()
+
+################################################################################
+# Warning if C++11 is not activated
+################################################################################
 if (CMAKE_CXX_STANDARD EQUAL 98)
     message( STATUS "At least C++ standard 11 must be enabled!" )
 endif()
 
+
+################################################################################
+# Returning whether ISAAC could be found
+################################################################################
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(ISAAC
-                                  REQUIRED_VARS ISAAC_LIBRARIES ISAAC_INCLUDE_DIRS JANSSON_LIBRARIES JANSSON_INCLUDE_DIRS CMAKE_THREAD_LIBS_INIT MPI_C_FOUND ICET_CORE_LIBS ICET_MPI_LIBS ICET_INCLUDE_DIRS Boost_FOUND ISAAC_PRIVATE_FOUND)
+                                  REQUIRED_VARS ISAAC_LIBRARIES ISAAC_INCLUDE_DIRS JANSSON_LIBRARIES JANSSON_INCLUDE_DIRS CMAKE_THREAD_LIBS_INIT ISAAC_MPI_FOUND ICET_CORE_LIBS ICET_MPI_LIBS ICET_INCLUDE_DIRS Boost_FOUND ISAAC_PRIVATE_FOUND)
