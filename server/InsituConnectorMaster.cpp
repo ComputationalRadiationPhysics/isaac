@@ -15,6 +15,7 @@
 
 #include "InsituConnectorMaster.hpp"
 #include "NetworkInterfaces.hpp"
+#include "version.hpp"
 
 #include <jansson.h>
 #include <sys/types.h>
@@ -140,27 +141,48 @@ errorCode InsituConnectorMaster::run()
 							MessageContainer* message = new MessageContainer(NONE,content);
 							MessageType type = message->type;
 							if (type == REGISTER)
+							{
 								json_object_set_new( message->json_root, "id", json_integer( con_array[i]->connector->getID() ) );
-							long long uid = json_integer_value( json_object_get(content, "uid") );
-							con_array[i]->connector->clientSendMessage(message);
-							if (type == EXIT_PLUGIN)
-							{
-								closed = true;
-								break;
-							}
-							else
-							{
-								//send, which uid we just got
-								char buffer[32];
-								sprintf(buffer,"{\"done\": %lld}", uid );
-								int l = strlen(buffer);
-								if ( send(fd_array[i].fd,buffer,l,MSG_NOSIGNAL) < l )
+								json_t* protocol_version = json_object_get( message->json_root, "protocol" );
+								long version[2] =
 								{
-									MessageContainer* message = new MessageContainer(EXIT_PLUGIN,json_object());
-									json_object_set_new( message->json_root, "type", json_string( "exit" ) );
-									con_array[i]->connector->clientSendMessage(message);
+									json_integer_value( json_array_get( protocol_version, 0) ),
+									json_integer_value( json_array_get( protocol_version, 1) )
+								};
+								if ( version[0] != ISAAC_PROTOCOL_VERSION_MAJOR )
+								{
+									printf("Fatal error: Protocol version mismatch: Library has %i.%i, server needs %i.%i!\n",version[0],version[1],ISAAC_PROTOCOL_VERSION_MAJOR,ISAAC_PROTOCOL_VERSION_MINOR);
+									const char buffer[] = "{ \"fatal error\": \"protocol mismatch\" }";
+									send(fd_array[i].fd,buffer,strlen(buffer),MSG_NOSIGNAL);
+									closed = true;
+								}
+								else
+								if ( version[1] != ISAAC_PROTOCOL_VERSION_MINOR )
+									printf("Warning: Protocol minor version mismatch: Library has %i.%i, server can %i.%i!\n",version[0],version[1],ISAAC_PROTOCOL_VERSION_MAJOR,ISAAC_PROTOCOL_VERSION_MINOR);
+							}
+							if (!closed)
+							{
+								long long uid = json_integer_value( json_object_get(content, "uid") );
+								con_array[i]->connector->clientSendMessage(message);
+								if (type == EXIT_PLUGIN)
+								{
 									closed = true;
 									break;
+								}
+								else
+								{
+									//send, which uid we just got
+									char buffer[32];
+									sprintf(buffer,"{\"done\": %lld}", uid );
+									int l = strlen(buffer);
+									if ( send(fd_array[i].fd,buffer,l,MSG_NOSIGNAL) < l )
+									{
+										MessageContainer* message = new MessageContainer(EXIT_PLUGIN,json_object());
+										json_object_set_new( message->json_root, "type", json_string( "exit" ) );
+										con_array[i]->connector->clientSendMessage(message);
+										closed = true;
+										break;
+									}
 								}
 							}
 						}

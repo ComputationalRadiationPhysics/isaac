@@ -278,6 +278,28 @@ observable and steerable. You can run multiple instances of the example with
 `mpirun -c N ./example_KIND` with the number of instances `N` and `KIND`
 being `cuda` or `alpaka`. To exit the example, use the client or ctrl+C.
 
+### Versions
+
+ISAAC has three different more or less independent (!) version strings.
+The server and the library both have versions consisting of the
+
+* major version number which is increased if the API compatibility is
+  broken to older versions,
+* minor version number, which indicates new features, but does not break
+  code not using these new features, and
+* patch version number, which is mostly for small bug fixes, but does not
+  change much about the behaviour.
+
+These version numbers are important if you want to use the ISAAC library
+in your application or you want to extend the server with your own
+meta data or image connector.
+
+The last version string of isaac, the protocol version number, does only
+consists of two version numbers: major and minor. The major protocol
+version number must be the same for server and library. The minor version
+number my differ, but in that case not all features of the protocol may
+be used.
+
 
 How to use in an own application
 --------------------------------

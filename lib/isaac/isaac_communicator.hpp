@@ -123,6 +123,8 @@ class IsaacCommunicator
 
 		isaac_int serverSend(char * content, bool starting = true, bool finishing = false)
 		{
+			if (sockfd < 0)
+				return 0;
 			if (sockfd == 0) //Connection lost or never established
 			{
 				if (serverConnect(RetryEverySend))
@@ -311,6 +313,18 @@ class IsaacCommunicator
 			{
 				//Search for ready messages:
 				json_t* js;
+				if (js = json_object_get( content, "fatal error"))
+				{
+					const char* fatal_error = json_string_value( js );
+					fprintf(stderr,"Fatal error: \"%s\".\n",fatal_error);
+					if (strcmp(fatal_error,"protocol mismatch") == 0)
+					{
+						close(sockfd);
+						sockfd = -1;
+					}
+					json_decref( content );
+				}
+				else
 				if (js = json_object_get( content, "done"))
 				{
 					isaac_uint new_server_id = json_integer_value( js );

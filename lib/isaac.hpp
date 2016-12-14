@@ -54,6 +54,8 @@
 #include "isaac/isaac_helper.hpp"
 #include "isaac/isaac_controllers.hpp"
 #include "isaac/isaac_compositors.hpp"
+#include "isaac/isaac_compositors.hpp"
+#include "isaac/isaac_version.hpp"
 
 namespace isaac
 {
@@ -190,7 +192,7 @@ class IsaacVisualization
                             alpaka::mem::buf::Buf< TDevAcc, isaac_float, TFraDim, size_t> (
                                 alpaka::mem::buf::alloc<isaac_float, size_t> (
                                     acc,
-                                    alpaka::Vec<TFraDim, size_t> (
+                                    alpaka::vec::Vec<TFraDim, size_t> (
                                         TSource::feature_dim * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE)
                                     )
                                 )
@@ -254,9 +256,9 @@ class IsaacVisualization
                             block_size.x = size_t(1);
                             block_size.y = size_t(1);
                         }
-                        const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
-                        const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
-                        const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
+                        const alpaka::vec::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+                        const alpaka::vec::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
+                        const alpaka::vec::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
                         auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
                         updateBufferKernel<TSource> kernel;
                         auto const instance
@@ -331,9 +333,9 @@ class IsaacVisualization
                         block_size.x = size_t(1);
                         block_size.y = size_t(1);
                     }
-                    const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
-                    const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
-                    const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
+                    const alpaka::vec::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+                    const alpaka::vec::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
+                    const alpaka::vec::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
                     auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
                     minMaxKernel<TSource> kernel;
                     auto const instance
@@ -351,8 +353,8 @@ class IsaacVisualization
                     );
                     alpaka::stream::enqueue(stream, instance);
                     alpaka::wait::wait(stream);
-                    alpaka::mem::view::ViewPlainPtr<THost, minmax_struct, TFraDim, size_t> minmax_buffer(local_minmax_array_h, host, alpaka::Vec<TFraDim, size_t>::Vec(size_t(local_size_array.x * local_size_array.y)));
-                    alpaka::mem::view::copy( stream, minmax_buffer, local_minmax, alpaka::Vec<TFraDim, size_t>::Vec(size_t(local_size_array.x * local_size_array.y)));
+                    alpaka::mem::view::ViewPlainPtr<THost, minmax_struct, TFraDim, size_t> minmax_buffer(local_minmax_array_h, host, alpaka::vec::Vec<TFraDim, size_t>(size_t(local_size_array.x * local_size_array.y)));
+                    alpaka::mem::view::copy( stream, minmax_buffer, local_minmax, alpaka::vec::Vec<TFraDim, size_t>(size_t(local_size_array.x * local_size_array.y)));
                 #else
                     dim3 block (block_size.x, block_size.y);
                     dim3 grid  (grid_size.x, grid_size.y);
@@ -475,9 +477,9 @@ class IsaacVisualization
 
             //Create functor chain pointer lookup table
             #if ISAAC_ALPAKA == 1
-                const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
-                const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(1), size_t(1));
-                const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(1), size_t(1));
+                const alpaka::vec::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+                const alpaka::vec::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(1), size_t(1));
+                const alpaka::vec::Vec<TAccDim, size_t> grid    (size_t(1), size_t(1), size_t(1));
                 auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
                 fillFunctorChainPointerKernel kernel;
                 auto const instance
@@ -515,8 +517,8 @@ class IsaacVisualization
             {
                 source_weight.value[i] = ISAAC_DEFAULT_WEIGHT;
                 #if ISAAC_ALPAKA == 1
-                    transfer_d_buf.push_back( alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>( acc, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
-                    transfer_h_buf.push_back( alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
+                    transfer_d_buf.push_back( alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>( acc, alpaka::vec::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
+                    transfer_h_buf.push_back( alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, alpaka::vec::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
                     transfer_d.pointer[i] = alpaka::mem::view::getPtrNative( transfer_d_buf[i] );
                     transfer_h.pointer[i] = alpaka::mem::view::getPtrNative( transfer_h_buf[i] );
                 #else
@@ -609,6 +611,10 @@ class IsaacVisualization
                     json_object_set_new( json_root, "height", json_integer ( global_size_scaled[1] ) );
                 if (TSimDim::value > 2)
                     json_object_set_new( json_root, "depth", json_integer ( global_size_scaled[2] ) );
+                json_t *json_version_array = json_array();
+                json_array_append_new( json_version_array, json_integer( ISAAC_PROTOCOL_VERSION_MAJOR ) );
+                json_array_append_new( json_version_array, json_integer( ISAAC_PROTOCOL_VERSION_MINOR ) );
+                json_object_set_new( json_root, "protocol", json_version_array);
             }
         }
         void setJpegQuality(isaac_uint jpeg_quality)
@@ -782,15 +788,15 @@ class IsaacVisualization
             dest_array_struct< boost::mpl::size< TSourceList >::type::value > dest;
             isaac_for_each_params( sources, update_functor_chain_iterator(), functions, dest);
             #if ISAAC_ALPAKA == 1
-                alpaka::mem::view::ViewPlainPtr<THost, isaac_float4, TFraDim, size_t> parameter_buffer(isaac_parameter_h, host, alpaka::Vec<TFraDim, size_t>::Vec(size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value)));
+                alpaka::mem::view::ViewPlainPtr<THost, isaac_float4, TFraDim, size_t> parameter_buffer(isaac_parameter_h, host, alpaka::vec::Vec<TFraDim, size_t>(size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value)));
 
-                alpaka::Vec<alpaka::dim::DimInt<1u>, size_t> const parameter_d_extent(size_t(16));
+                alpaka::vec::Vec<alpaka::dim::DimInt<1u>, size_t> const parameter_d_extent(size_t(16));
                 auto parameter_d_view(alpaka::mem::view::createStaticDevMemView(&isaac_parameter_d[0u],acc,parameter_d_extent));
-                alpaka::mem::view::copy( stream, parameter_d_view, parameter_buffer, alpaka::Vec<TFraDim, size_t>(size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value)) );
+                alpaka::mem::view::copy( stream, parameter_d_view, parameter_buffer, alpaka::vec::Vec<TFraDim, size_t>(size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value)) );
 
-                const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
-                const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(1), size_t(1));
-                const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), size_t(1), size_t(1));
+                const alpaka::vec::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
+                const alpaka::vec::Vec<TAccDim, size_t> blocks  (size_t(1), size_t(1), size_t(1));
+                const alpaka::vec::Vec<TAccDim, size_t> grid    (size_t(1), size_t(1), size_t(1));
                 auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
                 updateFunctorChainPointerKernel
                 <
@@ -811,7 +817,7 @@ class IsaacVisualization
                 alpaka::stream::enqueue(stream, instance);
                 alpaka::wait::wait(stream);
 
-                alpaka::Vec<alpaka::dim::DimInt<1u>, size_t> const function_chain_d_extent( size_t(ISAAC_MAX_SOURCES) );
+                alpaka::vec::Vec<alpaka::dim::DimInt<1u>, size_t> const function_chain_d_extent( size_t(ISAAC_MAX_SOURCES) );
                 auto function_chain_d_view(alpaka::mem::view::createStaticDevMemView(&isaac_function_chain_d[0u],acc,function_chain_d_extent));
                 alpaka::mem::view::copy( stream, function_chain_d_view, functor_chain_choose_d, size_t( boost::mpl::size< TSourceList >::type::value ) );
             #else
@@ -1445,11 +1451,11 @@ class IsaacVisualization
             };
 
             #if ISAAC_ALPAKA == 1
-                alpaka::Vec<alpaka::dim::DimInt<1u>, size_t> const inverse_d_extent(size_t(16));
+                alpaka::vec::Vec<alpaka::dim::DimInt<1u>, size_t> const inverse_d_extent(size_t(16));
                 auto inverse_d_view(alpaka::mem::view::createStaticDevMemView(&isaac_inverse_d[0u],myself->acc,inverse_d_extent));
                 alpaka::mem::view::copy(myself->stream, inverse_d_view, inverse_h_buf, size_t(16));
 
-                alpaka::Vec<alpaka::dim::DimInt<1u>, size_t> const size_d_extent(size_t(1));
+                alpaka::vec::Vec<alpaka::dim::DimInt<1u>, size_t> const size_d_extent(size_t(1));
                 auto size_d_view(alpaka::mem::view::createStaticDevMemView(&isaac_size_d[0u],myself->acc,size_d_extent));
                 alpaka::mem::view::copy(myself->stream, size_d_view, size_h_buf, size_t(1));
             #else
@@ -1508,8 +1514,8 @@ class IsaacVisualization
                 alpaka::wait::wait(myself->stream);
                 ISAAC_STOP_TIME_MEASUREMENT( myself->kernel_time, +=, kernel, myself->getTicksUs() )
                 ISAAC_START_TIME_MEASUREMENT( copy, myself->getTicksUs() )
-                alpaka::mem::view::ViewPlainPtr<THost, uint32_t, TFraDim, size_t> result_buffer((uint32_t*)(pixels), myself->host, alpaka::Vec<TFraDim, size_t>::Vec(myself->framebuffer_prod));
-                alpaka::mem::view::copy(myself->stream, result_buffer, myself->framebuffer, alpaka::Vec<TFraDim, size_t>::Vec(myself->framebuffer_prod));
+                alpaka::mem::view::ViewPlainPtr<THost, uint32_t, TFraDim, size_t> result_buffer((uint32_t*)(pixels), myself->host, alpaka::vec::Vec<TFraDim, size_t>(myself->framebuffer_prod));
+                alpaka::mem::view::copy(myself->stream, result_buffer, myself->framebuffer, alpaka::vec::Vec<TFraDim, size_t>(myself->framebuffer_prod));
             #else
                 IsaacRenderKernelCaller
                 <
@@ -1763,7 +1769,7 @@ class IsaacVisualization
         isaac_size2 framebuffer_size;
         isaac_size2 compbuffer_size;
         #if ISAAC_ALPAKA == 1
-            alpaka::Vec<TFraDim, size_t> framebuffer_prod;
+            alpaka::vec::Vec<TFraDim, size_t> framebuffer_prod;
             alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t> framebuffer;
             alpaka::mem::buf::Buf<TDevAcc, isaac_functor_chain_pointer_N, TFraDim, size_t> functor_chain_d;
             alpaka::mem::buf::Buf<TDevAcc, isaac_functor_chain_pointer_N, TFraDim, size_t> functor_chain_choose_d;

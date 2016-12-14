@@ -27,8 +27,7 @@
 	#include "URIImageConnector.hpp"
 	#include "SaveFileImageConnector.hpp"
 #endif
-
-#define ISAAC_VERSION "1.0"
+#include "version.hpp"
 
 #define ISAAC_INCREASE_NR_OR_DIE \
 	nr++; \
@@ -65,7 +64,7 @@ int main(int argc, char **argv)
 	{
 		if (strcmp(argv[nr],"--help") == 0)
 		{
-			printf("ISAAC - In Situ Animation of Accelerated Computations " ISAAC_VERSION"\n");
+			printf("ISAAC - In Situ Animation of Accelerated Computations (Server) " ISAAC_SERVER_VERSION_STRING"\n");
 			printf("Usage:\n");
 			printf("isaac [--help] [--url <X>] [--name <X>] [--web_port <X>] [--tcp_port <X>]\n");
 			printf("      [--sim_port <X>] [--web_int <X>] [--tcp_int <X>] [--sim_int <X>]\n");
@@ -92,7 +91,7 @@ int main(int argc, char **argv)
 		else
 		if (strcmp(argv[nr],"--version") == 0)
 		{
-			printf("Isaac version " ISAAC_VERSION "\n");
+			printf("Isaac server version " ISAAC_SERVER_VERSION_STRING "\n");
 			return 0;
 		}
 		else

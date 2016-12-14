@@ -974,9 +974,9 @@ struct IsaacRenderKernelCaller
                 block_size.x = size_t(1);
                 block_size.y = size_t(1);
             }
-            const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(ISAAC_VECTOR_ELEM));
-            const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.y, block_size.x);
-            const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.y, grid_size.x);
+            const alpaka::vec::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(ISAAC_VECTOR_ELEM));
+            const alpaka::vec::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.y, block_size.x);
+            const alpaka::vec::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.y, grid_size.x);
             auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
             #define ISAAC_KERNEL_START \
             { \

@@ -33,6 +33,7 @@ set(HDRS
 	${CMAKE_SOURCE_DIR}/server/TCPDataConnector.hpp
 	${CMAKE_SOURCE_DIR}/server/NetworkInterfaces.hpp
 	${CMAKE_SOURCE_DIR}/server/SaveFileImageConnector.hpp
+	${CMAKE_SOURCE_DIR}/server/version.hpp
 )
 
 option(ISAAC_SDL "Build SDL ImageConnector" OFF)
