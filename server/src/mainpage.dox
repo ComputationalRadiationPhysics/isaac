@@ -141,5 +141,6 @@ For a deeper insight have a look at the implementations of
 <li><A HREF=RTMPImageConnector_8cpp_source.html><B>RTMPImageConnector.cpp</B></A>, which creates RTMP streams (e.g. for Twitch™ and Youtube™) for the very first visualization registered at the server,</li>
 <li><A HREF=SDLImageConnector_8cpp_source.html><B>SDLImageConnector.cpp</B></A>, which creates a window on the same server for the very first visualization registered at the server (mainly for debugging reasons),</li>
 <li><A HREF=URIImageConnector_8cpp_source.html><B>URIImageConnector.cpp</B></A>, which (re)adds the image as base64 string to the json object and sends it directly to the observing clients.</li>
+<li><A HREF=SaveFileImageConnector_8cpp_source.html><B>SaveFileImageConnector.cpp</B></A>, which saves every received image as jpeg on the server which runs the isaac server.</li>
 </ul>
 */
