@@ -84,6 +84,11 @@ struct IsaacFunctorLength
     static const bool uses_parameter = false;
     static const std::string name;
     static const std::string description;
+
+    //Against annoying double->float casting warning with gcc5
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wnarrowing"
+
     ISAAC_HOST_DEVICE_INLINE
     static isaac_float_dim<1> call( const isaac_float_dim<4> v, const isaac_float4& p)
     {
@@ -129,6 +134,9 @@ struct IsaacFunctorLength
         isaac_float_dim<1> result = { fabs( v.value.x ) };
         return result;
     }
+
+    #pragma GCC diagnostics pop
+
     ISAAC_HOST_INLINE
     static std::string getName()
     {
