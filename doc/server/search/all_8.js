@@ -1,5 +1,6 @@
 var searchData=
 [
+  ['ifaddr',['ifaddr',['../classNetworkInterfaces.html#a8e29843e51f6660a7235506328eb22cc',1,'NetworkInterfaces']]],
   ['image',['image',['../classImageBufferContainer.html#af0a35e511d50420020a206a6de5eb019',1,'ImageBufferContainer']]],
   ['imagebuffer',['ImageBuffer',['../classImageBuffer.html',1,'ImageBuffer'],['../classImageBuffer.html#a6f9d82b1f0dec2cd7e1712a87a1559a2',1,'ImageBuffer::ImageBuffer()']]],
   ['imagebuffercontainer',['ImageBufferContainer',['../classImageBufferContainer.html',1,'ImageBufferContainer'],['../classImageBufferContainer.html#a228d35383152f55867747469f433b36b',1,'ImageBufferContainer::ImageBufferContainer()']]],
@@ -12,7 +13,7 @@ var searchData=
   ['img_5fforce_5fexit',['IMG_FORCE_EXIT',['../Common_8hpp.html#aa1a6f8ff4badd19e0507357658185695afc79fa4348e33009a404269e8e923d1f',1,'Common.hpp']]],
   ['incref',['incref',['../classImageBuffer.html#ab8b11de288e55cbf815f091d9e9e845d',1,'ImageBuffer']]],
   ['isaac_20server_20documentation',['ISAAC Server Documentation',['../index.html',1,'']]],
-  ['init',['init',['../classImageConnector.html#ae6c8a1f7c5c8e7db71787289787f9807',1,'ImageConnector::init()'],['../classInsituConnectorMaster.html#aaa1540a32885568ad945d3c01f4dd651',1,'InsituConnectorMaster::init()'],['../classMetaDataConnector.html#a3130223fa0425924d5659d8932412e46',1,'MetaDataConnector::init()'],['../classRTMPImageConnector.html#aeb47187328b62505db72110a0ebc9100',1,'RTMPImageConnector::init()'],['../classRTPImageConnector.html#a2a1bd5523f6b16d5424eb93144faf1bb',1,'RTPImageConnector::init()'],['../classSDLImageConnector.html#ad44069ebae49e529f7138d70b7aa1e21',1,'SDLImageConnector::init()'],['../classTCPDataConnector.html#aee4c74a1bc44753b00529dff1730d8a9',1,'TCPDataConnector::init()'],['../classURIImageConnector.html#a785476cf8e0ab47ef974353ee16423ff',1,'URIImageConnector::init()'],['../classWebSocketDataConnector.html#aa9c7e9f71b9fcf57a9dec74350a280ad',1,'WebSocketDataConnector::init()']]],
+  ['init',['init',['../classImageConnector.html#ae6c8a1f7c5c8e7db71787289787f9807',1,'ImageConnector::init()'],['../classInsituConnectorMaster.html#ac6312b6253e98d6cbe4fe4e48df3a8ee',1,'InsituConnectorMaster::init()'],['../classMetaDataConnector.html#a6ca57347548e34ce0f571b8811a86258',1,'MetaDataConnector::init()'],['../classRTMPImageConnector.html#aeb47187328b62505db72110a0ebc9100',1,'RTMPImageConnector::init()'],['../classRTPImageConnector.html#a2a1bd5523f6b16d5424eb93144faf1bb',1,'RTPImageConnector::init()'],['../classSaveFileImageConnector.html#a84f00b1c0314381215bb2f9019169087',1,'SaveFileImageConnector::init()'],['../classSDLImageConnector.html#ad44069ebae49e529f7138d70b7aa1e21',1,'SDLImageConnector::init()'],['../classTCPDataConnector.html#a8adf4d59a0f76a983f8fa41a9913aa91',1,'TCPDataConnector::init()'],['../classURIImageConnector.html#a785476cf8e0ab47ef974353ee16423ff',1,'URIImageConnector::init()'],['../classWebSocketDataConnector.html#a226258e968ef6cd00b938970bd0b5e16',1,'WebSocketDataConnector::init()']]],
   ['insitu_5fid',['insitu_id',['../classImageBufferContainer.html#ac5af0092a40132f73d20a4e58171e052',1,'ImageBufferContainer']]],
   ['insituconnector',['InsituConnector',['../classInsituConnector.html',1,'InsituConnector'],['../classInsituConnector.html#aa3ec18e388eef337bb02566c47f04278',1,'InsituConnector::InsituConnector()']]],
   ['insituconnector_2ecpp',['InsituConnector.cpp',['../InsituConnector_8cpp.html',1,'']]],
@@ -31,5 +32,10 @@ var searchData=
   ['isaac_5fjpeg_5fterm_5fdestination',['isaac_jpeg_term_destination',['../URIImageConnector_8cpp.html#a97674c9527347525337964d235c79bc8',1,'URIImageConnector.cpp']]],
   ['isaac_5fmax_5fheartbeat',['ISAAC_MAX_HEARTBEAT',['../RTMPImageConnector_8hpp.html#af94173a16436f0a2116d10aad6d6ac21',1,'RTMPImageConnector.hpp']]],
   ['isaac_5fmax_5freceive',['ISAAC_MAX_RECEIVE',['../Common_8hpp.html#aca3d480dccbefd5d1b2b5a3b02a6d3b4',1,'Common.hpp']]],
-  ['isaac_5fversion',['ISAAC_VERSION',['../isaac_8cpp.html#a27c71f1b2b60b671c59147c9b82e9bbf',1,'isaac.cpp']]]
+  ['isaac_5fprotocol_5fversion_5fmajor',['ISAAC_PROTOCOL_VERSION_MAJOR',['../version_8hpp.html#abae12753eb83782a36d3482ef7e02d4b',1,'version.hpp']]],
+  ['isaac_5fprotocol_5fversion_5fminor',['ISAAC_PROTOCOL_VERSION_MINOR',['../version_8hpp.html#acca498efbe2360aca46b9210d81cf999',1,'version.hpp']]],
+  ['isaac_5fserver_5fversion_5fmajor',['ISAAC_SERVER_VERSION_MAJOR',['../version_8hpp.html#a19885b0d4b6e24136409f8b47468fea9',1,'version.hpp']]],
+  ['isaac_5fserver_5fversion_5fminor',['ISAAC_SERVER_VERSION_MINOR',['../version_8hpp.html#ab6eeb96c1fccaa48ccb6b00c738ecae4',1,'version.hpp']]],
+  ['isaac_5fserver_5fversion_5fpatch',['ISAAC_SERVER_VERSION_PATCH',['../version_8hpp.html#ae51ebb0c5296df339c44b90a81867e7e',1,'version.hpp']]],
+  ['isaac_5fserver_5fversion_5fstring',['ISAAC_SERVER_VERSION_STRING',['../version_8hpp.html#a19753a4ae40fe2afc072883883852534',1,'version.hpp']]]
 ];

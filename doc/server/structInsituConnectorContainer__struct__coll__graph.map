@@ -1,7 +1,0 @@
-<map id="InsituConnectorContainer_struct" name="InsituConnectorContainer_struct">
-<area shape="rect" id="node2" href="$classInsituConnector.html" title="InsituConnector" alt="" coords="65,307,180,333"/>
-<area shape="rect" id="node3" href="$classMessageAble.html" title="MessageAble\&lt; MessageContainer \&gt;" alt="" coords="5,229,239,256"/>
-<area shape="rect" id="node4" href="$classThreadList.html" title="ThreadList\&lt; MessageContainer * \&gt;" alt="" coords="10,125,235,152"/>
-<area shape="rect" id="node5" href="$structThreadList_1_1ThreadListContainer__struct.html" title="ThreadList\&lt; T \&gt;::ThreadList\lContainer_struct" alt="" coords="31,6,215,47"/>
-<area shape="rect" id="node6" href="$classInsituConnectorGroup.html" title="InsituConnectorGroup" alt="" coords="204,307,352,333"/>
-</map>

@@ -1,5 +1,6 @@
 var searchData=
 [
+  ['savefileimageconnector',['SaveFileImageConnector',['../classSaveFileImageConnector.html#a1e6297635adaa8ac4e4a458de5ebfd3c',1,'SaveFileImageConnector']]],
   ['sdlimageconnector',['SDLImageConnector',['../classSDLImageConnector.html#a1fa906b5ca61d6771cc0f053ee06779c',1,'SDLImageConnector']]],
   ['setbroker',['setBroker',['../classImageConnector.html#a6c15e7536c7bcc82c5442fe5f2aeec14',1,'ImageConnector::setBroker()'],['../classMetaDataConnector.html#ac536bb823faa007098a63c3e04bf1712',1,'MetaDataConnector::setBroker()']]],
   ['setexit',['setExit',['../classInsituConnectorMaster.html#afc950ace6621d545cf7e6f1850d86108',1,'InsituConnectorMaster']]],

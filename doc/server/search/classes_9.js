@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['websocketdataconnector',['WebSocketDataConnector',['../classWebSocketDataConnector.html',1,'']]]
+  ['uriimageconnector',['URIImageConnector',['../classURIImageConnector.html',1,'']]]
 ];

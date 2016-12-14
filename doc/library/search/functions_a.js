@@ -1,10 +1,11 @@
 var searchData=
 [
   ['sendfeedback',['sendFeedback',['../structisaac_1_1DefaultController.html#ad79f52104de02ae73e3b79a5e866c934',1,'isaac::DefaultController::sendFeedback()'],['../structisaac_1_1StereoController.html#a208ce21574a00cd39e293d5096e3f568',1,'isaac::StereoController::sendFeedback()']]],
-  ['serverconnect',['serverConnect',['../classisaac_1_1IsaacCommunicator.html#a554c678052e27b54ff9f85f009141481',1,'isaac::IsaacCommunicator']]],
+  ['serverconnect',['serverConnect',['../classisaac_1_1IsaacCommunicator.html#ac90f8783bba7045ca277e6000dae8f8d',1,'isaac::IsaacCommunicator']]],
   ['serverdisconnect',['serverDisconnect',['../classisaac_1_1IsaacCommunicator.html#a6ce1f3d8cf3af538bfeec6104ede5352',1,'isaac::IsaacCommunicator']]],
   ['serversend',['serverSend',['../classisaac_1_1IsaacCommunicator.html#ab212e0ba61a9c7c3d7ec64e4e297db68',1,'isaac::IsaacCommunicator']]],
   ['serversendframe',['serverSendFrame',['../classisaac_1_1IsaacCommunicator.html#ae10708fc751aa6db0828998dcab97566',1,'isaac::IsaacCommunicator']]],
+  ['serversendregister',['serverSendRegister',['../classisaac_1_1IsaacCommunicator.html#a7b8ff5001ee5b51104a2576c40435cda',1,'isaac::IsaacCommunicator']]],
   ['setfrustum',['setFrustum',['../namespaceisaac.html#a9a34a56a6cf69458e6ca4b322eea1a50',1,'isaac']]],
   ['setjpegquality',['setJpegQuality',['../classisaac_1_1IsaacVisualization.html#ad8671425c4f17632131e0dd2bf4f7aa9',1,'isaac::IsaacVisualization::setJpegQuality()'],['../classisaac_1_1IsaacCommunicator.html#a3d3f7cd3ca7933d291959d7d24ebf23b',1,'isaac::IsaacCommunicator::setJpegQuality()']]],
   ['setperspective',['setPerspective',['../namespaceisaac.html#a85a25d061803518deb89c3df0390b854',1,'isaac']]],

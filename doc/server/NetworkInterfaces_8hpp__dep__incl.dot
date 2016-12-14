@@ -1,0 +1,12 @@
+digraph "src/NetworkInterfaces.hpp"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  Node5 [label="src/NetworkInterfaces.hpp",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node5 -> Node6 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node6 [label="src/InsituConnectorMaster.cpp",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$InsituConnectorMaster_8cpp.html"];
+  Node5 -> Node7 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node7 [label="src/NetworkInterfaces.cpp",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$NetworkInterfaces_8cpp.html"];
+  Node5 -> Node8 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="Helvetica"];
+  Node8 [label="src/TCPDataConnector.cpp",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$TCPDataConnector_8cpp.html"];
+}

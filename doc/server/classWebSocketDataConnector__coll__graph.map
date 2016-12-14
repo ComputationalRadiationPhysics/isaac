@@ -1,8 +1,0 @@
-<map id="WebSocketDataConnector" name="WebSocketDataConnector">
-<area shape="rect" id="node2" href="$classMetaDataConnector.html" title="MetaDataConnector" alt="" coords="148,320,287,347"/>
-<area shape="rect" id="node3" href="$classRunable.html" title="Runable" alt="" coords="5,229,75,256"/>
-<area shape="rect" id="node4" href="$classMessageAble.html" title="MessageAble\&lt; MessageContainer \&gt;" alt="" coords="100,229,333,256"/>
-<area shape="rect" id="node5" href="$classThreadList.html" title="ThreadList\&lt; MessageContainer * \&gt;" alt="" coords="105,125,329,152"/>
-<area shape="rect" id="node6" href="$structThreadList_1_1ThreadListContainer__struct.html" title="ThreadList\&lt; T \&gt;::ThreadList\lContainer_struct" alt="" coords="125,6,309,47"/>
-<area shape="rect" id="node7" href="$classBroker.html" title="Broker" alt="" coords="359,229,419,256"/>
-</map>

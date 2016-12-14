@@ -1,5 +1,8 @@
 var searchData=
 [
+  ['savefileimageconnector',['SaveFileImageConnector',['../classSaveFileImageConnector.html',1,'SaveFileImageConnector'],['../classSaveFileImageConnector.html#a1e6297635adaa8ac4e4a458de5ebfd3c',1,'SaveFileImageConnector::SaveFileImageConnector()']]],
+  ['savefileimageconnector_2ecpp',['SaveFileImageConnector.cpp',['../SaveFileImageConnector_8cpp.html',1,'']]],
+  ['savefileimageconnector_2ehpp',['SaveFileImageConnector.hpp',['../SaveFileImageConnector_8hpp.html',1,'']]],
   ['sdlimageconnector',['SDLImageConnector',['../classSDLImageConnector.html',1,'SDLImageConnector'],['../classSDLImageConnector.html#a1fa906b5ca61d6771cc0f053ee06779c',1,'SDLImageConnector::SDLImageConnector()']]],
   ['sdlimageconnector_2ecpp',['SDLImageConnector.cpp',['../SDLImageConnector_8cpp.html',1,'']]],
   ['sdlimageconnector_2ehpp',['SDLImageConnector.hpp',['../SDLImageConnector_8hpp.html',1,'']]],

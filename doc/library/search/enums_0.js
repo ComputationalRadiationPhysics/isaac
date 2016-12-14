@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['isaacvisualizationmetaenum',['IsaacVisualizationMetaEnum',['../namespaceisaac.html#a9b356e6a4f87525d67adbb7817eb74bd',1,'isaac']]]
+  ['communicatorsetting',['CommunicatorSetting',['../namespaceisaac.html#add4ac682a756698823fee3b1e6446621',1,'isaac']]]
 ];

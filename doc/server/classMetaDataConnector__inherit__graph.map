@@ -1,6 +1,0 @@
-<map id="MetaDataConnector" name="MetaDataConnector">
-<area shape="rect" id="node4" href="$classTCPDataConnector.html" title="TCPDataConnector" alt="" coords="5,155,141,181"/>
-<area shape="rect" id="node5" href="$classWebSocketDataConnector.html" title="WebSocketDataConnector" alt="" coords="167,155,345,181"/>
-<area shape="rect" id="node2" href="$classRunable.html" title="Runable" alt="" coords="41,5,111,32"/>
-<area shape="rect" id="node3" href="$classMessageAble.html" title="MessageAble\&lt; MessageContainer \&gt;" alt="" coords="136,5,369,32"/>
-</map>

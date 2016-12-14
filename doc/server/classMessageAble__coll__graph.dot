@@ -1,0 +1,11 @@
+digraph "MessageAble&lt; MessageTemplate &gt;"
+{
+  edge [fontname="Helvetica",fontsize="10",labelfontname="Helvetica",labelfontsize="10"];
+  node [fontname="Helvetica",fontsize="10",shape=record];
+  Node1 [label="MessageAble\< MessageTemplate \>",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black"];
+  Node2 -> Node1 [dir="back",color="darkorchid3",fontsize="10",style="dashed",label=" messagesIn\nmessagesOut" ,fontname="Helvetica"];
+  Node2 [label="ThreadList\< MessageTemplate *\>",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$classThreadList.html"];
+  Node3 -> Node2 [dir="back",color="darkorchid3",fontsize="10",style="dashed",label=" front\nback" ,fontname="Helvetica"];
+  Node3 [label="ThreadList\< T \>::ThreadList\lContainer_struct",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$structThreadList_1_1ThreadListContainer__struct.html"];
+  Node3 -> Node3 [dir="back",color="darkorchid3",fontsize="10",style="dashed",label=" next" ,fontname="Helvetica"];
+}
