@@ -89,45 +89,6 @@ be built yourself nevertheless or the distribution versions are outdated.
         `-DBoost_DIR=$BOOST/install`, where `$BOOST` is
         the path of the boost_1_56_0 directory.
 
-### Requirements for the server only
-
-* __libwebsockets__ for the connection between server and an HTML5 client.
-  It is in steady development and the most recent version should be used:
-  * _From Source_:
-    * `git clone https://github.com/warmcat/libwebsockets.git`
-    * `cd libwebsockets`
-    * `mkdir build`
-    * With admin rights and no other version of libwebsockets installed:
-      * `cd build`
-      * `cmake ..`
-        * `cmake ..` may fail if OpenSSL is not available. ISAAC itself does
-          not support HTTPS connections at the moment anyway, thus it can be
-          disabled with: `cmake -DLWS_WITH_SSL=OFF ..`
-      * `make`
-      * `sudo make install`
-    * Otherwise:
-      * `mkdir install`
-      * `cd build`
-      * `cmake -DCMAKE_INSTALL_PREFIX=../install ..`
-        * `cmake -DCMAKE_INSTALL_PREFIX=../install ..` may fail if OpenSSL
-          is not available. ISAAC itself does not support HTTPS connections at
-          the moment anyway, thus it can be disabled with:
-          `cmake -DLWS_WITH_SSL=OFF -DCMAKE_INSTALL_PREFIX=../install ..`
-      * `make install`
-      * Now a local version of libwebsockets is installed in the install
-        directory in the libwebsockets root folder. Later while compiling the
-        ISAAC server using libwebsockets add
-        `-DLibwebsockets_DIR=$LIBWEBSOCKETS/install/lib/cmake/libwebsockets`, where
-        `$LIBWEBSOCKETS` is the root folder of the libwebsockets source (the directory
-        `git clone …` created).
-* __gStreamer__ is only needed, if streaming over RTP or the Twitch plugin shall
-  be used. It should be possible to build gStreamer yourself, but it
-  is strongly adviced - even from the gStreamer team themself - to use
-  the prebuilt version of your distribution. The HML5 Client can show
-  streams of a server without gStreamer.
-  * _Debian/Ubuntu_:
-    * `sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base0.10-dev libgstreamer-plugins-good1.0-dev libgstreamer-plugins-bad1.0-dev`
-
 ### Requirements for the in situ library and the examples using it
 
 The ISAACConfig.cmake searches for these requirements. See
@@ -202,16 +163,87 @@ The ISAACConfig.cmake searches for these requirements. See
         MPI (including the ISAAC examples) add `$MPI/install` to the
         CMake variable `CMAKE_MODULE_PATH` to use this version.
 
+### Requirements for the server only
+
+* __libwebsockets__ for the connection between server and an HTML5 client.
+  It is in steady development and the most recent version should be used:
+  * _From Source_:
+    * `git clone https://github.com/warmcat/libwebsockets.git`
+    * `cd libwebsockets`
+    * `mkdir build`
+    * With admin rights and no other version of libwebsockets installed:
+      * `cd build`
+      * `cmake ..`
+        * `cmake ..` may fail if OpenSSL is not available. ISAAC itself does
+          not support HTTPS connections at the moment anyway, thus it can be
+          disabled with: `cmake -DLWS_WITH_SSL=OFF ..`
+      * `make`
+      * `sudo make install`
+    * Otherwise:
+      * `mkdir install`
+      * `cd build`
+      * `cmake -DCMAKE_INSTALL_PREFIX=../install ..`
+        * `cmake -DCMAKE_INSTALL_PREFIX=../install ..` may fail if OpenSSL
+          is not available. ISAAC itself does not support HTTPS connections at
+          the moment anyway, thus it can be disabled with:
+          `cmake -DLWS_WITH_SSL=OFF -DCMAKE_INSTALL_PREFIX=../install ..`
+      * `make install`
+      * Now a local version of libwebsockets is installed in the install
+        directory in the libwebsockets root folder. Later while compiling the
+        ISAAC server using libwebsockets add
+        `-DLibwebsockets_DIR=$LIBWEBSOCKETS/install/lib/cmake/libwebsockets`, where
+        `$LIBWEBSOCKETS` is the root folder of the libwebsockets source (the directory
+        `git clone …` created).
+* __gStreamer__ is only needed, if streaming over RTP or the Twitch plugin shall
+  be used. It should be possible to build gStreamer yourself, but it
+  is strongly adviced - even from the gStreamer team themself - to use
+  the prebuilt version of your distribution. The HML5 Client can show
+  streams of a server without gStreamer.
+  * _Debian/Ubuntu_:
+    * `sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base0.10-dev libgstreamer-plugins-good1.0-dev libgstreamer-plugins-bad1.0-dev`
+
 Building
 --------
 
-### The server
+### Installing the library
 
-The server resides in the direcoty `server` and uses CMake. Best practice
-is to create a new directory (like `build`) in the `server` directory and
-change to it:
+To install the isaac library to use it in your project
+go to directory `lib` inside the isaac root folder, create a folder like
+`build` and do the classic cmake magic:
 
 * `git clone https://github.com/ComputationalRadiationPhysics/isaac.git`
+* `cd isaac`
+* `cd lib`
+* `mkdir build`
+* `cd build`
+* `cmake ..`
+* (`sudo`) ` make install`
+
+You don't need to call `make` before `make install` as the template library
+does not need to be built until compiling the using application.
+
+### The example
+
+The building of the examples works similar, but the root directory of
+the examples is the folder `example`, so after changing directory to
+isaac (`cd isaac`) do:
+
+* `cd example`
+* `mkdir build`
+* `cd build`
+* `cmake ..`
+  * Don't forget the maybe needed `-DLIB_DIR=…` parameters
+    needed for local installed libraries. E.g.
+    `cmake -DIceT_DIR=$ICET/install/lib ..`
+* `make`
+
+Afterwards you get the executables `example_cuda`, `example_alpaka` or both.
+For running these examples you need a running isaac server.
+
+### The server
+
+The server resides in the direcoty `server` and also uses CMake:
+
 * `cd isaac`
 * `cd server`
 * `mkdir build`
@@ -220,7 +252,7 @@ change to it:
   * Don't forget the maybe needed `-DLIB_DIR=…` parameters
     needed for local installed libraries. E.g.
     `cmake -DLibwebsockets_DIR=$LIBWEBSOCKETS/install/lib/cmake/libwebsockets ..`
-  * There are some options to (de)activate features of ISAAC if they are not needed
+  * There are some options to (de)activate features of the server if they are not needed
     or not available on the system (like Gstreamer), which you can change with
     theese lines before `..` (in `cmake ..`) or afterwards with `ccmake` or `cmake-gui`:
     * `-DISAAC_GST=OFF` → Deactivates GStreamer.
@@ -238,7 +270,6 @@ change to it:
       the server. This may be wanted if library and server are not used on the same system.
     * `-DISAAC_BUILD_SERVER=OFF` → Does not build nor install the server at all. Use this,
       if you want to install the library on a system, but not the server itself.
-
 * `make`
 
 If you want to install the server type
@@ -251,44 +282,12 @@ Change the installation directory with adding
 
 in the initial `cmake ..`
 
-However, ISAAC doesn't need to be installed and can also directly be called with
+However, the server doesn't need to be installed and can also directly be called with
 
 * `./isaac`
 
 For more informations about parameters use `./isaac --help` or have
 a look in the __[server documentation](http://computationalradiationphysics.github.io/isaac/doc/server/index.html)__.
-
-### Installing the library
-
-Even if you install the server, the library itself is not installed. To do
-this you need to go to directory `lib` inside the isaac root folder, create a folder like
-`build` and do the same cmake commands as for the server:
-
-* `cd isaac`
-* `cd lib`
-* `mkdir build`
-* `cd build`
-* `cmake ..`
-* (`sudo`) ` make install`
-
-You don't need to call `make` before `make install` as the template library does
-not need to be built ast
-
-### The example
-
-The building of the examples works similar, but the root directory of
-the examples is the folder `example`, so after changing directory to
-isaac (`cd isaac`) do:
-
-* `cd example`
-* `mkdir build`
-* `cd build`
-* `cmake ..` (Don't forget the maybe needed `-DLIB_DIR=…` parameters
-  needed for local installed libraries. E.g.
-  `cmake -DIceT_DIR=$ICET/install/lib ..`)
-* `make`
-
-Afterwards you get the executables `example_cuda`, `example_alpaka` or both.
 
 ### Testing
 
