@@ -211,12 +211,16 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
                     else
                         data8[x][y][z] = ptr[coord.x + ISAAC_GUARD_SIZE + (coord.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
                 }
+        //Against annoying double->float casting warning with gcc5
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wnarrowing"
         isaac_float_dim < 3 > pos_in_cube =
         {
             pos.x - floor(pos.x),
             pos.y - floor(pos.y),
             pos.z - floor(pos.z)
         };
+        #pragma GCC diagnostic pop
         isaac_float_dim < TSource::feature_dim > data4[2][2];
         for (int x = 0; x < 2; x++)
             for (int y = 0; y < 2; y++)
@@ -974,9 +978,9 @@ struct IsaacRenderKernelCaller
                 block_size.x = size_t(1);
                 block_size.y = size_t(1);
             }
-            const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(ISAAC_VECTOR_ELEM));
-            const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.y, block_size.x);
-            const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.y, grid_size.x);
+            const alpaka::vec::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(ISAAC_VECTOR_ELEM));
+            const alpaka::vec::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.y, block_size.x);
+            const alpaka::vec::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.y, grid_size.x);
             auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
             #define ISAAC_KERNEL_START \
             { \

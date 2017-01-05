@@ -195,10 +195,10 @@ int main(int argc, char **argv)
 		DevHost devHost (alpaka::pltf::getDevByIdx<PltfHost>(0u));
 		Stream  stream  (devAcc);
 
-		const alpaka::Vec<SimDim, size_t> global_size(d[0]*VOLUME_X,d[1]*VOLUME_Y,d[2]*VOLUME_Z);
-		const alpaka::Vec<SimDim, size_t> local_size(size_t(VOLUME_X),size_t(VOLUME_Y),size_t(VOLUME_Z));
-		const alpaka::Vec<DatDim, size_t> data_size(size_t(VOLUME_X) * size_t(VOLUME_Y) * size_t(VOLUME_Z));
-		const alpaka::Vec<SimDim, size_t> position(p[0]*VOLUME_X,p[1]*VOLUME_Y,p[2]*VOLUME_Z);
+		const alpaka::vec::Vec<SimDim, size_t> global_size(d[0]*VOLUME_X,d[1]*VOLUME_Y,d[2]*VOLUME_Z);
+		const alpaka::vec::Vec<SimDim, size_t> local_size(size_t(VOLUME_X),size_t(VOLUME_Y),size_t(VOLUME_Z));
+		const alpaka::vec::Vec<DatDim, size_t> data_size(size_t(VOLUME_X) * size_t(VOLUME_Y) * size_t(VOLUME_Z));
+		const alpaka::vec::Vec<SimDim, size_t> position(p[0]*VOLUME_X,p[1]*VOLUME_Y,p[2]*VOLUME_Z);
 	#else //CUDA
 		//////////////////////////////////
 		// Cuda specific initialization //
@@ -299,7 +299,7 @@ int main(int argc, char **argv)
 		SimDim, //Dimension of the Simulation. In this case: 3D
 		SourceList, //The boost::fusion list of Source Types
 		#if ISAAC_ALPAKA == 1
-			alpaka::Vec<SimDim, size_t>, //Type of the 3D vectors used later
+			alpaka::vec::Vec<SimDim, size_t>, //Type of the 3D vectors used later
 		#else //CUDA
 			std::vector<size_t>, //Type of the 3D vectors used later
 		#endif
