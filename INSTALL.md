@@ -198,7 +198,8 @@ The ISAACConfig.cmake searches for these requirements. See
   be used. It should be possible to build gStreamer yourself, but it
   is strongly adviced - even from the gStreamer team themself - to use
   the prebuilt version of your distribution. The HML5 Client can show
-  streams of a server without gStreamer.
+  streams of a server without gStreamer. If gStreamer is not found, it is
+  deactivated by default.
   * _Debian/Ubuntu_:
     * `sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base0.10-dev libgstreamer-plugins-good1.0-dev libgstreamer-plugins-bad1.0-dev`
 
@@ -235,6 +236,13 @@ isaac (`cd isaac`) do:
   * Don't forget the maybe needed `-DLIB_DIR=…` parameters
     needed for local installed libraries. E.g.
     `cmake -DIceT_DIR=$ICET/install/lib ..`
+  * There are some options to (de)activate features of the library if they are not needed
+    or not available on the system (like Cuda), which you can change with
+    theese lines before `..` (in `cmake ..`) or afterwards with `ccmake` or `cmake-gui`:
+    * `-DISAAC_CUDA=OFF` →  Deactivates CUDA.
+    * `-DISAAC_ALPAKA=ON` → Activates ALPAKA. The used accelerator of Alpaka can be
+      changed inside the file `example.cpp`. At default OpenMP version 2 is used as
+      accelerator. At least CUDA or Alpaka need to be activated. 
 * `make`
 
 Afterwards you get the executables `example_cuda`, `example_alpaka` or both.
@@ -255,21 +263,13 @@ The server resides in the direcoty `server` and also uses CMake:
   * There are some options to (de)activate features of the server if they are not needed
     or not available on the system (like Gstreamer), which you can change with
     theese lines before `..` (in `cmake ..`) or afterwards with `ccmake` or `cmake-gui`:
-    * `-DISAAC_GST=OFF` → Deactivates GStreamer.
+    * `-DISAAC_GST=OFF` → Deactivates GStreamer (Default if not found).
     * `-DISAAC_JPEG=OFF` → Deactivates JPEG compression. As already mentioned: This is not advised
       and will most probably leave ISAAC in an unusable state in the end.
     * `-DISAAC_SDL=ON` → Activates a plugin for showing the oldest not yet finished
       visualization in an extra window using `libSDL`. Of course this option does not
       make much sense for most servers as they don't have a screen or even an
       X server installed.
-    * `-DISAAC_CUDA=OFF` →  Deactivates CUDA.
-    * `-DISAAC_ALPAKA=ON` → Activates ALPAKA. The used accelerator of Alpaka can be
-      changed inside the file `example.cpp`. At default OpenMP version 2 is used as
-      accelerator. At least CUDA or Alpaka need to be activated. 
-    * `-DISAAC_INSTALL_LIBRARY=OFF` → Does not install the library files while installing
-      the server. This may be wanted if library and server are not used on the same system.
-    * `-DISAAC_BUILD_SERVER=OFF` → Does not build nor install the server at all. Use this,
-      if you want to install the library on a system, but not the server itself.
 * `make`
 
 If you want to install the server type
