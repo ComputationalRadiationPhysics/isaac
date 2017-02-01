@@ -26,7 +26,6 @@ set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}/isaac")
 ###############################################################################
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ISAAC_DIR}/Modules")
 
-
 ###############################################################################
 # OPTIONS
 ###############################################################################
@@ -165,5 +164,18 @@ endif()
 ################################################################################
 # Returning whether ISAAC could be found
 ################################################################################
+
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(ISAAC
-                                  REQUIRED_VARS ISAAC_LIBRARIES ISAAC_INCLUDE_DIRS JANSSON_LIBRARIES JANSSON_INCLUDE_DIRS CMAKE_THREAD_LIBS_INIT ISAAC_MPI_FOUND ICET_CORE_LIBS ICET_MPI_LIBS ICET_INCLUDE_DIRS Boost_FOUND ISAAC_PRIVATE_FOUND)
+                                    REQUIRED_VARS
+                                        ISAAC_LIBRARIES
+                                        ISAAC_INCLUDE_DIRS
+                                        JANSSON_LIBRARIES
+                                        JANSSON_INCLUDE_DIRS
+                                        CMAKE_THREAD_LIBS_INIT
+                                        ISAAC_MPI_FOUND
+                                        ICET_CORE_LIBS
+                                        ICET_MPI_LIBS
+                                        ICET_INCLUDE_DIRS
+                                        Boost_FOUND
+                                        ISAAC_PRIVATE_FOUND
+                                )
