@@ -325,6 +325,8 @@ errorCode Broker::run()
 						json_t* js;
 						if ( js = json_object_get(message->json_root, "init") )
 						{
+							json_t* json_id = json_object_get( insitu->t->group->initData, "id" );
+							json_object_set( js, "id", json_id );
 							json_decref( insitu->t->group->initData );
 							insitu->t->group->initData = js;
 							json_incref( js );
