@@ -1,9 +1,10 @@
 # - Config file for the isaac package
 # It defines the following variables
-#  ISAAC_INCLUDE_DIRS - include directories for FooBar
-#  ISAAC_LIBRARIES    - libraries to link against
-#  ISAAC_DEFINITIONS  - necessary definitions
-#  ISAAC_FOUND        - whether ISAAC was found and is useable
+#  ISAAC_INCLUDE_DIRS     - include directories for FooBar
+#  ISAAC_LIBRARIES        - libraries to link against
+#  ISAAC_DEFINITIONS      - necessary definitions
+#  ISAAC_FOUND            - whether ISAAC was found and is useable
+#  ISAAC_DEPENDENCY_HINTS - hints about missing dependencies
 #
 # It defines the following options
 #  ISAAC_THREADING
@@ -25,7 +26,6 @@ set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}/isaac")
 # MODULES
 ###############################################################################
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ISAAC_DIR}/Modules")
-
 
 ###############################################################################
 # OPTIONS
@@ -72,11 +72,16 @@ if (ISAAC_VALGRIND_TWEAKS)
   set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_VALGRIND_TWEAKS)
 endif ()
 
+set(ISAAC_DEPENDENCY_HINTS "missing dependencies:")
+
 ###############################################################################
 # JANSSON LIB
 ###############################################################################
 # set(JANSSON_DIR JANSSON_DIR_NOT-FOUND CACHE PATH "The location of the jansson library")
-find_package (Jansson CONFIG)
+find_package (Jansson CONFIG QUIET)
+if (NOT Jansson_FOUND)
+    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   libJansson")
+endif()
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
 
@@ -84,14 +89,20 @@ set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
 ###############################################################################
 # PTHREADS
 ###############################################################################
-find_package (Threads MODULE)
+find_package (Threads MODULE QUIET)
+if (NOT Threads_FOUND)
+    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   pThreads")
+endif()
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 
 ################################################################################
 # IceT LIB
 ################################################################################
-find_package (IceT CONFIG)
+find_package (IceT CONFIG QUIET)
+if (NOT IceT_FOUND)
+    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   IceT")
+endif()
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${ICET_CORE_LIBS})
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${ICET_MPI_LIBS})
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${ICET_INCLUDE_DIRS})
@@ -100,7 +111,10 @@ set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${ICET_INCLUDE_DIRS})
 ################################################################################
 # BOOST LIB
 ################################################################################
-find_package(Boost 1.56.0 MODULE)
+find_package(Boost 1.56.0 MODULE QUIET)
+if (NOT Boost_FOUND)
+    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Boost")
+endif()
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${Boost_INCLUDE_DIR})
 set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DBOOST_ALL_NO_LIB)
 
@@ -110,7 +124,7 @@ set(ISAAC_PRIVATE_FOUND true)
 # CUDA LIB
 ################################################################################
 if (ISAAC_CUDA)
-    find_package( CUDA 7.0 )
+    find_package( CUDA 7.0 QUIET)
     if (!CUDA_FOUND)
         set(ISAAC_PRIVATE_FOUND false)
     else()
@@ -123,9 +137,10 @@ endif()
 # Alpaka LIB
 ################################################################################
 if (ISAAC_ALPAKA)
-    find_package(alpaka)
+    find_package(alpaka QUIET)
     if (!alpaka_FOUND)
         set(ISAAC_PRIVATE_FOUND false)
+        set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Cuda or Alpaka")
     else()
         set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${alpaka_INCLUDE_DIRS})
         set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${alpaka_LIBRARIES})
@@ -142,7 +157,10 @@ list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
 ################################################################################
 # MPI LIB
 ################################################################################
-find_package(MPI MODULE)
+find_package(MPI MODULE QUIET)
+if (NOT MPI_FOUND)
+    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   MPI")
+endif()
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${MPI_C_INCLUDE_PATH})
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${MPI_C_LIBRARIES})
 if (ISAAC_PRIVATE_FOUND)
@@ -165,5 +183,18 @@ endif()
 ################################################################################
 # Returning whether ISAAC could be found
 ################################################################################
+
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(ISAAC
-                                  REQUIRED_VARS ISAAC_LIBRARIES ISAAC_INCLUDE_DIRS JANSSON_LIBRARIES JANSSON_INCLUDE_DIRS CMAKE_THREAD_LIBS_INIT ISAAC_MPI_FOUND ICET_CORE_LIBS ICET_MPI_LIBS ICET_INCLUDE_DIRS Boost_FOUND ISAAC_PRIVATE_FOUND)
+                                    REQUIRED_VARS
+                                        ISAAC_LIBRARIES
+                                        ISAAC_INCLUDE_DIRS
+                                        JANSSON_LIBRARIES
+                                        JANSSON_INCLUDE_DIRS
+                                        CMAKE_THREAD_LIBS_INIT
+                                        ISAAC_MPI_FOUND
+                                        ICET_CORE_LIBS
+                                        ICET_MPI_LIBS
+                                        ICET_INCLUDE_DIRS
+                                        Boost_FOUND
+                                        ISAAC_PRIVATE_FOUND
+                                )
