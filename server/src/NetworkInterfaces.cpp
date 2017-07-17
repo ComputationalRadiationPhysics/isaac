@@ -46,12 +46,13 @@ void NetworkInterfaces::bindInterface(in_addr_t &s_addr,std::string interface,bo
 	struct ifaddrs * it = ifaddr;
 	while (it)
 	{
-		int family, s, n;
+		int family, s;
 		char host[NI_MAXHOST];
 		family = it->ifa_addr->sa_family;
 		if (family == correct_family)
 		{
 			s = getnameinfo(it->ifa_addr,size_of_struct,host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+			(void)(s);
 			if (interface.compare(std::string(it->ifa_name)) == 0)
 			{
 				s_addr = inet_addr(host);

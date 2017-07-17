@@ -52,7 +52,7 @@ errorCode URIImageConnector::run()
 	while(finish == 0)
 	{
 		ImageBufferContainer* message;
-		while(message = clientGetMessage())
+		while( (message = clientGetMessage()) )
 		{
 			if (message->type == GROUP_OBSERVED)
 			{
@@ -96,7 +96,8 @@ errorCode URIImageConnector::run()
 			clientSendMessage( message );
 		}
 		usleep(1000);
-	}	
+	}
+	return 0;
 }
 
 URIImageConnector::~URIImageConnector()

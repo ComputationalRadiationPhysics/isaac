@@ -85,10 +85,10 @@ class InsituConnectorGroup
 		}
 	private:
 		InsituConnectorContainer* master;
-		int nodes;
-		std::string name;
 		json_t* initData;
 		int id;
+		std::string name;
+		int nodes;
 		int framebuffer_width;
 		int framebuffer_height;
 		size_t video_buffer_size;

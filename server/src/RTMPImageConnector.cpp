@@ -89,6 +89,7 @@ void* RTMPImageConnector::heartbeatFunction(void* ptr)
 		}
 		usleep(10000);
 	}
+	return ptr;
 }
 
 errorCode RTMPImageConnector::run()
@@ -100,7 +101,7 @@ errorCode RTMPImageConnector::run()
 	while (finish == 0)
 	{
 		ImageBufferContainer* message;
-		while (message = clientGetMessage())
+		while ( (message = clientGetMessage()) )
 		{
 			if (message->type == IMG_FORCE_EXIT)
 				finish = 1;
@@ -235,4 +236,5 @@ errorCode RTMPImageConnector::run()
 	heartbeat_finish = true;
 	pthread_join(heartbeat_thread,NULL);
 	pthread_mutex_destroy(&heartbeat_mutex);
+	return 0;
 }

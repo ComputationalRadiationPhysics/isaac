@@ -42,7 +42,7 @@ errorCode SaveFileImageConnector::run()
 	while (finish == 0)
 	{
 		ImageBufferContainer* message;
-		while (message = clientGetMessage())
+		while ( (message = clientGetMessage()) )
 		{
 			if (message->type == IMG_FORCE_EXIT)
 				finish = 1;
@@ -126,4 +126,5 @@ errorCode SaveFileImageConnector::run()
 		}
 		usleep(1000);
 	}
+	return 0;
 }
