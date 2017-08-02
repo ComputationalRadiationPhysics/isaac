@@ -429,7 +429,7 @@ This page documents the JSON messages a client can send and receive from and to 
 </tr>
 <tr>
 	<td><pre>"stop"</pre></td>
-	<td>Means, that the client wants to stop getting "period" messages from a given simulation/visualization. For this beside the type one attribute need to be sent:
+	<td>Means, that the client wants to stop observing a simulation, so not getting "period" messages from a given simulation/visualization anymore. For this beside the type, one attribute needs to be sent:
 		<center><table>
 		<tr>
 			<th>Variable name</th>
@@ -444,7 +444,7 @@ This page documents the JSON messages a client can send and receive from and to 
 </tr>
 <tr>
 	<td><pre>"closed"</pre></td>
-	<td>Means, that the client will disconnect.</td>
+	<td>Means, that the client will disconnect from the isaac server.</td>
 </tr>
 </table>
 </center>
