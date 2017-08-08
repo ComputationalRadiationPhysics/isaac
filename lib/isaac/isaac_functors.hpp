@@ -135,7 +135,7 @@ struct IsaacFunctorLength
         return result;
     }
 
-    #pragma GCC diagnostics pop
+    #pragma GCC diagnostic pop
 
     ISAAC_HOST_INLINE
     static std::string getName()
