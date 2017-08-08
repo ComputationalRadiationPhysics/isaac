@@ -151,7 +151,9 @@ if (ISAAC_ALPAKA)
     endif()
 endif()
 
-list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
+if (CUDA_NVCC_FLAGS)
+    list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
+endif()
 
 
 ################################################################################
