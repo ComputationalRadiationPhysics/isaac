@@ -15,8 +15,10 @@
 
 #pragma once
 
-//Hack for a bug, which occurs only in Cuda 7.0
-#if (__CUDACC_VER_MAJOR__ < 7) && (__CUDACC_VER_MINOR__ < 5) && !defined(BOOST_RESULT_OF_USE_TR1)
+/* Hack for a bug, which occurs only in CUDA 7.0
+ * __CUDACC_VER_MAJOR__ is first defined in CUDA 7.5, so this checks for
+ * CUDA Version < 7.5 */
+#if !defined(__CUDACC_VER_MAJOR__) && !defined(BOOST_RESULT_OF_USE_TR1)
     #define BOOST_RESULT_OF_USE_TR1
 #endif
 
