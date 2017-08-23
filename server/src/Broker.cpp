@@ -108,14 +108,14 @@ MetaDataClient* Broker::addDataClient()
 	}
 	boolean isaac_jpeg_fill_input_buffer(j_decompress_ptr cinfo)
 	{
-		return true;
+		return TRUE;
 	}
 	void isaac_jpeg_skip_input_data(j_decompress_ptr cinfo,long num_bytes)
 	{
 	}
 	boolean isaac_jpeg_resync_to_restart(j_decompress_ptr cinfo, int desired)
 	{
-		return true;
+		return TRUE;
 	}
 	void isaac_jpeg_term_source(j_decompress_ptr cinfo)
 	{
