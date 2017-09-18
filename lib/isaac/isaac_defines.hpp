@@ -59,9 +59,9 @@
 
 #if ISAAC_ALPAKA == 1
     #ifdef __CUDACC__
-        #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC __forceinline__
+        #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_HOST_ACC __forceinline__
     #else
-        #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_ACC inline
+        #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_HOST_ACC inline
     #endif
 #else
     #define ISAAC_HOST_DEVICE_INLINE __device__ __host__ __forceinline__
