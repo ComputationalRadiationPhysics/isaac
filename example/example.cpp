@@ -13,6 +13,7 @@
  * You should have received a copy of the GNU General Lesser Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
+#define ISAAC_IDX_TYPE int
 #include <isaac.hpp>
 
 #include "example_details.hpp"

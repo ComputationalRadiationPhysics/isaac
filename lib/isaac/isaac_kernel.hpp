@@ -269,7 +269,7 @@ ISAAC_HOST_DEVICE_INLINE void check_coord( isaac_float3& coord, const TLocalSize
 }
 
 template <
-    size_t Ttransfer_size,
+    ISAAC_IDX_TYPE Ttransfer_size,
     typename TFilter,
     isaac_int TInterpolation,
     isaac_int TIsoSurface
@@ -440,7 +440,7 @@ template <
     typename TSourceWeight,
     typename TPointerArray,
     typename TFilter,
-    size_t Ttransfer_size,
+    ISAAC_IDX_TYPE Ttransfer_size,
     isaac_int TInterpolation,
     isaac_int TIsoSurface,
     typename TScale
@@ -788,7 +788,7 @@ template <
     typename TPointerArray,
     typename TFilter,
     typename TFramebuffer,
-    size_t TTransfer_size,
+    ISAAC_IDX_TYPE TTransfer_size,
     typename TScale,
 #if ISAAC_ALPAKA == 1
     typename TAccDim,
@@ -909,7 +909,7 @@ template <
     typename TPointerArray,
     typename TFilter,
     typename TFramebuffer,
-    size_t TTransfer_size,
+    ISAAC_IDX_TYPE TTransfer_size,
     typename TScale
 #if ISAAC_ALPAKA == 1
     ,typename TAccDim
@@ -960,28 +960,28 @@ struct IsaacRenderKernelCaller
     {
         isaac_size2 block_size=
         {
-            size_t(8),
-            size_t(16)
+            ISAAC_IDX_TYPE(8),
+            ISAAC_IDX_TYPE(16)
         };
         isaac_size2 grid_size=
         {
-            size_t((readback_viewport[2]+block_size.x-1)/block_size.x + ISAAC_VECTOR_ELEM - 1)/size_t(ISAAC_VECTOR_ELEM),
-            size_t((readback_viewport[3]+block_size.y-1)/block_size.y)
+            ISAAC_IDX_TYPE((readback_viewport[2]+block_size.x-1)/block_size.x + ISAAC_VECTOR_ELEM - 1)/ISAAC_IDX_TYPE(ISAAC_VECTOR_ELEM),
+            ISAAC_IDX_TYPE((readback_viewport[3]+block_size.y-1)/block_size.y)
         };
         #if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
-            if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
+            if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
             {
-                grid_size.x = size_t(readback_viewport[2] + ISAAC_VECTOR_ELEM - 1)/size_t(ISAAC_VECTOR_ELEM);
-                grid_size.y = size_t(readback_viewport[3]);
-                block_size.x = size_t(1);
-                block_size.y = size_t(1);
+                grid_size.x = ISAAC_IDX_TYPE(readback_viewport[2] + ISAAC_VECTOR_ELEM - 1)/ISAAC_IDX_TYPE(ISAAC_VECTOR_ELEM);
+                grid_size.y = ISAAC_IDX_TYPE(readback_viewport[3]);
+                block_size.x = ISAAC_IDX_TYPE(1);
+                block_size.y = ISAAC_IDX_TYPE(1);
             }
-            const alpaka::vec::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(ISAAC_VECTOR_ELEM));
-            const alpaka::vec::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.y, block_size.x);
-            const alpaka::vec::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.y, grid_size.x);
-            auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> threads (ISAAC_IDX_TYPE(1), ISAAC_IDX_TYPE(1), ISAAC_IDX_TYPE(ISAAC_VECTOR_ELEM));
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> blocks  (ISAAC_IDX_TYPE(1), block_size.y, block_size.x);
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> grid    (ISAAC_IDX_TYPE(1), grid_size.y, grid_size.x);
+            auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, ISAAC_IDX_TYPE>(grid,blocks,threads));
             #define ISAAC_KERNEL_START \
             { \
                 isaacRenderKernel \
