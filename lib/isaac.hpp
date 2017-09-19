@@ -194,8 +194,8 @@ class IsaacVisualization
                             alpaka::mem::buf::Buf< TDevAcc, isaac_float, TFraDim, ISAAC_IDX_TYPE> (
                                 alpaka::mem::buf::alloc<isaac_float, ISAAC_IDX_TYPE> (
                                     acc,
-                                    alpaka::vec::Vec<TFraDim, ISAAC_IDX_TYPE> (
-                                        TSource::feature_dim * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE)
+                                    alpaka::vec::Vec<TFraDim, ISAAC_IDX_TYPE> (ISAAC_IDX_TYPE(
+                                        TSource::feature_dim * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE) )
                                     )
                                 )
                             )
@@ -715,7 +715,7 @@ class IsaacVisualization
                 functions[i].error_code = 0;
                 //Going from | to |...
                 std::string source = functions[i].source;
-                ISAAC_IDX_TYPE pos = 0;
+                size_t pos = 0;
                 bool again = true;
                 int elem = 0;
                 while (again && ((pos = source.find("|")) != std::string::npos || ((again = false) == false)) )
@@ -730,12 +730,12 @@ class IsaacVisualization
                     //ignore " " in token
                     token.erase(remove_if(token.begin(), token.end(), isspace), token.end());
                     //search "(" and parse parameters
-                    ISAAC_IDX_TYPE t_begin = token.find("(");
+                    size_t t_begin = token.find("(");
                     if (t_begin == std::string::npos)
                         memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(isaac_float4));
                     else
                     {
-                        ISAAC_IDX_TYPE t_end = token.find(")");
+                        size_t t_end = token.find(")");
                         if (t_end == std::string::npos)
                         {
                             functions[i].error_code = -1;
@@ -746,7 +746,7 @@ class IsaacVisualization
                         else
                         {
                             std::string parameters = token.substr(t_begin+1, t_end-t_begin-1);
-                            ISAAC_IDX_TYPE p_pos = 0;
+                            size_t p_pos = 0;
                             bool p_again = true;
                             int p_elem = 0;
                             isaac_float* parameter_array = (float*)&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]);
@@ -843,7 +843,7 @@ class IsaacVisualization
                 for(next++; next != transfer_h.description[i].end(); next++)
                 {
                     isaac_uint width = next->first - before->first;
-                    for (ISAAC_IDX_TYPE j = 0; j < width && j + before->first < TTransfer_size; j++)
+                    for (ISAAC_IDX_TYPE j = 0; j < ISAAC_IDX_TYPE(width) && ISAAC_IDX_TYPE(j + before->first) < ISAAC_IDX_TYPE(TTransfer_size); j++)
                     {
                         transfer_h.pointer[i][before->first + j] = (
                             before->second * isaac_float(width-j) +
@@ -926,7 +926,7 @@ class IsaacVisualization
                 while (json_t* last = communicator->getLastMessage())
                 {
                     json_t* js;
-                    ISAAC_IDX_TYPE index;
+                    size_t index;
                     json_t *value;
                     //search for update requests
                     if ( js = json_object_get(last, "request") )
@@ -1100,7 +1100,7 @@ class IsaacVisualization
             }
 
             json_t* js;
-            ISAAC_IDX_TYPE index;
+            size_t index;
             json_t *value;
 
             //search for requests for all ranks
@@ -1133,7 +1133,7 @@ class IsaacVisualization
                 json_array_foreach(js, index, value)
                 {
                     transfer_h.description[index].clear();
-                    ISAAC_IDX_TYPE index_2;
+                    size_t index_2;
                     json_t *element;
                     json_array_foreach(value, index_2, element)
                     {
@@ -1683,7 +1683,7 @@ class IsaacVisualization
                 if ( myself->send_clipping )
                 {
                     json_object_set_new( myself->json_root, "clipping", matrix = json_array() );
-                    for (ISAAC_IDX_TYPE i = 0; i < myself->clipping.count; i++)
+                    for (ISAAC_IDX_TYPE i = 0; i < ISAAC_IDX_TYPE(myself->clipping.count); i++)
                     {
                         json_t* f = json_object();
                         json_array_append_new( matrix, f );
