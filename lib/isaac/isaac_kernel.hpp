@@ -472,11 +472,11 @@ template <
             isaac_uint2 pixel[ISAAC_VECTOR_ELEM];
             bool finish[ISAAC_VECTOR_ELEM];
 #if ISAAC_ALPAKA == 1
-            auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            auto alpThreadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
             ISAAC_ELEM_ITERATE(e)
             {
-                pixel[e].x = isaac_uint(threadIdx[2]) * isaac_uint(ISAAC_VECTOR_ELEM) + e;
-                pixel[e].y = isaac_uint(threadIdx[1]);
+                pixel[e].x = isaac_uint(alpThreadIdx[2]) * isaac_uint(ISAAC_VECTOR_ELEM) + e;
+                pixel[e].y = isaac_uint(alpThreadIdx[1]);
 #else
             ISAAC_ELEM_ITERATE(e)
             {
@@ -1135,11 +1135,11 @@ template
 #endif
         {
             #if ISAAC_ALPAKA == 1
-                auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+                auto alpThreadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
                 isaac_int3 dest =
                 {
-                    isaac_int(threadIdx[1]),
-                    isaac_int(threadIdx[2]),
+                    isaac_int(alpThreadIdx[1]),
+                    isaac_int(alpThreadIdx[2]),
                     0
                 };
             #else
@@ -1214,11 +1214,11 @@ template
 #endif
         {
             #if ISAAC_ALPAKA == 1
-                auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+                auto alpThreadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
                 isaac_int3 coord =
                 {
-                    isaac_int(threadIdx[1]),
-                    isaac_int(threadIdx[2]),
+                    isaac_int(alpThreadIdx[1]),
+                    isaac_int(alpThreadIdx[2]),
                     0
                 };
             #else
