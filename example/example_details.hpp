@@ -67,7 +67,7 @@ void update_data(
 				alpaka::mem::view::getPtrNative(hostBuffer1)[pos][2] = intensity;
 				alpaka::mem::view::getPtrNative(hostBuffer2)[pos] =  (2.0f - l)*(2.0f - l) / 4.0f;
 			}
-	const alpaka::vec::Vec<alpaka::dim::DimInt<1>, size_t> data_size(size_t(local_size[0]) * size_t(local_size[1]) * size_t(local_size[2]));
+	const alpaka::vec::Vec<alpaka::dim::DimInt<1>, ISAAC_IDX_TYPE> data_size(ISAAC_IDX_TYPE(local_size[0]) * ISAAC_IDX_TYPE(local_size[1]) * ISAAC_IDX_TYPE(local_size[2]));
 	alpaka::mem::view::copy(stream, deviceBuffer1, hostBuffer1, data_size);
 	alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, data_size);
 #else
@@ -81,7 +81,7 @@ void update_data(
 #endif
 }
 
-void mul_to_smallest_d(size_t *d,int nr)
+void mul_to_smallest_d(ISAAC_IDX_TYPE *d,int nr)
 {
 	if (d[0] < d[1]) // 0 < 1
 	{
@@ -99,7 +99,7 @@ void mul_to_smallest_d(size_t *d,int nr)
 	}
 }
 
-void recursive_kgv(size_t* d,int number,int test)
+void recursive_kgv(ISAAC_IDX_TYPE* d,int number,int test)
 {
 	if (number == 1)
 		return;
@@ -254,7 +254,7 @@ void read_vtk_to_memory(
 	}
 
 #if ISAAC_ALPAKA == 1
-	const alpaka::vec::Vec<alpaka::dim::DimInt<1>, size_t> data_size(size_t(local_size[0]) * size_t(local_size[1]) * size_t(local_size[2]));
+	const alpaka::vec::Vec<alpaka::dim::DimInt<1>, ISAAC_IDX_TYPE> data_size(ISAAC_IDX_TYPE(local_size[0]) * ISAAC_IDX_TYPE(local_size[1]) * ISAAC_IDX_TYPE(local_size[2]));
 	alpaka::mem::view::copy(stream, deviceBuffer2, hostBuffer2, data_size);
 #else
 	cudaMemcpy(deviceBuffer2, hostBuffer2, sizeof(float)*prod, cudaMemcpyHostToDevice);
