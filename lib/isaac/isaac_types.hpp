@@ -162,8 +162,8 @@ ISAAC_OVERLOAD_OPERATOR_CREATE(size)
 #undef ISAAC_OVERLOAD_OPERATOR_DEF_UNARY
 #undef ISAAC_OVERLOAD_OPERATOR_CREATE
 
-#define ISAAC_DIM_TYPES ( 4, ( size, float, int, uint ) )
-#define ISAAC_DIM_TYPES_DIM ( 4, ( size_dim, float_dim, int_dim, uint_dim ) )
+#define ISAAC_DIM_TYPES ( 3, ( size, float, int ) )
+#define ISAAC_DIM_TYPES_DIM ( 3, ( size_dim, float_dim, int_dim ) )
 
 #define ISAAC_DIM_SUBDEF(Z, J, I ) \
     template <> \
@@ -176,7 +176,9 @@ ISAAC_OVERLOAD_OPERATOR_CREATE(size)
     struct BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES_DIM ) ); \
     BOOST_PP_REPEAT( 4, ISAAC_DIM_SUBDEF, I )
 
-BOOST_PP_REPEAT( 4, ISAAC_DIM_DEF, ~ )
+BOOST_PP_REPEAT( 3, ISAAC_DIM_DEF, ~ )
+
+
 
 #undef ISAAC_DIM_SUBDEF
 #undef ISAAC_DIM_DEF
