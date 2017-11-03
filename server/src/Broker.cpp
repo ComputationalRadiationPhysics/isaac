@@ -40,6 +40,7 @@ void* delete_pointer_later(void* ptr)
 {
 	sleep(300); //5 minutes sleeping
 	delete( (Type*)ptr );
+	return ptr;
 }
 
 Broker::Broker(std::string name,int inner_port,std::string interface)
@@ -107,14 +108,14 @@ MetaDataClient* Broker::addDataClient()
 	}
 	boolean isaac_jpeg_fill_input_buffer(j_decompress_ptr cinfo)
 	{
-		return true;
+		return TRUE;
 	}
 	void isaac_jpeg_skip_input_data(j_decompress_ptr cinfo,long num_bytes)
 	{
 	}
 	boolean isaac_jpeg_resync_to_restart(j_decompress_ptr cinfo, int desired)
 	{
-		return true;
+		return TRUE;
 	}
 	void isaac_jpeg_term_source(j_decompress_ptr cinfo)
 	{
@@ -224,7 +225,7 @@ void Broker::receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char
 			{
 				int y = cinfo.output_scanline;
 				(void) jpeg_read_scanlines(&cinfo, buffer, 1);
-				for (int x = 0; x < cinfo.output_width; x++)
+				for (unsigned x = 0; x < cinfo.output_width; x++)
 				{
 					video_buffer[4*(x+y*cinfo.output_width)+0] = buffer[0][x*3+0];
 					video_buffer[4*(x+y*cinfo.output_width)+1] = buffer[0][x*3+1];
@@ -323,7 +324,7 @@ errorCode Broker::run()
 					{
 						//Let's see, whether some options are broadcastet and change them in the initData
 						json_t* js;
-						if ( js = json_object_get(message->json_root, "init") )
+						if ( (js = json_object_get(message->json_root, "init")) )
 						{
 							json_t* json_id = json_object_get( insitu->t->group->initData, "id" );
 							json_object_set( js, "id", json_id );
@@ -388,16 +389,14 @@ errorCode Broker::run()
 					}
 					insitu->t->group = group;
 
-					switch (message->type)
+					if (message->type == REGISTER)
 					{
-						case REGISTER:
-							group->initData = message->json_root;
-							group->framebuffer_width = json_integer_value( json_object_get(group->initData, "framebuffer width") );
-							group->framebuffer_height = json_integer_value( json_object_get(group->initData, "framebuffer height") );
-							group->video_buffer_size = group->framebuffer_width*group->framebuffer_height*4;
-							delete_message = false;
-							printf("New connection, giving id %i (control)\n",insitu->t->connector->getID());
-							break;
+						group->initData = message->json_root;
+						group->framebuffer_width = json_integer_value( json_object_get(group->initData, "framebuffer width") );
+						group->framebuffer_height = json_integer_value( json_object_get(group->initData, "framebuffer height") );
+						group->video_buffer_size = group->framebuffer_width*group->framebuffer_height*4;
+						delete_message = false;
+						printf("New connection, giving id %i (control)\n",insitu->t->connector->getID());
 					}
 
 					group->master = insitu->t;
@@ -500,7 +499,7 @@ errorCode Broker::run()
 					bool dropable = json_boolean_value( json_object_get(message->json_root, "dropable") );
 					if ( stream < 0 )
 						stream = 0;
-					if ( stream >= imageConnectorList.size() )
+					if ( stream >= int(imageConnectorList.size()) )
 						stream = imageConnectorList.size()-1;
 					const char* url = json_string_value( json_object_get(message->json_root, "url") );
 					void* ref = (void*)dc->t;
@@ -525,7 +524,7 @@ errorCode Broker::run()
 							json_object_set( root, "rotation", js );
 						if (json_array_size( js = json_object_get( group->initData, "position") ) == 3)
 							json_object_set( root, "position", js );
-						if ( js = json_object_get( group->initData, "distance") )
+						if ( (js = json_object_get( group->initData, "distance")) )
 							json_object_set( root, "distance", js );
 						json_object_set_new( root, "type", json_string( "update" ) );
 						dc->t->masterSendMessage(new MessageContainer(UPDATE,root));

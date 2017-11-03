@@ -13,6 +13,7 @@
  * You should have received a copy of the GNU General Lesser Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
+#define ISAAC_IDX_TYPE int
 #include <isaac.hpp>
 
 #include "example_details.hpp"
@@ -33,7 +34,7 @@ template < typename TDevAcc, typename THost, typename TStream >
 class TestSource1
 {
 	public:
-		static const size_t feature_dim = 3;
+		static const ISAAC_IDX_TYPE feature_dim = 3;
 		static const bool has_guard = false;
 		static const bool persistent = true;
 
@@ -82,7 +83,7 @@ template < typename TDevAcc, typename THost, typename TStream >
 class TestSource2
 {
 	public:
-		static const size_t feature_dim = 1;
+		static const ISAAC_IDX_TYPE feature_dim = 1;
 		static const bool has_guard = false;
 		static const bool persistent = false;
 
@@ -148,9 +149,9 @@ int main(int argc, char **argv)
 	MPI_Comm_size(MPI_COMM_WORLD, &numProc);
 
 	//Let's calculate the best spatial distribution of the dimensions so that d[0]*d[1]*d[2] = numProc
-	size_t d[3] = {1,1,1};
+	ISAAC_IDX_TYPE d[3] = {1,1,1};
 	recursive_kgv(d,numProc,2);
-	size_t p[3] = { rank % d[0], (rank / d[0]) % d[1],  (rank / d[0] / d[1]) % d[2] };
+	ISAAC_IDX_TYPE p[3] = { rank % d[0], (rank / d[0]) % d[1],  (rank / d[0] / d[1]) % d[2] };
 
 	//Let's generate some unique name for the simulation and broadcast it
 	int id;
@@ -167,8 +168,8 @@ int main(int argc, char **argv)
 	//This defines the size of the generated rendering
 	isaac_size2 framebuffer_size =
 	{
-		size_t(800),
-		size_t(600)
+		ISAAC_IDX_TYPE(800),
+		ISAAC_IDX_TYPE(600)
 	};
 
 	#if ISAAC_ALPAKA == 1
@@ -179,11 +180,11 @@ int main(int argc, char **argv)
 		using SimDim = alpaka::dim::DimInt<3>;
 		using DatDim = alpaka::dim::DimInt<1>;
 
-		//using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
+		//using Acc = alpaka::acc::AccGpuCudaRt<AccDim, ISAAC_IDX_TYPE>;
 		//using Stream  = alpaka::stream::StreamCudaRtSync;
-		using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
+		using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, ISAAC_IDX_TYPE>;
 		using Stream  = alpaka::stream::StreamCpuSync;
-		//using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
+		//using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, ISAAC_IDX_TYPE>;
 		//using Stream  = alpaka::stream::StreamCpuSync;
 
 		using DevAcc = alpaka::dev::Dev<Acc>;
@@ -195,10 +196,10 @@ int main(int argc, char **argv)
 		DevHost devHost (alpaka::pltf::getDevByIdx<PltfHost>(0u));
 		Stream  stream  (devAcc);
 
-		const alpaka::vec::Vec<SimDim, size_t> global_size(d[0]*VOLUME_X,d[1]*VOLUME_Y,d[2]*VOLUME_Z);
-		const alpaka::vec::Vec<SimDim, size_t> local_size(size_t(VOLUME_X),size_t(VOLUME_Y),size_t(VOLUME_Z));
-		const alpaka::vec::Vec<DatDim, size_t> data_size(size_t(VOLUME_X) * size_t(VOLUME_Y) * size_t(VOLUME_Z));
-		const alpaka::vec::Vec<SimDim, size_t> position(p[0]*VOLUME_X,p[1]*VOLUME_Y,p[2]*VOLUME_Z);
+		const alpaka::vec::Vec<SimDim, ISAAC_IDX_TYPE> global_size(d[0]*VOLUME_X,d[1]*VOLUME_Y,d[2]*VOLUME_Z);
+		const alpaka::vec::Vec<SimDim, ISAAC_IDX_TYPE> local_size(ISAAC_IDX_TYPE(VOLUME_X),ISAAC_IDX_TYPE(VOLUME_Y),ISAAC_IDX_TYPE(VOLUME_Z));
+		const alpaka::vec::Vec<DatDim, ISAAC_IDX_TYPE> data_size(ISAAC_IDX_TYPE(VOLUME_X) * ISAAC_IDX_TYPE(VOLUME_Y) * ISAAC_IDX_TYPE(VOLUME_Z));
+		const alpaka::vec::Vec<SimDim, ISAAC_IDX_TYPE> position(p[0]*VOLUME_X,p[1]*VOLUME_Y,p[2]*VOLUME_Z);
 	#else //CUDA
 		//////////////////////////////////
 		// Cuda specific initialization //
@@ -207,15 +208,15 @@ int main(int argc, char **argv)
 		cudaGetDeviceCount( &devCount );
 		cudaSetDevice( rank % devCount );
 		typedef boost::mpl::int_<3> SimDim;
-		std::vector<size_t> global_size;
+		std::vector<ISAAC_IDX_TYPE> global_size;
 			global_size.push_back(d[0]*VOLUME_X);
 			global_size.push_back(d[1]*VOLUME_Y);
 			global_size.push_back(d[2]*VOLUME_Z);
-		std::vector<size_t> local_size;
+		std::vector<ISAAC_IDX_TYPE> local_size;
 			local_size.push_back(VOLUME_X);
 			local_size.push_back(VOLUME_Y);
 			local_size.push_back(VOLUME_Z);
-		std::vector<size_t> position;
+		std::vector<ISAAC_IDX_TYPE> position;
 			position.push_back(p[0]*VOLUME_X);
 			position.push_back(p[1]*VOLUME_Y);
 			position.push_back(p[2]*VOLUME_Z);
@@ -223,16 +224,16 @@ int main(int argc, char **argv)
 	#endif
 
 	//The whole size of the rendered sub volumes
-	size_t prod = local_size[0]*local_size[1]*local_size[2];
+	ISAAC_IDX_TYPE prod = local_size[0]*local_size[1]*local_size[2];
 
 	/////////////////
 	// Init memory //
 	/////////////////
 	#if ISAAC_ALPAKA == 1
-		alpaka::mem::buf::Buf<DevHost, float3_t, DatDim, size_t> hostBuffer1   ( alpaka::mem::buf::alloc<float3_t, size_t>(devHost, data_size));
-		alpaka::mem::buf::Buf<DevAcc, float3_t, DatDim, size_t>  deviceBuffer1 ( alpaka::mem::buf::alloc<float3_t, size_t>(devAcc,  data_size));
-		alpaka::mem::buf::Buf<DevHost, float, DatDim, size_t> hostBuffer2   ( alpaka::mem::buf::alloc<float, size_t>(devHost, data_size));
-		alpaka::mem::buf::Buf<DevAcc, float, DatDim, size_t>  deviceBuffer2 ( alpaka::mem::buf::alloc<float, size_t>(devAcc,  data_size));
+		alpaka::mem::buf::Buf<DevHost, float3_t, DatDim, ISAAC_IDX_TYPE> hostBuffer1   ( alpaka::mem::buf::alloc<float3_t, ISAAC_IDX_TYPE>(devHost, data_size));
+		alpaka::mem::buf::Buf<DevAcc, float3_t, DatDim, ISAAC_IDX_TYPE>  deviceBuffer1 ( alpaka::mem::buf::alloc<float3_t, ISAAC_IDX_TYPE>(devAcc,  data_size));
+		alpaka::mem::buf::Buf<DevHost, float, DatDim, ISAAC_IDX_TYPE> hostBuffer2   ( alpaka::mem::buf::alloc<float, ISAAC_IDX_TYPE>(devHost, data_size));
+		alpaka::mem::buf::Buf<DevAcc, float, DatDim, ISAAC_IDX_TYPE>  deviceBuffer2 ( alpaka::mem::buf::alloc<float, ISAAC_IDX_TYPE>(devAcc,  data_size));
 	#else //CUDA
 		float3_t* hostBuffer1 = (float3_t*)malloc(sizeof(float3_t)*prod);
 		float3_t* deviceBuffer1; cudaMalloc((float3_t**)&deviceBuffer1, sizeof(float3_t)*prod);
@@ -299,9 +300,9 @@ int main(int argc, char **argv)
 		SimDim, //Dimension of the Simulation. In this case: 3D
 		SourceList, //The boost::fusion list of Source Types
 		#if ISAAC_ALPAKA == 1
-			alpaka::vec::Vec<SimDim, size_t>, //Type of the 3D vectors used later
+			alpaka::vec::Vec<SimDim, ISAAC_IDX_TYPE>, //Type of the 3D vectors used later
 		#else //CUDA
-			std::vector<size_t>, //Type of the 3D vectors used later
+			std::vector<ISAAC_IDX_TYPE>, //Type of the 3D vectors used later
 		#endif
 		1024, //Size of the transfer functions
 		std::vector<float>, //user defined type of scaling

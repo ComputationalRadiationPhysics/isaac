@@ -31,6 +31,10 @@ typedef uint32_t isaac_uint;
 #define ISAAC_COMPONENTS_SEQ_1 (x)(y)
 #define ISAAC_COMPONENTS_SEQ_0 (x)
 
+#ifndef ISAAC_IDX_TYPE
+    #define ISAAC_IDX_TYPE size_t
+#endif
+
 #ifndef __CUDACC__
     //isaac_float4, isaac_float3, isaac_float2
     #define ISAAC_FLOAT_DEF(Z, I, unused) \
@@ -70,7 +74,7 @@ typedef uint32_t isaac_uint;
 #define ISAAC_SIZE_DEF(Z, I, unused) \
     struct BOOST_PP_CAT(isaac_size, BOOST_PP_INC(I) ) \
     { \
-        size_t BOOST_PP_SEQ_ENUM( BOOST_PP_CAT( ISAAC_COMPONENTS_SEQ_ , I ) ); \
+        ISAAC_IDX_TYPE BOOST_PP_SEQ_ENUM( BOOST_PP_CAT( ISAAC_COMPONENTS_SEQ_ , I ) ); \
     };
 BOOST_PP_REPEAT(4, ISAAC_SIZE_DEF, ~)
 #undef ISAAC_SIZE_DEF
@@ -158,36 +162,38 @@ ISAAC_OVERLOAD_OPERATOR_CREATE(size)
 #undef ISAAC_OVERLOAD_OPERATOR_DEF_UNARY
 #undef ISAAC_OVERLOAD_OPERATOR_CREATE
 
-#define ISAAC_DIM_TYPES ( 4, ( size, float, int, uint ) )
-#define ISAAC_DIM_TYPES_DIM ( 4, ( size_dim, float_dim, int_dim, uint_dim ) )
+#define ISAAC_DIM_TYPES ( 3, ( size, float, int ) )
+#define ISAAC_DIM_TYPES_DIM ( 3, ( size_dim, float_dim, int_dim ) )
 
 #define ISAAC_DIM_SUBDEF(Z, J, I ) \
     template <> \
     struct BOOST_PP_CAT( isaac_, BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES_DIM ) ) \
-    < size_t( BOOST_PP_INC(J) ) > { \
+    < ISAAC_IDX_TYPE( BOOST_PP_INC(J) ) > { \
     BOOST_PP_CAT( isaac_, BOOST_PP_CAT( BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES ) , BOOST_PP_INC(J) ) ) value; };
 
 #define ISAAC_DIM_DEF(Z, I, unused) \
-    template < size_t > \
+    template < ISAAC_IDX_TYPE > \
     struct BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES_DIM ) ); \
     BOOST_PP_REPEAT( 4, ISAAC_DIM_SUBDEF, I )
 
-BOOST_PP_REPEAT( 4, ISAAC_DIM_DEF, ~ )
+BOOST_PP_REPEAT( 3, ISAAC_DIM_DEF, ~ )
+
+
 
 #undef ISAAC_DIM_SUBDEF
 #undef ISAAC_DIM_DEF
 #undef ISAAC_DIM_TYPES
 #undef ISAAC_DIM_TYPES_DIM
 
-template < size_t simdim >
+template < ISAAC_IDX_TYPE simdim >
 struct isaac_size_struct
 {
     isaac_size_dim < simdim > global_size;
-    size_t max_global_size;
+    ISAAC_IDX_TYPE max_global_size;
     isaac_size_dim < simdim > position;
     isaac_size_dim < simdim > local_size;
     isaac_size_dim < simdim > global_size_scaled;
-    size_t max_global_size_scaled;
+    ISAAC_IDX_TYPE max_global_size_scaled;
     isaac_size_dim < simdim > position_scaled;
     isaac_size_dim < simdim > local_size_scaled;
 };

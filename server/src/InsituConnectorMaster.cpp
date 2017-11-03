@@ -51,6 +51,7 @@ errorCode InsituConnectorMaster::init(int port,std::string interface)
 		printf("Bind failed with error %i\n",errno);
 		return -2;
 	}
+	return 0;
 }
 
 int InsituConnectorMaster::getSockFD()
@@ -151,14 +152,14 @@ errorCode InsituConnectorMaster::run()
 								};
 								if ( version[0] != ISAAC_PROTOCOL_VERSION_MAJOR )
 								{
-									printf("Fatal error: Protocol version mismatch: Library has %i.%i, server needs %i.%i!\n",version[0],version[1],ISAAC_PROTOCOL_VERSION_MAJOR,ISAAC_PROTOCOL_VERSION_MINOR);
+									printf("Fatal error: Protocol version mismatch: Library has %ld.%ld, server needs %i.%i!\n",version[0],version[1],ISAAC_PROTOCOL_VERSION_MAJOR,ISAAC_PROTOCOL_VERSION_MINOR);
 									const char buffer[] = "{ \"fatal error\": \"protocol mismatch\" }";
 									send(fd_array[i].fd,buffer,strlen(buffer),MSG_NOSIGNAL);
 									closed = true;
 								}
 								else
 								if ( version[1] != ISAAC_PROTOCOL_VERSION_MINOR )
-									printf("Warning: Protocol minor version mismatch: Library has %i.%i, server can %i.%i!\n",version[0],version[1],ISAAC_PROTOCOL_VERSION_MAJOR,ISAAC_PROTOCOL_VERSION_MINOR);
+									printf("Warning: Protocol minor version mismatch: Library has %ld.%ld, server can %i.%i!\n",version[0],version[1],ISAAC_PROTOCOL_VERSION_MAJOR,ISAAC_PROTOCOL_VERSION_MINOR);
 							}
 							if (!closed)
 							{
@@ -218,6 +219,7 @@ errorCode InsituConnectorMaster::run()
 			}
 		}
 	}
+	return 0;
 }
 
 void InsituConnectorMaster::setExit()
@@ -228,7 +230,7 @@ void InsituConnectorMaster::setExit()
 InsituConnectorMaster::~InsituConnectorMaster()
 {
 	InsituConnectorContainer* mom;
-	while (mom = insituConnectorList.pop_front())
+	while ((mom = insituConnectorList.pop_front()))
 	{
 		shutdown(mom->connector->getSockFD(),SHUT_RDWR);
 		printf("Waiting for Connections %i to finish... ",mom->connector->getID());

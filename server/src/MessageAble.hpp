@@ -25,13 +25,13 @@ class MessageAble
 		virtual ~MessageAble()
 		{
 			MessageTemplate* mom;
-			while (mom = messagesIn.pop_front())
+			while ((mom = messagesIn.pop_front()))
 				mom->suicide();
-			while (mom = messagesOut.pop_front())
+			while ((mom = messagesOut.pop_front()))
 				mom->suicide();
 		}
 		//Called from MetaDataConnector / Client
-		errorCode clientSendMessage(MessageTemplate* message)
+		void clientSendMessage(MessageTemplate* message)
 		{
 			messagesOut.push_back(message);
 		}
@@ -40,7 +40,7 @@ class MessageAble
 			return messagesIn.pop_front();
 		}
 		//Called from Master
-		errorCode masterSendMessage(MessageTemplate* message)
+		void masterSendMessage(MessageTemplate* message)
 		{
 			messagesIn.push_back(message);
 		}

@@ -56,6 +56,8 @@ static int callback_http(
 	Broker* broker = NULL;
 	if (broker_ptr)
 		broker = *broker_ptr;
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wswitch"
 	switch (reason)
 	{
 		case LWS_CALLBACK_HTTP:
@@ -78,6 +80,7 @@ static int callback_http(
 			return -1;
 		}
 	}
+	#pragma GCC diagnostic pop
 	return 0;
 }
 

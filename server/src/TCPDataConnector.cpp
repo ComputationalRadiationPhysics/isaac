@@ -48,6 +48,7 @@ errorCode TCPDataConnector::init(int port,std::string interface)
 		printf("TCPDataConnector: Bind failed with error %i\n",errno);
 		return -2;
 	}
+	return 0;
 }
 
 struct jlcb_container
@@ -157,7 +158,6 @@ errorCode TCPDataConnector::run()
 					{
 						last_working_pos = jlcb_array[i]->jlcb.pos;
 						MessageContainer* message = new MessageContainer(NONE,content);
-						MessageType type = message->type;
 						json_object_set_new( message->json_root, "url", json_string( "127.0.0.1" ) ); //TODO: Using real url
 						client_array[i]->clientSendMessage(message);
 					}

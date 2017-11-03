@@ -40,7 +40,7 @@ void isaac_init_destination(j_compress_ptr cinfo)
 }
 boolean isaac_jpeg_empty_output_buffer(j_compress_ptr cinfo)
 {
-	return true;
+	return TRUE;
 }
 void isaac_jpeg_term_destination(j_compress_ptr cinfo)
 {
@@ -52,7 +52,7 @@ errorCode URIImageConnector::run()
 	while(finish == 0)
 	{
 		ImageBufferContainer* message;
-		while(message = clientGetMessage())
+		while( (message = clientGetMessage()) )
 		{
 			if (message->type == GROUP_OBSERVED)
 			{
@@ -96,7 +96,8 @@ errorCode URIImageConnector::run()
 			clientSendMessage( message );
 		}
 		usleep(1000);
-	}	
+	}
+	return 0;
 }
 
 URIImageConnector::~URIImageConnector()

@@ -67,11 +67,11 @@ errorCode RTPImageConnector::run()
 	while(finish == 0)
 	{
 		ImageBufferContainer* message;
-		while(message = clientGetMessage())
+		while( (message = clientGetMessage()) )
 		{
 			if (message->type == GROUP_OBSERVED)
 			{
-				int nr;
+				unsigned nr;
 				for (nr = 0; nr < streams.size(); nr++)
 					if (!streams[nr].is_used)
 						break;
@@ -183,7 +183,7 @@ errorCode RTPImageConnector::run()
 			}
 			if (message->type == GROUP_OBSERVED_STOPPED || message->type == GROUP_FINISHED)
 			{
-				int nr;
+				unsigned nr;
 				for (nr = 0; nr < streams.size(); nr++)
 					if ((message->type == GROUP_OBSERVED_STOPPED && streams[nr].ref == message->reference) ||
 						(message->type == GROUP_FINISHED && streams[nr].group == message->group))
@@ -199,7 +199,7 @@ errorCode RTPImageConnector::run()
 			}
 			if (message->type == UPDATE_BUFFER)
 			{
-				int nr;
+				unsigned nr;
 				for (nr = 0; nr < streams.size(); nr++)
 					if (streams[nr].is_used && streams[nr].group == message->group)
 					{
@@ -219,7 +219,7 @@ errorCode RTPImageConnector::run()
 		}
 		usleep(1000);
 	}
-	int nr;
+	unsigned nr;
 	for (nr = 0; nr < streams.size(); nr++)
 		if (streams[nr].is_used)
 		{
@@ -228,6 +228,7 @@ errorCode RTPImageConnector::run()
 			gst_object_unref(GST_OBJECT(streams[nr].pipeline));
 			streams[nr].is_used = false;
 		}
+	return 0;
 }
 
 RTPImageConnector::~RTPImageConnector()
