@@ -22,8 +22,6 @@
     #define BOOST_RESULT_OF_USE_TR1
 #endif
 
-#include <boost/config/select_compiler_config.hpp>
-
 #include <string>
 #include <string.h>
 #include <jansson.h>
