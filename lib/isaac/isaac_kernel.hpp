@@ -212,15 +212,19 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
                         data8[x][y][z] = ptr[coord.x + ISAAC_GUARD_SIZE + (coord.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
                 }
         //Against annoying double->float casting warning with gcc5
+#if __CUDACC_VER_MAJOR__ > 7
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wnarrowing"
+#endif
         isaac_float_dim < 3 > pos_in_cube =
         {
             pos.x - floor(pos.x),
             pos.y - floor(pos.y),
             pos.z - floor(pos.z)
         };
+#if __CUDACC_VER_MAJOR__ > 7
         #pragma GCC diagnostic pop
+#endif
         isaac_float_dim < TSource::feature_dim > data4[2][2];
         for (int x = 0; x < 2; x++)
             for (int y = 0; y < 2; y++)
