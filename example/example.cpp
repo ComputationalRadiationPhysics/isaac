@@ -160,7 +160,7 @@ int main(int argc, char **argv)
 		srand(time(NULL));
 		id = rand() % 1000000;
 	}
-	MPI_Bcast(&id,sizeof(id), MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&id,1, MPI_INT, 0, MPI_COMM_WORLD);
 	char name[32];
 	sprintf(name,"Example_%i",id);
 	printf("Using name %s\n",name);
