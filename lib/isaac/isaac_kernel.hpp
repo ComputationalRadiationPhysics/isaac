@@ -255,21 +255,40 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
     return result;
 }
 
-template < typename TLocalSize >
+template < bool TInterpolation, typename TLocalSize >
 ISAAC_HOST_DEVICE_INLINE void check_coord( isaac_float3& coord, const TLocalSize local_size)
 {
+    constexpr auto extra_border = static_cast<decltype(local_size.value.x)>(TInterpolation);
     if (coord.x < isaac_float(0))
         coord.x = isaac_float(0);
     if (coord.y < isaac_float(0))
         coord.y = isaac_float(0);
     if (coord.z < isaac_float(0))
         coord.z = isaac_float(0);
-    if ( coord.x >= isaac_float(local_size.value.x) )
-        coord.x = isaac_float(local_size.value.x)-isaac_float(1)-FLT_MIN;
-    if ( coord.y >= isaac_float(local_size.value.y) )
-        coord.y = isaac_float(local_size.value.y)-isaac_float(1)-FLT_MIN;
-    if ( coord.z >= isaac_float(local_size.value.z) )
-        coord.z = isaac_float(local_size.value.z)-isaac_float(1)-FLT_MIN;
+    if ( coord.x >= isaac_float(local_size.value.x-extra_border) )
+        coord.x = isaac_float(local_size.value.x-extra_border)-FLT_MIN;
+    if ( coord.y >= isaac_float(local_size.value.y-extra_border) )
+        coord.y = isaac_float(local_size.value.y-extra_border)-FLT_MIN;
+    if ( coord.z >= isaac_float(local_size.value.z-extra_border) )
+        coord.z = isaac_float(local_size.value.z-extra_border)-FLT_MIN;
+}
+
+template < bool TInterpolation, typename TLocalSize >
+ISAAC_HOST_DEVICE_INLINE void check_coord_with_guard( isaac_float3& coord, const TLocalSize local_size)
+{
+    constexpr auto extra_border = static_cast<decltype(local_size.value.x)>(TInterpolation);
+    if (coord.x < isaac_float(-ISAAC_GUARD_SIZE))
+        coord.x = isaac_float(-ISAAC_GUARD_SIZE);
+    if (coord.y < isaac_float(-ISAAC_GUARD_SIZE))
+        coord.y = isaac_float(-ISAAC_GUARD_SIZE);
+    if (coord.z < isaac_float(-ISAAC_GUARD_SIZE))
+        coord.z = isaac_float(-ISAAC_GUARD_SIZE);
+    if ( coord.x >= isaac_float(local_size.value.x+ISAAC_GUARD_SIZE-extra_border) )
+        coord.x = isaac_float(local_size.value.x+ISAAC_GUARD_SIZE-extra_border)-FLT_MIN;
+    if ( coord.y >= isaac_float(local_size.value.y+ISAAC_GUARD_SIZE-extra_border) )
+        coord.y = isaac_float(local_size.value.y+ISAAC_GUARD_SIZE-extra_border)-FLT_MIN;
+    if ( coord.z >= isaac_float(local_size.value.z+ISAAC_GUARD_SIZE-extra_border) )
+        coord.z = isaac_float(local_size.value.z+ISAAC_GUARD_SIZE-extra_border)-FLT_MIN;
 }
 
 template <
@@ -330,11 +349,15 @@ struct merge_source_iterator
                     isaac_float3  left = {-1, 0, 0};
                     left = left + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( left, local_size);
+                        check_coord<TInterpolation>( left, local_size);
+		    else
+                        check_coord_with_guard<TInterpolation>( left, local_size);
                     isaac_float3 right = { 1, 0, 0};
                     right = right + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( right, local_size );
+                        check_coord<TInterpolation>( right, local_size );
+		    else
+                        check_coord_with_guard<TInterpolation>( right, local_size);
                     isaac_float d1;
                     if (TInterpolation)
                         d1 = right.x - left.x;
@@ -344,11 +367,15 @@ struct merge_source_iterator
                     isaac_float3    up = { 0,-1, 0};
                     up = up + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( up, local_size );
+                        check_coord<TInterpolation>( up, local_size );
+		    else
+                        check_coord_with_guard<TInterpolation>( up, local_size);
                     isaac_float3  down = { 0, 1, 0};
                     down = down + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( down, local_size );
+                        check_coord<TInterpolation>( down, local_size );
+		    else
+                        check_coord_with_guard<TInterpolation>( down, local_size);
                     isaac_float d2;
                     if (TInterpolation)
                         d2 = down.y - up.y;
@@ -358,11 +385,15 @@ struct merge_source_iterator
                     isaac_float3 front = { 0, 0,-1};
                     front = front + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( front, local_size );
+                        check_coord<TInterpolation>( front, local_size );
+		    else
+                        check_coord_with_guard<TInterpolation>( front, local_size);
                     isaac_float3  back = { 0, 0, 1};
                     back = back + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( back, local_size );
+                        check_coord<TInterpolation>( back, local_size );
+		    else
+                        check_coord_with_guard<TInterpolation>( back, local_size);
                     isaac_float d3;
                     if (TInterpolation)
                         d3 = back.z - front.z;
