@@ -309,6 +309,7 @@ int main(int argc, char **argv)
 
 		#if (ISAAC_STEREO == 0)
 			isaac::DefaultController,
+			//isaac::OrthoController,
 			isaac::DefaultCompositor
 		#else
 			isaac::StereoController,

@@ -21,12 +21,22 @@ namespace isaac
 struct DefaultController
 {
 	static const int pass_count = 1;
-	DefaultController() {}
-	~DefaultController() {}
 	inline bool updateProjection( IceTDouble * const projection, const isaac_size2 & framebuffer_size, json_t * const message, const bool first = false)
 	{
 		if (first)
 			setPerspective( projection, 45.0f, (isaac_float)framebuffer_size.x/(isaac_float)framebuffer_size.y,ISAAC_Z_NEAR, ISAAC_Z_FAR);
+		return false;
+	}
+	inline void sendFeedback( json_t * const json_root, bool force = false ) {}
+};
+
+struct OrthoController
+{
+	static const int pass_count = 1;
+	inline bool updateProjection( IceTDouble * const projection, const isaac_size2 & framebuffer_size, json_t * const message, const bool first = false)
+	{
+		if (first)
+			setOrthographic( projection, (isaac_float)framebuffer_size.x/(isaac_float)framebuffer_size.y*isaac_float(2), isaac_float(2), ISAAC_Z_NEAR, ISAAC_Z_FAR);
 		return false;
 	}
 	inline void sendFeedback( json_t * const json_root, bool force = false ) {}
@@ -39,7 +49,6 @@ struct StereoController
 		eye_distance(0.06f),
 		send_stereo(true)
 	{}
-	~StereoController() {}
 	inline bool updateProjection( IceTDouble * const projection, const isaac_size2 & framebuffer_size, json_t * const message, const bool first = false)
 	{
 		if ( json_t* js = json_object_get(message, "eye distance") )
