@@ -697,8 +697,11 @@ function updateMetaDataTable(metadata)
 		var row = metadata_table.insertRow(-1);
 		var cell = row.insertCell(-1);
 		cell.innerHTML += "<b>" + element + "</b>";
-			cell = row.insertCell(-1);
-		cell.innerHTML += metadata[element];
+		cell = row.insertCell(-1);
+		var cell_string = String(metadata[element]);
+		if (cell_string.length > 50)
+			cell_string = cell_string.substring(0,50) + "...";
+		cell.innerHTML += cell_string;
 	}
 }
 
