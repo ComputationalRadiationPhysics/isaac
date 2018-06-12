@@ -212,15 +212,19 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
                         data8[x][y][z] = ptr[coord.x + ISAAC_GUARD_SIZE + (coord.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
                 }
         //Against annoying double->float casting warning with gcc5
+#if __CUDACC_VER_MAJOR__ > 7
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wnarrowing"
+#endif
         isaac_float_dim < 3 > pos_in_cube =
         {
             pos.x - floor(pos.x),
             pos.y - floor(pos.y),
             pos.z - floor(pos.z)
         };
+#if __CUDACC_VER_MAJOR__ > 7
         #pragma GCC diagnostic pop
+#endif
         isaac_float_dim < TSource::feature_dim > data4[2][2];
         for (int x = 0; x < 2; x++)
             for (int y = 0; y < 2; y++)
@@ -251,21 +255,40 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
     return result;
 }
 
-template < typename TLocalSize >
+template < bool TInterpolation, typename TLocalSize >
 ISAAC_HOST_DEVICE_INLINE void check_coord( isaac_float3& coord, const TLocalSize local_size)
 {
+    constexpr auto extra_border = static_cast<decltype(local_size.value.x)>(TInterpolation);
     if (coord.x < isaac_float(0))
         coord.x = isaac_float(0);
     if (coord.y < isaac_float(0))
         coord.y = isaac_float(0);
     if (coord.z < isaac_float(0))
         coord.z = isaac_float(0);
-    if ( coord.x >= isaac_float(local_size.value.x) )
-        coord.x = isaac_float(local_size.value.x)-isaac_float(1)-FLT_MIN;
-    if ( coord.y >= isaac_float(local_size.value.y) )
-        coord.y = isaac_float(local_size.value.y)-isaac_float(1)-FLT_MIN;
-    if ( coord.z >= isaac_float(local_size.value.z) )
-        coord.z = isaac_float(local_size.value.z)-isaac_float(1)-FLT_MIN;
+    if ( coord.x >= isaac_float(local_size.value.x-extra_border) )
+        coord.x = isaac_float(local_size.value.x-extra_border)-FLT_MIN;
+    if ( coord.y >= isaac_float(local_size.value.y-extra_border) )
+        coord.y = isaac_float(local_size.value.y-extra_border)-FLT_MIN;
+    if ( coord.z >= isaac_float(local_size.value.z-extra_border) )
+        coord.z = isaac_float(local_size.value.z-extra_border)-FLT_MIN;
+}
+
+template < bool TInterpolation, typename TLocalSize >
+ISAAC_HOST_DEVICE_INLINE void check_coord_with_guard( isaac_float3& coord, const TLocalSize local_size)
+{
+    constexpr auto extra_border = static_cast<decltype(local_size.value.x)>(TInterpolation);
+    if (coord.x < isaac_float(-ISAAC_GUARD_SIZE))
+        coord.x = isaac_float(-ISAAC_GUARD_SIZE);
+    if (coord.y < isaac_float(-ISAAC_GUARD_SIZE))
+        coord.y = isaac_float(-ISAAC_GUARD_SIZE);
+    if (coord.z < isaac_float(-ISAAC_GUARD_SIZE))
+        coord.z = isaac_float(-ISAAC_GUARD_SIZE);
+    if ( coord.x >= isaac_float(local_size.value.x+ISAAC_GUARD_SIZE-extra_border) )
+        coord.x = isaac_float(local_size.value.x+ISAAC_GUARD_SIZE-extra_border)-FLT_MIN;
+    if ( coord.y >= isaac_float(local_size.value.y+ISAAC_GUARD_SIZE-extra_border) )
+        coord.y = isaac_float(local_size.value.y+ISAAC_GUARD_SIZE-extra_border)-FLT_MIN;
+    if ( coord.z >= isaac_float(local_size.value.z+ISAAC_GUARD_SIZE-extra_border) )
+        coord.z = isaac_float(local_size.value.z+ISAAC_GUARD_SIZE-extra_border)-FLT_MIN;
 }
 
 template <
@@ -291,9 +314,7 @@ struct merge_source_iterator
         typename TStepLength,
         typename TScale,
         typename TFirst,
-        typename TLast,
-        typename TStartNormal,
-        typename TEndNormal
+        typename TStartNormal
     >
     ISAAC_HOST_DEVICE_INLINE  void operator()(
         const NR& nr,
@@ -309,9 +330,7 @@ struct merge_source_iterator
         const TStepLength& stepLength,
         const TScale& scale,
         const TFirst& first,
-        const TLast& last,
-        const TStartNormal& start_normal,
-        const TEndNormal& end_normal
+        const TStartNormal& start_normal
     ) const
     {
         if ( mpl::at_c< TFilter, NR::value >::type::value )
@@ -330,11 +349,15 @@ struct merge_source_iterator
                     isaac_float3  left = {-1, 0, 0};
                     left = left + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( left, local_size);
+                        check_coord<TInterpolation>( left, local_size);
+		    else
+                        check_coord_with_guard<TInterpolation>( left, local_size);
                     isaac_float3 right = { 1, 0, 0};
                     right = right + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( right, local_size );
+                        check_coord<TInterpolation>( right, local_size );
+		    else
+                        check_coord_with_guard<TInterpolation>( right, local_size);
                     isaac_float d1;
                     if (TInterpolation)
                         d1 = right.x - left.x;
@@ -344,11 +367,15 @@ struct merge_source_iterator
                     isaac_float3    up = { 0,-1, 0};
                     up = up + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( up, local_size );
+                        check_coord<TInterpolation>( up, local_size );
+		    else
+                        check_coord_with_guard<TInterpolation>( up, local_size);
                     isaac_float3  down = { 0, 1, 0};
                     down = down + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( down, local_size );
+                        check_coord<TInterpolation>( down, local_size );
+		    else
+                        check_coord_with_guard<TInterpolation>( down, local_size);
                     isaac_float d2;
                     if (TInterpolation)
                         d2 = down.y - up.y;
@@ -358,11 +385,15 @@ struct merge_source_iterator
                     isaac_float3 front = { 0, 0,-1};
                     front = front + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( front, local_size );
+                        check_coord<TInterpolation>( front, local_size );
+		    else
+                        check_coord_with_guard<TInterpolation>( front, local_size);
                     isaac_float3  back = { 0, 0, 1};
                     back = back + pos;
                     if (!TSource::has_guard && TSource::persistent)
-                        check_coord( back, local_size );
+                        check_coord<TInterpolation>( back, local_size );
+		    else
+                        check_coord_with_guard<TInterpolation>( back, local_size);
                     isaac_float d3;
                     if (TInterpolation)
                         d3 = back.z - front.z;
@@ -383,12 +414,6 @@ struct merge_source_iterator
                         gradient.x = start_normal.x;
                         gradient.y = start_normal.y;
                         gradient.z = start_normal.z;
-                    }
-                    if (last)
-                    {
-                        gradient.x = end_normal.x;
-                        gradient.y = end_normal.y;
-                        gradient.z = end_normal.z;
                     }
                     isaac_float l = sqrt(
                         gradient.x * gradient.x +
@@ -543,10 +568,11 @@ template <
             isaac_float3 local_size_f[ISAAC_VECTOR_ELEM];
             isaac_float3 count_end[ISAAC_VECTOR_ELEM];
             isaac_float3 start_normal[ISAAC_VECTOR_ELEM];
-            isaac_float3   end_normal[ISAAC_VECTOR_ELEM];
+            bool global_front[ISAAC_VECTOR_ELEM];
 
             ISAAC_ELEM_ITERATE(e)
             {
+                global_front[e] = false;
                 pixel_f[e].x = isaac_float( pixel[e].x )/(isaac_float)framebuffer_size.x*isaac_float(2)-isaac_float(1);
                 pixel_f[e].y = isaac_float( pixel[e].y )/(isaac_float)framebuffer_size.y*isaac_float(2)-isaac_float(1);
 
@@ -627,21 +653,65 @@ template <
 
                 //calc intersection of all three super planes and save in [count_start.x ; count_end.x]
                 float max_start = ISAAC_MAX( ISAAC_MAX( count_start[e].x, count_start[e].y ), count_start[e].z );
-                if (count_start[e].x == max_start)
-                    start_normal[e] = {-1,0,0};
-                if (count_start[e].y == max_start)
-                    start_normal[e] = {0,-1,0};
-                if (count_start[e].z == max_start)
-                    start_normal[e] = {0,0,-1};
+                if (ceil(count_start[e].x) == ceil(max_start))
+                {
+                    if (step_vec[e].x>0.0f)
+                    {
+                        if (isaac_size_d[0].position.value.x == 0)
+                        {
+                            global_front[e] = true;
+                            start_normal[e] = { 1.0f,0,0};
+                        }
+                    }
+                    else
+                    {
+                        if (isaac_size_d[0].position.value.x == isaac_size_d[0].global_size.value.x - isaac_size_d[0].local_size.value.x)
+                        {
+                            global_front[e] = true;
+                            start_normal[e] = {-1.0f,0,0};
+                        }
+                    }
+                }
+                if (ceil(count_start[e].y) == ceil(max_start))
+                {
+                    if (step_vec[e].y>0.0f)
+                    {
+                        if (isaac_size_d[0].position.value.y == 0)
+                        {
+                            global_front[e] = true;
+                            start_normal[e] = {0, 1.0f,0};
+                        }
+                    }
+                    else
+                    {
+                        if (isaac_size_d[0].position.value.y == isaac_size_d[0].global_size.value.y - isaac_size_d[0].local_size.value.y)
+                        {
+                            global_front[e] = true;
+                            start_normal[e] = {0,-1.0f,0};
+                        }
+                    }
+                }
+                if (ceil(count_start[e].z) == ceil(max_start))
+                {
+                    if (step_vec[e].z>0.0f)
+                    {
+                        if (isaac_size_d[0].position.value.z == 0)
+                        {
+                            global_front[e] = true;
+                            start_normal[e] = {0,0, 1.0f};
+                        }
+                    }
+                    else
+                    {
+                        if (isaac_size_d[0].position.value.z == isaac_size_d[0].global_size.value.z- isaac_size_d[0].local_size.value.z)
+                        {
+                            global_front[e] = true;
+                            start_normal[e] = {0,0,-1.0f};
+                        }
+                    }
+                }
                 count_start[e].x = max_start;
-                float min_end = ISAAC_MIN( ISAAC_MIN(   count_end[e].x,   count_end[e].y ),   count_end[e].z );
-                if (count_end[e].x == min_end)
-                    end_normal[e] = {-1,0,0};
-                if (count_end[e].y == min_end)
-                    end_normal[e] = {0,-1,0};
-                if (count_end[e].z == min_end)
-                    end_normal[e] = {0,0,-1};
-                count_end[e].x = min_end;
+                count_end[e].x = ISAAC_MIN( ISAAC_MIN(   count_end[e].x,   count_end[e].y ),   count_end[e].z );
                 if ( count_start[e].x > count_end[e].x)
                 {
                     if (!finish[e])
@@ -660,8 +730,8 @@ template <
 
             ISAAC_ELEM_ITERATE(e)
             {
-                first[e] = isaac_int( floor(count_start[e].x) );
-                last[e] = isaac_int( ceil(count_end[e].x) );
+                first[e] = isaac_int( ceil(count_start[e].x) );
+                last[e] = isaac_int( floor(count_end[e].x) );
 
                 //Moving last and first until their points are valid
                 pos[e] = start[e] + step_vec[e] * isaac_float(last[e]);
@@ -711,9 +781,10 @@ template <
                                 ISAAC_SET_COLOR( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], color[e] )
                             finish[e] = true;
                         }
-                        if ( first[e] < intersection_step[e] )
+                        if ( first[e] <= ceil( intersection_step[e] ) )
                         {
                             first[e] = ceil( intersection_step[e] );
+                            global_front[e] = true;
                             start_normal[e].x = clipping[e].elem[i].normal.x;
                             start_normal[e].y = clipping[e].elem[i].normal.y;
                             start_normal[e].z = clipping[e].elem[i].normal.z;
@@ -728,12 +799,7 @@ template <
                             finish[e] = true;
                         }
                         if ( last[e] > intersection_step[e] )
-                        {
                             last[e] = floor( intersection_step[e] );
-                            end_normal[e].x = clipping[e].elem[i].normal.x;
-                            end_normal[e].y = clipping[e].elem[i].normal.y;
-                            end_normal[e].z = clipping[e].elem[i].normal.z;
-                        }
                     }
                 }
             }
@@ -762,8 +828,7 @@ template <
                     value[e].z = 0;
                     value[e].w = 0;
                     result[e] = 0;
-                    bool firstRound = (i == first[e]);
-                    bool lastRound = (i == last[e]);
+                    bool firstRound = (global_front[e] && i == first[e]);
                     isaac_for_each_with_mpl_params
                     (
                         sources,
@@ -785,9 +850,7 @@ template <
                         step,
                         scale,
                         firstRound,
-                        lastRound,
-                        start_normal[e],
-                        end_normal[e]
+                        start_normal[e]
                     );
                     /*if ( mpl::size< TSourceList >::type::value > 1)
                         value = value / isaac_float( mpl::size< TSourceList >::type::value );*/

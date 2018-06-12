@@ -21,7 +21,6 @@ namespace isaac
 struct DefaultCompositor
 {
 	DefaultCompositor( isaac_size2 framebuffer_size ) {}
-	~DefaultCompositor() {}
 	static inline isaac_size2 getCompositedbufferSize( isaac_size2 framebuffer_size )
 	{
 		return framebuffer_size;

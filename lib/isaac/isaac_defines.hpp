@@ -38,7 +38,7 @@
 #endif
 
 #ifndef ISAAC_GUARD_SIZE
-    #define ISAAC_GUARD_SIZE 2
+    #define ISAAC_GUARD_SIZE 1
 #endif
 
 #ifndef ISAAC_DEFAULT_STEP

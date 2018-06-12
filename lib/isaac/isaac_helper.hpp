@@ -276,6 +276,7 @@ void setFrustum(IceTDouble * const projection, const isaac_float left,const isaa
 	projection[14] = ( -znear2 * zfar ) / -zRange;
 	projection[15] = isaac_float( 0);
 }
+
 void setPerspective(IceTDouble * const projection, const isaac_float fovyInDegrees,const isaac_float aspectRatio,const isaac_float znear,const isaac_float zfar )
 {
 	isaac_float ymax = znear * tan( fovyInDegrees * M_PI / isaac_float(360) );
@@ -293,6 +294,29 @@ void spSetPerspectiveStereoscopic( IceTDouble * const projection, const isaac_fl
 	setFrustum(projection, xmin, xmax, ymin, ymax, znear, zfar );
 	projection[12] += distance;
 }
+
+
+void setOrthographic(IceTDouble * const projection, const isaac_float right,const isaac_float top,const isaac_float znear,const isaac_float zfar )
+{
+	projection[ 0] = 1.0 / right;
+	projection[ 1] = isaac_float( 0);
+	projection[ 2] = isaac_float( 0);
+	projection[ 3] = isaac_float( 0);
+	projection[ 4] = isaac_float( 0);
+	projection[ 5] = 1.0 / top;
+	projection[ 6] = isaac_float( 0);
+	projection[ 7] = isaac_float( 0);
+	projection[ 8] = isaac_float( 0);
+	projection[ 9] = isaac_float( 0);
+	projection[10] = -2.0 / (zfar-znear);
+	projection[11] = isaac_float( 0);
+	projection[12] = isaac_float( 0);
+	projection[13] = isaac_float( 0);
+	projection[14] = - (zfar+znear) / (zfar-znear);
+	projection[15] = isaac_float( 1);
+}
+
+
 
 #if ISAAC_VALGRIND_TWEAKS == 1
 	static void *extra_malloc(size_t size)

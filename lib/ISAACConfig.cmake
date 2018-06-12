@@ -19,13 +19,7 @@
 cmake_minimum_required (VERSION 3.3.0)
 cmake_policy(SET CMP0048 OLD)
 
-set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}")
-set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}/isaac")
-
-###############################################################################
-# MODULES
-###############################################################################
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ISAAC_DIR}/Modules")
+include("${CMAKE_CURRENT_LIST_DIR}/ISAACBaseDir.cmake")
 
 ###############################################################################
 # OPTIONS
