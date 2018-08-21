@@ -1061,7 +1061,14 @@ document.getElementById("connect").onclick = function()
 								for (var i in transfer_points[s])
 								{
 									var subnode = document.createElement("DIV");
-									subnode.innerHTML = '<font face="monospace">' + (transfer_points[s][i].value / transfer_array[s].length).toFixed(3) + ": </font>";
+									var transfer = document.createElement("INPUT");
+									transfer.type = "text";
+									transfer.value = (transfer_points[s][i].value / transfer_array[s].length).toFixed(3);
+									transfer.size = 4;
+									transfer.id = "p_" + s + "_" + i + "_transfer";
+									if (i == 0 || i == transfer_points[s].length - 1)
+										transfer.disabled = true;
+									subnode.appendChild(transfer);
 									var input = document.createElement("INPUT");
 									input.type = button;
 									var picker = new jscolor(input);
@@ -1115,6 +1122,16 @@ document.getElementById("connect").onclick = function()
 										transfer_points[s][i].g = color.jscolor.rgb[1]/255;
 										transfer_points[s][i].b = color.jscolor.rgb[2]/255;
 										transfer_points[s][i].a = parseFloat(alpha.value);
+										if (i > 0 && i < transfer_points[s].length - 1)
+										{
+											var transfer = document.getElementById( base + "_transfer");
+											var transfer_value = Math.round(parseFloat(transfer.value) * transfer_array[s].length);
+											if (transfer_value < 1)
+												transfer_value = 1;
+											if (transfer_value >= transfer_array[s].length)
+												transfer_value = transfer_array[s].length - 1;
+											transfer_points[s][i].value = transfer_value;
+										}
 									}
 								sendFeedback( "transfer points", transfer_points );
 							};

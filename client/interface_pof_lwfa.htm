@@ -3,43 +3,83 @@
 <head>
 <meta charset="utf-8">
 <title>ISAAC Control Page</title>
-</head>
 <style>
     * {
       font-family: sans-serif;
     }
+
+input {
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  -webkit-box-shadow: inset 0 0 1px 1px #f6f6f6;
+  box-shadow: inset 0 0 1px 1px #f6f6f6;
+  padding: 8px 8px 8px;
+  text-shadow: 0 1px 0 #fff;
+}
+input[type=button] {
+  background: #e3e3e3;
+  padding: 8px 8px 8px;
+  text-align: center;
+}
+input[type=button]:hover {
+    background: #d9d9d9;
+    -webkit-box-shadow: inset 0 0 1px 1px #eaeaea;
+    box-shadow: inset 0 0 1px 1px #eaeaea;
+    color: #222;
+    cursor: pointer;
+}
+input[type=button]:active {
+    background: #d0d0d0;
+    -webkit-box-shadow: inset 0 0 1px 1px #e3e3e3;
+    box-shadow: inset 0 0 1px 1px #e3e3e3;
+    color: #000;
+}
+
+table {
+  border: 1px solid #000;
+}
+td, th {
+  border: 0;
+}
+td:not(:last-child), th:not(:last-child) {
+  border-right: 1px solid #000;
+}
+th {
+  border-bottom: 1px solid #000;
+}
 </style>
+</head>
 <body>
 <script src="jscolor.js"></script>
-<h3>Preview and camera setting</h3>
-<p>Usage:
-<ul>
-<li>Left click + Mouse movement: Change view angle</li>
-<li>Right/Middle click + Mouse movement: Change position</li>
-<li>Mousewheel: zoom</li>
-</ul>
-<form>
-	Server URL:<input type="text" id="url" value="127.0.0.1">
-	Port:<input type="text" id="port" value="2459">
-	<input type="button" value="Connect" id="connect">
-	<br/><input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()"> Show video and control in one window
-	<br/><input type="checkbox" id="wireframe_checkbox" checked onchange="wireframe_checkbox_click()"> Show wireframe bounding box
-	<br/><input type="checkbox" id="dropable_checkbox" onchange="dropable_checkbox_click()"> Meta data can be dropped (Select before observing!)
-</form>
-<div id="status">Status: Not connected</div>
-</p>
-<table id="metadata_table" border="1"></table>
-<table><tr>
-<td id="video_td" valign="top">
+<div>
+    <h3>Preview and camera setting</h3>
+    Usage:
+    <ul>
+    <li>Left click + Mouse movement: Change view angle</li>
+    <li>Right/Middle click + Mouse movement: Change position</li>
+    <li>Mousewheel: zoom</li>
+    </ul>
+    <form>
+	    Server URL:<input type="text" id="url" value="hypnos5">
+	    Port:<input type="text" id="port" value="12459">
+	    <input type="button" value="Connect" id="connect">
+	    <br /><input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()"> Show video and control in one window
+	    <br /><input type="checkbox" id="wireframe_checkbox" checked onchange="wireframe_checkbox_click()"> Show wireframe bounding box
+	    <br /><input type="checkbox" id="dropable_checkbox" onchange="dropable_checkbox_click()"> Meta data can be dropped (Select before observing!)
+    </form>
+    <div id="status">Status: Not connected</div>
+</div>
+<div>
+<div id="video_td" style="vertical-align:top;">
 	<!--canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas-->
 	<div id="video_container_div" style="position: relative;">
 		<div id="video_div" style="position: relative; top: 0; left: 0;">
-			<table><tr>
+			<table style="border:0;"><tr>
 			<td>
 				<canvas id="video" width="512" height="512"></canvas>
 				<div id="url_div" style="display:none;"></div>
 			</td>
-			<td align="center"><div id="controls" style="display:none;">
+			<td style="text-align:center;"><div id="controls" style="display:none;">
 				<input type="button" value="+" id="zoom_in"> <input type="button" value="5 x" id="zoom_in_5"><br/>
 				<input type="button" value="-" id="zoom_out"> <input type="button" value="5 x" id="zoom_out_5"><br/>
 				<input type="button" value="X+" id="plus_x"> <input type="button" value="5 x" id="plus_x_5"><br/>
@@ -54,7 +94,7 @@
 				<input type="button" value="↓" id="ctl_down"> <input type="button" value="5 x" id="ctl_down_5">
 			</div></td>
 			</tr></table>
-			<form>
+				<form>
 				<input type="button" value="Pause" id="pause">
 				<input type="button" value="Stop observing" id="stop">
 				<input type="button" value="Reset view" id="panic">
@@ -67,8 +107,6 @@
 				<input type="button" value="Set" id="interval_change">
 				<input type="checkbox" id="controls_checkbox" onchange="controls_checkbox_click()"> Show controls
 			</form>
-			<div id="stereo_div"></div>
-			<div id="functions_div"></div>
 			<div id="weight_div"></div>
 			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation
 			<input type="checkbox" id="iso_surface_checkbox" checked onchange="iso_surface_checkbox_click()"> Iso Surface
@@ -81,19 +119,25 @@
 				                      <input type="button" value="Add"        id="clip_add">
 			</div>
 			<div id="clipping_list_div"></div>
-			<table border="1"><tr id="transfer_form"></tr></table>
+			<table border="1"><tr id="transfer_form"><td></td></tr></table>
 			<canvas id="transfer" width="412" height="16"></canvas>
+			<div id="stereo_div"></div>
+			<div id="functions_div"></div>
 		</div>
 		<div id="preview_div" style="position: absolute; top: 0; left: 0; opacity: 0.5;">
 			<canvas id="preview" width="512" height="512" style="border:1px solid #000000;"></canvas>
+			<canvas id="fft" width="1" height="1"></canvas>
+		</div>
+		<div id="live_div" style="position: absolute; top: 10px; left: 10px">
+			<span style="font-size:60px; color:#ffffff"><img src="record.gif" width="48" height="48" alt="live"/> LIVE</span>
 		</div>
 	</div>
-<td>
-<td id="preview_td" valign="top">
+</div>
+<div id="preview_td" style="vertical-align:top;">
 	<div id="preview_container_div" style="position: relative;">
 	</div>
-</td>
-</tr></table>
+</div>
+</div>
 <div id="list_td" style="display:none">
 	<h3 id="isaac_name"></h3>
 	<table id="list_table" border="1">
@@ -110,7 +154,6 @@
 	</tr>
 	</table>
 </div>
-</body>
 <script>
 /**
  * ISAAC Client - Reference client implementation for ISAAC
@@ -120,6 +163,7 @@
  * @author  Alexander Matthes
  */
 var video = document.getElementById("video");
+var fft_view = document.getElementById("fft");
 var preview = document.getElementById("preview");
 var p_ctx = preview.getContext("2d");
 var transfer = document.getElementById("transfer");
@@ -167,6 +211,8 @@ var modelview = [
 var znear = 0;
 var transfer_array = [];
 var transfer_points = [];
+const s_per_timestep = 1.804479741767268012E-17;
+const fs_per_timestep = s_per_timestep * 1.0e15;
 
 var edges = [
 	[ -1,  1,  1 ],
@@ -283,6 +329,13 @@ function drawUnitCube()
 	line( edges[3], edges[7] );
 }
 
+var particle_count = 0; //no underscore in json!
+var time_step = 0; //no underscore in json!
+var cell_count = 0; //no underscore in json!
+var simulation_time = 0;
+var drawing_time = 0;
+var nodes = 0;
+
 function redraw()
 {
 	//recalc modelview
@@ -332,6 +385,18 @@ function redraw()
 	}
 	p_ctx.stroke();
 	p_ctx.globalAlpha=1.0;
+
+	if (preview.clientWidth == stream_img.width && preview.clientHeight == stream_img.height)
+	{
+		p_ctx.font = "30px Arial";
+		p_ctx.fillStyle = wireframe_color;
+		p_ctx.textAlign = "right";
+		p_ctx.fillText( parseInt(Math.round(particle_count/1000000)) + " Mio. Particles",parseInt(preview.clientWidth)-10,parseInt(32));
+		p_ctx.fillText( parseInt(Math.round(cell_count/1000000)) + " Mio. Cells",parseInt(preview.clientWidth)-10,parseInt(57));
+		p_ctx.fillText( parseInt(nodes) + " GPUs",parseInt(preview.clientWidth)-10,parseInt(preview.clientHeight)-10);
+		p_ctx.textAlign = "left";
+		p_ctx.fillText( "Simulation time " + (parseFloat(time_step) * fs_per_timestep).toFixed(2) + " fs",parseInt(10),parseInt(preview.clientHeight)-10);
+	}
 }
 
 var last_feedback_send = 0;
@@ -688,20 +753,18 @@ function updateMetaDataTable(metadata)
 {
 	if (Object.keys(metadata).length === 0 && JSON.stringify(metadata) === JSON.stringify({}))
 		return;
-	var metadata_table = document.getElementById("metadata_table");
-	while (metadata_table.firstChild) {
-		metadata_table.removeChild(metadata_table.firstChild);
-	}
 	for (element in metadata)
 	{
-		var row = metadata_table.insertRow(-1);
-		var cell = row.insertCell(-1);
-		cell.innerHTML += "<b>" + element + "</b>";
-		cell = row.insertCell(-1);
-		var cell_string = String(metadata[element]);
-		if (cell_string.length > 50)
-			cell_string = cell_string.substring(0,50) + "...";
-		cell.innerHTML += cell_string;
+		if (element == "particle count")
+			particle_count = metadata[element];
+		if (element == "time step")
+			time_step = metadata[element];
+		if (element == "cell count")
+			cell_count = metadata[element];
+		if (element == "simulation_time")
+			simulation_time = metadata[element];
+		if (element == "drawing_time")
+			drawing_time = metadata[element];
 	}
 }
 
@@ -753,6 +816,7 @@ document.getElementById("connect").onclick = function()
 					row.insertCell(0).innerHTML = obj["name"];
 					row.insertCell(1).innerHTML = obj["id"];
 					row.insertCell(2).innerHTML = obj["nodes"];
+					nodes = obj["nodes"];
 					row.insertCell(3).innerHTML = obj["max functors"];
 
 					var cell = row.insertCell(4);
@@ -837,6 +901,51 @@ document.getElementById("connect").onclick = function()
 							interval_span.innerHTML = obj["metadata"]["interval"];
 							delete obj["metadata"]["interval"];
 						}
+						if (obj["metadata"].hasOwnProperty("radiation sum field x"))
+							fft_view.width = parseInt(obj["metadata"]["radiation sum field x"]);
+						if (obj["metadata"].hasOwnProperty("radiation sum field y"))
+							fft_view.height = parseInt(obj["metadata"]["radiation sum field y"]);
+						if (obj["metadata"].hasOwnProperty("radiation sum field"))
+						{
+							blob = atob(obj["metadata"]["radiation sum field"]);
+							var len = blob.length;
+							var bytes = new Uint8Array( len );
+							for (var i = 0; i < len; i++)
+								bytes[i] = blob.charCodeAt(i);
+							var floats = new Float32Array(bytes.buffer,0,bytes.length/4);
+							var ctx = fft_view.getContext('2d');
+							var image = ctx.createImageData(fft_view.width, fft_view.height);
+							var pixels = image.data;
+							for (var i = 0; i < floats.length; i++)
+							{
+								var l = Math.log10(floats[i]);
+								var v = (26.0+l)*0.2;
+								if (v < 0.0)
+									v = 0.0;
+								if (v > 2.0)
+									v = 2.0;
+								var r = 0;
+								var g;
+								var b = 0;
+								if (v < 1.0)
+								{
+									g = v*128.0;
+									b = v*128.0;
+								}
+								else
+								{
+									b = (2.0-v)*128.0;
+									g = (v+1.0)*64.0;
+									r = (v-1.0)*192.0;
+								}
+								pixels[i*4 + 0] = Math.floor(r);
+								pixels[i*4 + 1] = Math.floor(g);
+								pixels[i*4 + 2] = Math.floor(b);
+								pixels[i*4 + 3] = 255;
+							}
+							ctx.putImageData(image, 0, 0);
+						}
+
 						updateMetaDataTable( obj["metadata"] );
 						if (obj["metadata"].hasOwnProperty("reference particles"))
 							particles = obj["metadata"]["reference particles"];
@@ -1258,6 +1367,7 @@ document.getElementById("stop").onclick = function()
 
 document.getElementById("pause").onclick = function()
 {
+
 	var metadata =
 	{
 		"pause" : true
@@ -1479,5 +1589,7 @@ function controls_checkbox_click()
 	else
 		document.getElementById("controls").style.display = 'none';
 }
+
 </script>
+</body>
 </html>
