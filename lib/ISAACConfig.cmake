@@ -41,6 +41,9 @@ if ( (NOT ISAAC_CUDA) AND (NOT ISAAC_ALPAKA) )
     message( FATAL_ERROR "At least Alpaka or Cuda have to be activated!" )
 endif()
 
+###############################################################################
+# JPEGLIB
+###############################################################################
 set( JPEG_DESCRIPTION "Use JPEG compression between visualization and isaac server. Deactivating will not work with big images. And with big I am talking about bigger than 800x600." )
 option(ISAAC_JPEG ${JPEG_DESCRIPTION} ON)
 if (ISAAC_JPEG)
@@ -54,6 +57,7 @@ if (ISAAC_JPEG)
                 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JPEG_LIBRARY})
                 set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_JPEG")
             else()
+                set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   wrong libjpeg flavour found, needing libjpeg-turbo!")
                 message( WARNING "wrong libjpeg flavour found, needing libjpeg-turbo!" )
                 set( JPEG_FOUND FALSE )
             endif()
@@ -63,7 +67,8 @@ if (ISAAC_JPEG)
         endif(NOT JPEG_FOUND)
 endif (ISAAC_JPEG)
 if (NOT ISAAC_JPEG)
-    message( WARNING "Using ISAAC without libjpeg is not recommended." )
+    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Using ISAAC without libjpeg is not recommended. Set ISAAC_JPEG to ON to enable libjpeg compression." )
+    message( WARNING "Using ISAAC without libjpeg is not recommended. Set ISAAC_JPEG to ON to enable libjpeg compression." )
 endif (NOT ISAAC_JPEG)
 
 set(ISAAC_VECTOR_ELEM "1" CACHE STRING "The amounts of elements used for vectorization. On GPU 1 should be fine, on CPU 4..32, depending on the vectorization capabilities" )
