@@ -17,7 +17,22 @@
 # ISAAC
 ###############################################################################
 cmake_minimum_required (VERSION 3.3.0)
-cmake_policy(SET CMP0048 OLD)
+
+
+################################################################################
+# CMake Policies
+###############################################################################
+# TODO update our VERSION syntax in project
+#   https://cmake.org/cmake/help/v3.12/policy/CMP0048.html
+if(POLICY CMP0048)
+    cmake_policy(SET CMP0048 OLD)
+endif()
+
+# Search in <PackageName>_ROOT:
+#   https://cmake.org/cmake/help/v3.12/policy/CMP0074.html
+if(POLICY CMP0074)
+    cmake_policy(SET CMP0074 NEW)
+endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/ISAACBaseDir.cmake")
 
