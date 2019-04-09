@@ -192,6 +192,7 @@ struct isaac_size_struct
     ISAAC_IDX_TYPE max_global_size;
     isaac_size_dim < simdim > position;
     isaac_size_dim < simdim > local_size;
+    isaac_size_dim < simdim > local_particle_size;
     isaac_size_dim < simdim > global_size_scaled;
     ISAAC_IDX_TYPE max_global_size_scaled;
     isaac_size_dim < simdim > position_scaled;

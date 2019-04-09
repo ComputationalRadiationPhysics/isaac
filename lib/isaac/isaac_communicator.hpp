@@ -306,6 +306,12 @@ class IsaacCommunicator
 			pthread_cancel(readThread);
 			pthread_mutex_destroy(&deleteMessageMutex);
 		}
+		void setMessage(json_t * content)
+		{
+			pthread_mutex_lock(&deleteMessageMutex);
+			messageList.push_back(content);
+			pthread_mutex_unlock(&deleteMessageMutex);
+		}
 	private:
 		void readAndSetMessages()
 		{
