@@ -481,13 +481,14 @@ errorCode Broker::run()
 						ThreadList< InsituConnectorGroup* >::ThreadListContainer_ptr group = insituConnectorGroupList.getFront();
 						while (group)
 						{
-							char* buffer = json_dumps( message->json_root, 0 );
+
 							if ( group->t->master->connector->getID() == id)
 							{
+								char* buffer = json_dumps( message->json_root, 0 );
 								send(group->t->master->connector->getSockFD(),buffer,strlen(buffer),0);
+								free(buffer);
 								break;
 							}
-							free(buffer);
 							group = group->next;
 						}
 					}
