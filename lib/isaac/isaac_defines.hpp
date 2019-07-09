@@ -104,7 +104,7 @@
 }
 
 #if ISAAC_ALPAKA == 1
-    #define ISAAC_CONSTANT ALPAKA_STATIC_DEV_MEM_CONSTANT
+    #define ISAAC_CONSTANT ALPAKA_STATIC_ACC_MEM_CONSTANT
 #else
     #define ISAAC_CONSTANT __constant__
 #endif

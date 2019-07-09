@@ -39,7 +39,7 @@ endif()
 
 if (ISAAC_ALPAKA)
 	ALPAKA_ADD_EXECUTABLE(isaac_example_alpaka ${CMAKE_SOURCE_DIR}/example.cpp)
-	target_link_libraries(isaac_example_alpaka ${ISAAC_LIBRARIES})
+	target_link_libraries(isaac_example_alpaka PUBLIC ${ISAAC_LIBRARIES})
 	install(TARGETS isaac_example_alpaka DESTINATION bin )
 endif()
 
