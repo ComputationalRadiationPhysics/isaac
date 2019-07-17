@@ -33,7 +33,6 @@ using namespace isaac;
 
 #define PARTICLE_COUNT 64
 
-
 // Volume Source 1
 
 ISAAC_NO_HOST_DEVICE_WARNING
@@ -376,16 +375,18 @@ int main(
     using AccDim = alpaka::dim::DimInt< 3 >;
     using SimDim = alpaka::dim::DimInt< 3 >;
     using DatDim = alpaka::dim::DimInt< 1 >;
-
+    
     //using Acc = alpaka::acc::AccGpuCudaRt<AccDim, ISAAC_IDX_TYPE>;
-    //using Stream  = alpaka::queue::StreamCudaRtSync;
+    //using Stream  = alpaka::queue::QueueCudaRtSync;
+
     using Acc = alpaka::acc::AccCpuOmp2Blocks<
         AccDim,
         ISAAC_IDX_TYPE
     >;
-    using Stream  = alpaka::queue::StreamCpuSync;
+    using Stream  = alpaka::queue::QueueCpuSync;
+
     //using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, ISAAC_IDX_TYPE>;
-    //using Stream  = alpaka::queue::StreamCpuSync;
+    //using Stream  = alpaka::queue::QueueCpuSync;
 
     using DevAcc = alpaka::dev::Dev< Acc >;
     using DevHost = alpaka::dev::DevCpu;
@@ -419,6 +420,10 @@ int main(
         p[1] * VOLUME_Y,
         p[2] * VOLUME_Z
     );
+    const alpaka::vec::Vec< alpaka::dim::DimInt< 1 >, ISAAC_IDX_TYPE > particle_count(
+        ISAAC_IDX_TYPE( PARTICLE_COUNT )
+    );
+
 #else //CUDA
 
     // Cuda specific initialization
@@ -439,6 +444,8 @@ int main(
     position.push_back( p[1] * VOLUME_Y );
     position.push_back( p[2] * VOLUME_Z );
     int stream = 0;
+    std::vector< ISAAC_IDX_TYPE > particle_count;
+    particle_count.push_back( ISAAC_IDX_TYPE( PARTICLE_COUNT ) );
 #endif
 
     //The whole size of the rendered sub volumes
@@ -446,6 +453,7 @@ int main(
 
     // Init memory
 #if ISAAC_ALPAKA == 1
+
     alpaka::mem::buf::Buf< DevHost, float3_t, DatDim, ISAAC_IDX_TYPE >
         hostBuffer1(
         alpaka::mem::buf::alloc<
@@ -488,6 +496,27 @@ int main(
         >(
             devAcc,
             data_size
+        )
+    );
+
+    alpaka::mem::buf::Buf< DevHost, float3_t, DatDim, ISAAC_IDX_TYPE >
+        hostBuffer3(
+        alpaka::mem::buf::alloc<
+            float3_t,
+            ISAAC_IDX_TYPE
+        >(
+            devHost,
+            particle_count
+        )
+    );
+    alpaka::mem::buf::Buf< DevAcc, float3_t, DatDim, ISAAC_IDX_TYPE >
+        deviceBuffer3(
+        alpaka::mem::buf::alloc<
+            float3_t,
+            ISAAC_IDX_TYPE
+        >(
+            devAcc,
+            particle_count
         )
     );
 #else //CUDA
@@ -534,6 +563,19 @@ int main(
         stream,
         reinterpret_cast<isaac_float *> ( alpaka::mem::view::getPtrNative( deviceBuffer2 ) )
     );
+
+    ParticleSource1<
+        DevAcc,
+        DevHost,
+        Stream
+    >particleTestSource1(
+        devAcc,
+        devHost,
+        stream,
+        reinterpret_cast<isaac_float3 *> ( alpaka::mem::view::getPtrNative( deviceBuffer3 ) ),
+        PARTICLE_COUNT
+    );
+
     using SourceList = boost::fusion::list<
         TestSource1<
             DevAcc,
@@ -546,6 +588,15 @@ int main(
             Stream
         >
     >;
+
+    using ParticleList = boost::fusion::list<
+        ParticleSource1<
+            DevAcc,
+            DevHost,
+            Stream
+        >
+    >;
+
 #else //CUDA
     TestSource1
         testSource1( reinterpret_cast<isaac_float3 *> ( deviceBuffer1 ) );
@@ -586,6 +637,15 @@ int main(
             global_size
         );
     }
+
+    update_particles(
+        stream,
+        hostBuffer3,
+        deviceBuffer3,
+        particle_count,
+        0.0f
+    );
+
 
 #endif
     int s_x = 1, s_y = 1, s_z = 3;
@@ -785,13 +845,19 @@ int main(
                     global_size
                 );
             }
-#endif
+
             update_particles(
+                stream,
                 hostBuffer3,
                 deviceBuffer3,
-                PARTICLE_COUNT,
+                particle_count,
                 a
             );
+
+#endif
+
+
+
             simulation_time += visualization->getTicksUs( ) - start_simulation;
         }
         step++;
@@ -984,6 +1050,7 @@ int main(
 #if ISAAC_ALPAKA == 0
     free( hostBuffer1 );
     free( hostBuffer2 );
+    free( hostBuffer3 );
     cudaFree( deviceBuffer1 );
     cudaFree( deviceBuffer2 );
     cudaFree( deviceBuffer3 );

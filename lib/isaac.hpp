@@ -468,7 +468,7 @@ namespace isaac
                     );
                     updateBufferKernel< TSource > kernel;
                     auto const instance(
-                        alpaka::exec::create< TAcc >(
+                        alpaka::kernel::createTaskKernel< TAcc >(
                             workdiv,
                             kernel,
                             source,
@@ -584,7 +584,7 @@ namespace isaac
                     );
                     minMaxKernel< TSource > kernel;
                     auto const instance(
-                        alpaka::exec::create< TAcc >(
+                        alpaka::kernel::createTaskKernel< TAcc >(
                             workdiv,
                             kernel,
                             source,
@@ -755,7 +755,7 @@ namespace isaac
                     );
                     minMaxPartikelKernel< TParticleSource > kernel;
                     auto const instance(
-                        alpaka::exec::create< TAcc >(
+                        alpaka::kernel::createTaskKernel< TAcc >(
                             workdiv,
                             kernel,
                             particle_source,
@@ -1086,7 +1086,7 @@ namespace isaac
             );
             fillFunctorChainPointerKernel kernel;
             auto const instance(
-                alpaka::exec::create< TAcc >(
+                alpaka::kernel::createTaskKernel< TAcc >(
                     workdiv,
                     kernel,
                     alpaka::mem::view::getPtrNative( functor_chain_d )
@@ -1962,7 +1962,7 @@ namespace isaac
                 >
             > kernel;
             auto const instance(
-                alpaka::exec::create< TAcc >(
+                alpaka::kernel::createTaskKernel< TAcc >(
                     workdiv,
                     kernel,
                     alpaka::mem::view::getPtrNative( functor_chain_choose_d ),

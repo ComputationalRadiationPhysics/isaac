@@ -1993,9 +1993,11 @@ namespace isaac
 
 
                 if( !finish[e] )
-                ISAAC_SET_COLOR ( pixels[pixel[e].x
-                                         + pixel[e].y * framebuffer_size.x],
-                    color[e] )
+                {
+                    ISAAC_SET_COLOR ( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x],
+                        color[e] )
+                }
+
             }
         }
 
@@ -2266,7 +2268,7 @@ N - 1
                 kernel; \
                 auto const instance \
                 ( \
-                    alpaka::exec::create<TAcc> \
+                    alpaka::kernel::createTaskKernel<TAcc> \
                     ( \
                         workdiv, \
                         kernel, \
@@ -2284,7 +2286,7 @@ N - 1
                         clipping \
                     ) \
                 ); \
-                alpaka::stream::enqueue(stream, instance); \
+                alpaka::queue::enqueue(stream, instance); \
             }
 #else
             dim3 block(

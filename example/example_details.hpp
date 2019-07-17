@@ -17,23 +17,46 @@
 #include <sstream>
 #include <string>
 
-
 typedef float float3_t[3];
 
 
 template<
+    typename TStream,
     typename THost3,
-    typename TDev3
+    typename TDev3,
+    typename TSize
 >
 void update_particles(
+    TStream stream,
     THost3 hostBuffer3,
     TDev3 deviceBuffer3,
-    size_t particle_count,
+    TSize particle_count,
     float pos
 )
 {
-    for( size_t i = 0; i < particle_count; i++ )
+    for( ISAAC_IDX_TYPE i = 0; i < particle_count[0]; i++ )
     {
+#if ISAAC_ALPAKA == 1
+        alpaka::mem::view::getPtrNative( hostBuffer3 )[i][0] =
+            float( ( int( i * 29.6f ) ) % 64 ) / 64.0f;
+        alpaka::mem::view::getPtrNative( hostBuffer3 )[i][1] =
+            float( ( int( i * 23.1f ) ) % 64 ) / 64.0f;
+        alpaka::mem::view::getPtrNative( hostBuffer3 )[i][2] = float(
+            ( int( ( i * 7.9f + pos * ( i % 20 + 1 ) ) * 1000 ) ) % 64000
+        ) / 1000.0f / 64.0f;
+    }
+    /*
+    const alpaka::vec::Vec <alpaka::dim::DimInt< 1 >, ISAAC_IDX_TYPE>
+        data_size( ISAAC_IDX_TYPE( particle_count )
+    );
+     */
+    alpaka::mem::view::copy(
+        stream,
+        deviceBuffer3,
+        hostBuffer3,
+        particle_count
+    );
+#else
         hostBuffer3[i][0] = float( ( int( i * 29.6f ) ) % 64 ) / 64.0f;
         hostBuffer3[i][1] = float( ( int( i * 23.1f ) ) % 64 ) / 64.0f;
         hostBuffer3[i][2] = float(
@@ -43,9 +66,10 @@ void update_particles(
     cudaMemcpy(
         deviceBuffer3,
         hostBuffer3,
-        sizeof( float3_t ) * particle_count,
+        sizeof( float3_t ) * particle_count[0],
         cudaMemcpyHostToDevice
     );
+#endif
 }
 
 
@@ -122,340 +146,342 @@ void update_data(
                 alpaka::mem::view::getPtrNative( hostBuffer2 )[pos] =
                     ( 2.0f - l ) * ( 2.0f - l ) / 4.0f;
             }
-            const alpaka::vec::Vec <alpaka::dim::DimInt< 1 >, ISAAC_IDX_TYPE>
-                data_size(
-                ISAAC_IDX_TYPE( local_size[0] )
-                * ISAAC_IDX_TYPE( local_size[1] )
-                * ISAAC_IDX_TYPE( local_size[2] )
-            );
-            alpaka::mem::view::copy(
-                stream,
-                deviceBuffer1,
-                hostBuffer1,
-                data_size
-            );
-            alpaka::mem::view::copy(
-                stream,
-                deviceBuffer2,
-                hostBuffer2,
-                data_size
-            );
-#else
-            hostBuffer1[pos][0] = intensity;
-            hostBuffer1[pos][1] = intensity;
-            hostBuffer1[pos][2] = intensity;
-            hostBuffer2[pos] = ( 2.0f - l ) * ( 2.0f - l ) / 4.0f;
         }
     }
-}
-cudaMemcpy(
-    deviceBuffer1,
-    hostBuffer1,
-    sizeof( float3_t ) * prod,
-    cudaMemcpyHostToDevice
-);
-cudaMemcpy(
-    deviceBuffer2,
-    hostBuffer2,
-    sizeof( float ) * prod,
-    cudaMemcpyHostToDevice
-);
-
-#endif
-        }
-
-
-        void mul_to_smallest_d(
-            ISAAC_IDX_TYPE * d,
-            int nr
-        )
-        {
-            if( d[0] < d[1] ) // 0 < 1
-            {
-                if( d[2] < d[0] )
-                {
-                    d[2] *= nr; //2 < 0 < 1
-                }
-                else
-                {
-                    d[0] *= nr;
-                } //0 < 2 < 1 || 0 < 1 < 2
-            }
-            else // 1 < 0
-            {
-                if( d[2] < d[1] )
-                {
-                    d[2] *= nr; // 2 < 1 < 0
-                }
-                else
-                {
-                    d[1] *= nr;
-                } // 1 < 0 < 2 || 1 < 2 < 0
-            }
-        }
-
-
-        void recursive_kgv(
-            ISAAC_IDX_TYPE * d,
-            int number,
-            int test
-        )
-        {
-            if( number == 1 )
-            {
-                return;
-            }
-            if( number == test )
-            {
-                mul_to_smallest_d(
-                    d,
-                    test
-                );
-                return;
-            }
-            if( number % test == 0 )
-            {
-                number /= test;
-                recursive_kgv(
-                    d,
-                    number,
-                    test
-                );
-                mul_to_smallest_d(
-                    d,
-                    test
-                );
-            }
-            else
-            {
-                recursive_kgv(
-                    d,
-                    number,
-                    test + 1
-                );
-            }
-        }
-
-
-        template<
-            typename TStream,
-            typename THost1,
-            typename TDev1,
-            typename THost2,
-            typename TDev2,
-            typename TLoc,
-            typename TPos,
-            typename TGlo
-        >
-        void read_vtk_to_memory(
-            char * filename,
-            TStream stream,
-            THost1 hostBuffer1,
-            TDev1 deviceBuffer1,
-            THost2 hostBuffer2,
-            TDev2 deviceBuffer2,
-            size_t prod,
-            float pos,
-            TLoc & local_size,
-            TPos & position,
-            TGlo & global_size,
-            int & s_x,
-            int & s_y,
-            int & s_z
-        )
-        {
-            //Set first default values
-            update_data(
-                stream,
-                hostBuffer1,
-                deviceBuffer1,
-                hostBuffer2,
-                deviceBuffer2,
-                prod,
-                pos,
-                local_size,
-                position,
-                global_size
-            );
-            std::ifstream infile( filename );
-            std::string line;
-            //Format
-            std::getline(
-                infile,
-                line
-            );
-            //Name
-            std::getline(
-                infile,
-                line
-            );
-            printf(
-                "Reading data set %s\n",
-                line.c_str( )
-            );
-            //Format
-            std::getline(
-                infile,
-                line
-            );
-            if( line.compare( std::string( "ASCII" ) ) != 0 )
-            {
-                printf( "Only ASCII supported yet!\n" );
-                return;
-            }
-            //dataset
-            std::getline(
-                infile,
-                line
-            );
-            if( line.compare( std::string( "DATASET STRUCTURED_POINTS" ) )
-                != 0 )
-            {
-                printf( "Only DATASET STRUCTURED_POINTS supported yet!\n" );
-                return;
-            }
-            //dimensions
-            std::getline(
-                infile,
-                line
-            );
-            const char * buffer = line.c_str( );
-            int x, y, z;
-            int i = strlen( "DIMENSIONS " );
-            x = atoi( &buffer[i] );
-            while( buffer[i] && buffer[i] != ' ' )
-            {
-                i++;
-            }
-            i++;
-            y = atoi( &buffer[i] );
-            while( buffer[i] && buffer[i] != ' ' )
-            {
-                i++;
-            }
-            i++;
-            z = atoi( &buffer[i] );
-            printf(
-                "Dimensions: %i %i %i\n",
-                x,
-                y,
-                z
-            );
-            //Spacing
-            std::getline(
-                infile,
-                line
-            );
-            buffer = line.c_str( );
-            i = strlen( "SPACING " );
-            s_x = atoi( &buffer[i] );
-            while( buffer[i] && buffer[i] != ' ' )
-            {
-                i++;
-            }
-            i++;
-            s_y = atoi( &buffer[i] );
-            while( buffer[i] && buffer[i] != ' ' )
-            {
-                i++;
-            }
-            i++;
-            s_z = atoi( &buffer[i] );
-            printf(
-                "Spacing: %i %i %i\n",
-                s_x,
-                s_y,
-                s_z
-            );
-            if( size_t( x ) != global_size[0] )
-            {
-                printf(
-                    "Width needs to be %lu instead of %i!\n",
-                    global_size[0],
-                    x
-                );
-                return;
-            }
-            if( size_t( y ) != global_size[1] )
-            {
-                printf(
-                    "Width needs to be %lu instead of %i!\n",
-                    global_size[1],
-                    y
-                );
-                return;
-            }
-            if( size_t( z ) != global_size[2] )
-            {
-                printf(
-                    "Width needs to be %lu instead of %i!\n",
-                    global_size[2],
-                    z
-                );
-                return;
-            }
-            //ORIGIN, POINT_DATA, SCALARS, LOOKUP_TABLE
-            std::getline(
-                infile,
-                line
-            );
-            std::getline(
-                infile,
-                line
-            );
-            std::getline(
-                infile,
-                line
-            );
-            std::getline(
-                infile,
-                line
-            );
-            x = 0;
-            y = 0;
-            z = 0;
-            while( std::getline(
-                infile,
-                line
-            ) )
-            {
-                char * buffer = const_cast<char *>(line.c_str( ));
-                while( buffer[0] && buffer[0] != '\n' )
-                {
-                    int value = strtol(
-                        buffer,
-                        &buffer,
-                        0
-                    );;
-                    int t_x = x - position[0];
-                    int t_y = y - position[1];
-                    int t_z = z - position[2];
-                    if( t_x >= 0 && size_t( t_x ) < local_size[0] && t_y >= 0
-                        && size_t( t_y ) < local_size[1] && t_z >= 0
-                        && size_t( t_z ) < local_size[2] )
-                    {
-                        size_t pos = t_x + t_y * local_size[0]
-                                     + t_z * local_size[0] * local_size[1];
-#if ISAAC_ALPAKA == 1
-                        alpaka::mem::view::getPtrNative( hostBuffer2 )[pos] =
-                            ( float ) value;
+    const alpaka::vec::Vec <alpaka::dim::DimInt< 1 >, ISAAC_IDX_TYPE>
+        data_size(
+        ISAAC_IDX_TYPE( local_size[0] )
+        * ISAAC_IDX_TYPE( local_size[1] )
+        * ISAAC_IDX_TYPE( local_size[2] )
+    );
+    alpaka::mem::view::copy(
+        stream,
+        deviceBuffer1,
+        hostBuffer1,
+        data_size
+    );
+    alpaka::mem::view::copy(
+        stream,
+        deviceBuffer2,
+        hostBuffer2,
+        data_size
+    );
 #else
-                        hostBuffer2[pos] = ( float ) value;
+                hostBuffer1[pos][0] = intensity;
+                hostBuffer1[pos][1] = intensity;
+                hostBuffer1[pos][2] = intensity;
+                hostBuffer2[pos] = ( 2.0f - l ) * ( 2.0f - l ) / 4.0f;
+            }
+        }
+    }
+    cudaMemcpy(
+        deviceBuffer1,
+        hostBuffer1,
+        sizeof( float3_t ) * prod,
+        cudaMemcpyHostToDevice
+    );
+    cudaMemcpy(
+        deviceBuffer2,
+        hostBuffer2,
+        sizeof( float ) * prod,
+        cudaMemcpyHostToDevice
+    );
+
 #endif
-                    }
-                    x++;
-                    if( size_t( x ) >= global_size[0] )
-                    {
-                        x = 0;
-                        y++;
-                        if( size_t( y ) >= global_size[1] )
-                        {
-                            y = 0;
-                            z++;
-                        }
-                    }
+}
+
+
+void mul_to_smallest_d(
+    ISAAC_IDX_TYPE * d,
+    int nr
+)
+{
+    if( d[0] < d[1] ) // 0 < 1
+    {
+        if( d[2] < d[0] )
+        {
+            d[2] *= nr; //2 < 0 < 1
+        }
+        else
+        {
+            d[0] *= nr;
+        } //0 < 2 < 1 || 0 < 1 < 2
+    }
+    else // 1 < 0
+    {
+        if( d[2] < d[1] )
+        {
+            d[2] *= nr; // 2 < 1 < 0
+        }
+        else
+        {
+            d[1] *= nr;
+        } // 1 < 0 < 2 || 1 < 2 < 0
+    }
+}
+
+
+void recursive_kgv(
+    ISAAC_IDX_TYPE * d,
+    int number,
+    int test
+)
+{
+    if( number == 1 )
+    {
+        return;
+    }
+    if( number == test )
+    {
+        mul_to_smallest_d(
+            d,
+            test
+        );
+        return;
+    }
+    if( number % test == 0 )
+    {
+        number /= test;
+        recursive_kgv(
+            d,
+            number,
+            test
+        );
+        mul_to_smallest_d(
+            d,
+            test
+        );
+    }
+    else
+    {
+        recursive_kgv(
+            d,
+            number,
+            test + 1
+        );
+    }
+}
+
+
+template<
+    typename TStream,
+    typename THost1,
+    typename TDev1,
+    typename THost2,
+    typename TDev2,
+    typename TLoc,
+    typename TPos,
+    typename TGlo
+>
+void read_vtk_to_memory(
+    char * filename,
+    TStream stream,
+    THost1 hostBuffer1,
+    TDev1 deviceBuffer1,
+    THost2 hostBuffer2,
+    TDev2 deviceBuffer2,
+    size_t prod,
+    float pos,
+    TLoc & local_size,
+    TPos & position,
+    TGlo & global_size,
+    int & s_x,
+    int & s_y,
+    int & s_z
+)
+{
+    //Set first default values
+    update_data(
+        stream,
+        hostBuffer1,
+        deviceBuffer1,
+        hostBuffer2,
+        deviceBuffer2,
+        prod,
+        pos,
+        local_size,
+        position,
+        global_size
+    );
+    std::ifstream infile( filename );
+    std::string line;
+    //Format
+    std::getline(
+        infile,
+        line
+    );
+    //Name
+    std::getline(
+        infile,
+        line
+    );
+    printf(
+        "Reading data set %s\n",
+        line.c_str( )
+    );
+    //Format
+    std::getline(
+        infile,
+        line
+    );
+    if( line.compare( std::string( "ASCII" ) ) != 0 )
+    {
+        printf( "Only ASCII supported yet!\n" );
+        return;
+    }
+    //dataset
+    std::getline(
+        infile,
+        line
+    );
+    if( line.compare( std::string( "DATASET STRUCTURED_POINTS" ) )
+        != 0 )
+    {
+        printf( "Only DATASET STRUCTURED_POINTS supported yet!\n" );
+        return;
+    }
+    //dimensions
+    std::getline(
+        infile,
+        line
+    );
+    const char * buffer = line.c_str( );
+    int x, y, z;
+    int i = strlen( "DIMENSIONS " );
+    x = atoi( &buffer[i] );
+    while( buffer[i] && buffer[i] != ' ' )
+    {
+        i++;
+    }
+    i++;
+    y = atoi( &buffer[i] );
+    while( buffer[i] && buffer[i] != ' ' )
+    {
+        i++;
+    }
+    i++;
+    z = atoi( &buffer[i] );
+    printf(
+        "Dimensions: %i %i %i\n",
+        x,
+        y,
+        z
+    );
+    //Spacing
+    std::getline(
+        infile,
+        line
+    );
+    buffer = line.c_str( );
+    i = strlen( "SPACING " );
+    s_x = atoi( &buffer[i] );
+    while( buffer[i] && buffer[i] != ' ' )
+    {
+        i++;
+    }
+    i++;
+    s_y = atoi( &buffer[i] );
+    while( buffer[i] && buffer[i] != ' ' )
+    {
+        i++;
+    }
+    i++;
+    s_z = atoi( &buffer[i] );
+    printf(
+        "Spacing: %i %i %i\n",
+        s_x,
+        s_y,
+        s_z
+    );
+    if( size_t( x ) != global_size[0] )
+    {
+        printf(
+            "Width needs to be %lu instead of %i!\n",
+            global_size[0],
+            x
+        );
+        return;
+    }
+    if( size_t( y ) != global_size[1] )
+    {
+        printf(
+            "Width needs to be %lu instead of %i!\n",
+            global_size[1],
+            y
+        );
+        return;
+    }
+    if( size_t( z ) != global_size[2] )
+    {
+        printf(
+            "Width needs to be %lu instead of %i!\n",
+            global_size[2],
+            z
+        );
+        return;
+    }
+    //ORIGIN, POINT_DATA, SCALARS, LOOKUP_TABLE
+    std::getline(
+        infile,
+        line
+    );
+    std::getline(
+        infile,
+        line
+    );
+    std::getline(
+        infile,
+        line
+    );
+    std::getline(
+        infile,
+        line
+    );
+    x = 0;
+    y = 0;
+    z = 0;
+    while( std::getline(
+        infile,
+        line
+    ) )
+    {
+        char * buffer = const_cast<char *>(line.c_str( ));
+        while( buffer[0] && buffer[0] != '\n' )
+        {
+            int value = strtol(
+                buffer,
+                &buffer,
+                0
+            );;
+            int t_x = x - position[0];
+            int t_y = y - position[1];
+            int t_z = z - position[2];
+            if( t_x >= 0 && size_t( t_x ) < local_size[0] && t_y >= 0
+                && size_t( t_y ) < local_size[1] && t_z >= 0
+                && size_t( t_z ) < local_size[2] )
+            {
+                size_t pos = t_x + t_y * local_size[0]
+                             + t_z * local_size[0] * local_size[1];
+#if ISAAC_ALPAKA == 1
+                alpaka::mem::view::getPtrNative( hostBuffer2 )[pos] =
+                    ( float ) value;
+#else
+                hostBuffer2[pos] = ( float ) value;
+#endif
+            }
+            x++;
+            if( size_t( x ) >= global_size[0] )
+            {
+                x = 0;
+                y++;
+                if( size_t( y ) >= global_size[1] )
+                {
+                    y = 0;
+                    z++;
                 }
             }
+        }
+    }
 
 #if ISAAC_ALPAKA == 1
             const alpaka::vec::Vec <alpaka::dim::DimInt< 1 >, ISAAC_IDX_TYPE>
@@ -478,4 +504,4 @@ cudaMemcpy(
                 cudaMemcpyHostToDevice
             );
 #endif
-        }
+}
