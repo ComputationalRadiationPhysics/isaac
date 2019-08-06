@@ -67,14 +67,43 @@ namespace isaac
         isaac_int
     );
 
+    //inverse mvp matrix
     ISAAC_CONSTANT isaac_float
     isaac_inverse_d[16];
+
+    //modelview matrix
+    ISAAC_CONSTANT 
+    isaac_float isaac_modelview_d[16];
+
+    //projection matrix
+    ISAAC_CONSTANT 
+    isaac_float isaac_projection_d[16];
+
+    //simulation size properties
     ISAAC_CONSTANT isaac_size_struct< 3 >
     isaac_size_d[1]; //[1] to access it for cuda and alpaka the same way
+
     ISAAC_CONSTANT isaac_float4
     isaac_parameter_d[ ISAAC_MAX_SOURCES*ISAAC_MAX_FUNCTORS ];
+
     ISAAC_CONSTANT isaac_functor_chain_pointer_N
     isaac_function_chain_d[ ISAAC_MAX_SOURCES ];
+
+
+    /* 
+     * SSAO
+     * Kernels for ssao calculation
+     */
+
+    //filter kernel
+    ISAAC_CONSTANT 
+    isaac_float3 ssao_kernel_d[64];
+
+    //vector rotation noise kernel
+    ISAAC_CONSTANT 
+    isaac_float3 ssao_noise_d[16];
+
+
 
     template<
         typename T
@@ -1200,9 +1229,10 @@ namespace isaac
                     if( !finish[e] ) {
                         //if no source is found set all values to their defaults
                         //color = background, ...
-                        ISAAC_SET_COLOR ( pixels[pixel[e].x
-                                                + pixel[e].y * framebuffer_size.x],
-                            color[e] )
+                        ISAAC_SET_COLOR ( 
+                            pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], 
+                            color[e] 
+                        )
                         gNormal[pixel[e].x + pixel[e].y * framebuffer_size.x] = default_normal;
                         gDepth[pixel[e].x + pixel[e].y * framebuffer_size.x] = default_depth;
                     }
@@ -1226,11 +1256,15 @@ namespace isaac
             isaac_float3 count_start[ISAAC_VECTOR_ELEM];    //start index for ray
             isaac_float3 local_size_f[ISAAC_VECTOR_ELEM];   //subvolume size as float
             isaac_float3 count_end[ISAAC_VECTOR_ELEM];      //end index for ray
+            isaac_float3 start_normal[ISAAC_VECTOR_ELEM];
+            bool global_front[ISAAC_VECTOR_ELEM];
 
             ISAAC_ELEM_ITERATE ( e )
             {
-                //get normalized pixel position in framebuffer
+                
                 global_front[e] = false;
+
+                //get normalized pixel position in framebuffer
                 pixel_f[e].x = isaac_float( pixel[e].x )
                                / ( isaac_float ) framebuffer_size.x
                                * isaac_float( 2 ) - isaac_float( 1 );
@@ -2071,23 +2105,20 @@ namespace isaac
                     //the w component stores the particle depth and will be replaced later by new alpha values and 
                     //is therefore stored in march_length
                     //LINE 2044
-                    isaac_float3 depth_value = {
+                    /*isaac_float3 depth_value = {
                         0.0f,
                         0.0f,
                         march_length[e];
                     };                
 
                     gDepth[pixel[e].x + pixel[e].y * framebuffer_size.x] = depth_value;
+                    */
                 }
-
             }
         }
-
-
 #if ISAAC_ALPAKA == 1
     };
 #endif
-
 
     /**
      * @brief Calculate SSAO factor
@@ -2142,10 +2173,12 @@ namespace isaac
             * Possible errors could be mv or proj matrix
             */
 
+            isaac_int radius = 10;
+
             /*
             //isaac_float3 origin = gDepth[pixel.x + pixel.y * framebuffer_size.x];
 
-            isaac_int radius = 10;
+            
 
             //get the normal value from the gbuffer
             isaac_float3 normal = gNormal[pixel.x + pixel.y * framebuffer_size.x];
@@ -2347,7 +2380,10 @@ namespace isaac
         typename TSourceWeight,
         typename TPointerArray,
         typename TFilter,
-        typename TFramebuffer, ISAAC_IDX_TYPE TTransfer_size,
+        typename TFramebuffer, 
+        typename TFramebufferDepth,
+        typename TFramebufferNormal,
+        ISAAC_IDX_TYPE TTransfer_size,
         typename TScale,
 #if ISAAC_ALPAKA == 1
         typename TAccDim,
@@ -2364,8 +2400,8 @@ namespace isaac
             TStream stream,
 #endif
             TFramebuffer framebuffer,
-            isaac_float3 & depthBuffer,
-            isaac_float3 & normalBuffer,
+            TFramebufferDepth depthBuffer,
+            TFramebufferNormal normalBuffer,
             const isaac_size2 & framebuffer_size,
             const isaac_uint2 & framebuffer_start,
             const TParticleList & particle_sources,
@@ -2399,6 +2435,8 @@ namespace isaac
                         mpl::false_
                     >::type,
                     TFramebuffer,
+                    TFramebufferDepth,
+                    TFramebufferNormal,
                     TTransfer_size,
                     TScale,
 #if ISAAC_ALPAKA == 1
@@ -2446,6 +2484,8 @@ N - 1
                         mpl::true_
                     >::type,
                     TFramebuffer,
+                    TFramebufferDepth,
+                    TFramebufferNormal,
                     TTransfer_size,
                     TScale,
 #if ISAAC_ALPAKA == 1
@@ -2490,7 +2530,10 @@ N - 1
         typename TSourceWeight,
         typename TPointerArray,
         typename TFilter,
-        typename TFramebuffer, ISAAC_IDX_TYPE TTransfer_size,
+        typename TFramebuffer, 
+        typename TFramebufferDepth,
+        typename TFramebufferNormal,
+        ISAAC_IDX_TYPE TTransfer_size,
         typename TScale
 #if ISAAC_ALPAKA == 1
         ,
@@ -2509,6 +2552,8 @@ N - 1
         TPointerArray,
         TFilter,
         TFramebuffer,
+        TFramebufferDepth,
+        TFramebufferNormal,
         TTransfer_size,
         TScale,
 #if ISAAC_ALPAKA == 1
@@ -2525,8 +2570,8 @@ N - 1
             TStream stream,
 #endif
             TFramebuffer framebuffer,
-            isaac_float3 * depthBuffer,
-            isaac_float3 * normalBuffer,
+            TFramebufferDepth depthBuffer,
+            TFramebufferNormal normalBuffer,
             const isaac_size2 & framebuffer_size,
             const isaac_uint2 & framebuffer_start,
             const TParticleList & particle_sources,
@@ -2700,10 +2745,92 @@ N - 1
         }
     };
 
+    template <
+        typename TAOBuffer,
+        typename TDepthBuffer,
+        typename TNormalBuffer
+#if ISAAC_ALPAKA == 1
+        ,typename TAccDim
+        ,typename TAcc
+        ,typename TStream
+#endif
+        >
+    struct IsaacSSAOKernelCaller {
+        
+        inline static void call (
+#if ISAAC_ALPAKA == 1
+            TStream stream,
+#endif
+            TAOBuffer aoBuffer,
+            TDepthBuffer depthBuffer,
+            TNormalBuffer normalBuffer,
+            const isaac_size2& framebuffer_size,
+            const isaac_uint2& framebuffer_start,
+            IceTInt const * const readback_viewport,
+            ao_struct ao_properties
+        )
+        {
+            isaac_size2 block_size= {
+                ISAAC_IDX_TYPE ( 8 ),
+                ISAAC_IDX_TYPE ( 16 )
+            };
+            isaac_size2 grid_size= {
+                ISAAC_IDX_TYPE ( ( readback_viewport[2]+block_size.x-1 ) /block_size.x + ISAAC_VECTOR_ELEM - 1 ) /ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ),
+                ISAAC_IDX_TYPE ( ( readback_viewport[3]+block_size.y-1 ) /block_size.y )
+            };
+#if ISAAC_ALPAKA == 1
+#if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
+            if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
+#endif
+            {
+                grid_size.x = ISAAC_IDX_TYPE ( readback_viewport[2] + ISAAC_VECTOR_ELEM - 1 ) /ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM );
+                grid_size.y = ISAAC_IDX_TYPE ( readback_viewport[3] );
+                block_size.x = ISAAC_IDX_TYPE ( 1 );
+                block_size.y = ISAAC_IDX_TYPE ( 1 );
+            }
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> threads ( ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ) );
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> blocks ( ISAAC_IDX_TYPE ( 1 ), block_size.y, block_size.x );
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> grid ( ISAAC_IDX_TYPE ( 1 ), grid_size.y, grid_size.x );
+            auto const workdiv ( alpaka::workdiv::WorkDivMembers<TAccDim, ISAAC_IDX_TYPE> ( grid,blocks,threads ) );
+
+            {
+                isaacSSAOKernel kernel;
+                auto const instance
+                (
+                    alpaka::kernel::createTaskKernel<TAcc>
+                    (
+                        workdiv,
+                        kernel,
+                        alpaka::mem::view::getPtrNative(aoBuffer),
+                        alpaka::mem::view::getPtrNative(depthBuffer),
+                        alpaka::mem::view::getPtrNative(normalBuffer),
+                        framebuffer_size,
+                        framebuffer_start,
+                        ao_properties
+                    )
+                );
+                alpaka::queue::enqueue(stream, instance);
+            }
+#else
+            dim3 block ( block_size.x, block_size.y );
+            dim3 grid ( grid_size.x, grid_size.y );
+            isaacSSAOKernel<<<grid, block>>>
+            (
+                aoBuffer,
+                depthBuffer,
+                normalBuffer,
+                framebuffer_size,
+                framebuffer_start,
+                ao_properties
+            );
+#endif
+        }
+    };
+
 
     template <
         typename TFramebuffer,
-        typename TAOBuffer
+        typename TFramebufferAO
 #if ISAAC_ALPAKA == 1
         ,typename TAccDim
         ,typename TAcc
@@ -2717,7 +2844,7 @@ N - 1
             TStream stream,
 #endif
             TFramebuffer framebuffer,
-            isaac_float * aobuffer,
+            TFramebufferAO aobuffer,
             const isaac_size2& framebuffer_size,
             const isaac_uint2& framebuffer_start,
             IceTInt const * const readback_viewport,
@@ -2751,7 +2878,7 @@ N - 1
                 isaacSSAOFilterKernel kernel;
                 auto const instance
                 (
-                    alpaka::exec::create<TAcc>
+                    alpaka::kernel::createTaskKernel<TAcc>
                     (
                         workdiv,
                         kernel,
@@ -2762,7 +2889,7 @@ N - 1
                         ao_properties
                     )
                 );
-                alpaka::stream::enqueue(stream, instance);
+                alpaka::queue::enqueue(stream, instance);
             }
 #else
             dim3 block ( block_size.x, block_size.y );
