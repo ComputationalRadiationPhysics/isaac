@@ -442,7 +442,15 @@ namespace isaac
         return result;
     }
 
-
+    /**
+     * @brief Clamps coordinates to min/max
+     * 
+     * @tparam TInterpolation 
+     * @tparam TLocalSize 
+     * @param coord 
+     * @param local_size 
+     * @return ISAAC_HOST_DEVICE_INLINE check_coord clamped coordiantes
+     */
     template<
         bool TInterpolation,
         typename TLocalSize
@@ -499,7 +507,15 @@ namespace isaac
         }
     }
 
-
+    /**
+     * @brief Clamps coordinates to min/max +- Guard margin
+     * 
+     * @tparam TInterpolation 
+     * @tparam TLocalSize 
+     * @param coord 
+     * @param local_size 
+     * @return ISAAC_HOST_DEVICE_INLINE check_coord_with_guard clamped coordinate
+     */
     template<
         bool TInterpolation,
         typename TLocalSize
@@ -556,7 +572,15 @@ namespace isaac
         }
     }
 
-
+    /**
+     * @brief Checks for collision with source particles
+     * 
+     * Returns color, normal, position of particle
+     * 
+     * @tparam Ttransfer_size 
+     * @tparam TOffset 
+     * @tparam TFilter 
+     */
     template<
         ISAAC_IDX_TYPE Ttransfer_size,
         int TOffset,
@@ -583,17 +607,17 @@ namespace isaac
         >
         ISAAC_HOST_DEVICE_INLINE void operator()(
             const NR & nr,
-            const TSource & source,
-            TColor & color,
-            TNormal & normal,
-            TPosition & position,
+            const TSource & source,                     //particle source
+            TColor & color,                             //particle color
+            TNormal & normal,                           //particle normal
+            TPosition & position,                       //particle hit position
             const TStart & start,
             const TDir & dir,
-            const TLightDir & light_dir,
+            const TLightDir & light_dir,                //direction of incoming light
             const TCellPos & cell_pos,
             const TTransferArray & transferArray,
             const TSourceWeight & sourceWeight,
-            TFeedback & feedback,
+            TFeedback & feedback,                       //true or false if particle has been hit or not
             const TParticleScale & particle_scale,
             const TClippingNormal & clipping_normal,
             const TClipped & is_clipped
@@ -1101,18 +1125,18 @@ namespace isaac
 #else
             __global__ void isaacRenderKernel(
 #endif
-            uint32_t * const pixels,
-            const isaac_size2 framebuffer_size,
-            const isaac_uint2 framebuffer_start,
-            const TParticleList particle_sources,
-            const TSourceList sources,
-            isaac_float step,
-            const isaac_float4 background_color,
-            const TTransferArray transferArray,
-            const TSourceWeight sourceWeight,
+            uint32_t * const pixels,                //ptr to output pixels
+            const isaac_size2 framebuffer_size,     //size of framebuffer
+            const isaac_uint2 framebuffer_start,    //framebuffer offset
+            const TParticleList particle_sources,   //source simulation particles
+            const TSourceList sources,              //source of volumes
+            isaac_float step,                       //ray step length
+            const isaac_float4 background_color,    //color of render background
+            const TTransferArray transferArray,     //mapping to simulation memory
+            const TSourceWeight sourceWeight,       //weights of sources for blending
             const TPointerArray pointerArray,
-            const TScale scale,
-            const clipping_struct input_clipping
+            const TScale scale,                     //isaac set scaling
+            const clipping_struct input_clipping,   //clipping planes
         )
 #if ISAAC_ALPAKA == 1
         const
@@ -1120,6 +1144,8 @@ namespace isaac
         {
             isaac_uint2 pixel[ISAAC_VECTOR_ELEM];
             bool finish[ISAAC_VECTOR_ELEM];
+
+            //get pixel values from thread ids
 #if ISAAC_ALPAKA == 1
             auto alpThreadIdx = alpaka::idx::getIdx<
                 alpaka::Grid,
@@ -1137,6 +1163,8 @@ namespace isaac
                                  * isaac_uint( ISAAC_VECTOR_ELEM ) + e;
                     pixel[e].y = isaac_uint( threadIdx.y + blockIdx.y * blockDim.y );
 #endif
+                //apply framebuffer offset to pixel
+                //stop if pixel position is out of bounds
                 finish[e] = false;
                 pixel[e] = pixel[e] + framebuffer_start;
                 if( ISAAC_FOR_EACH_DIM_TWICE ( 2,
@@ -1150,6 +1178,7 @@ namespace isaac
             bool at_least_one[ISAAC_VECTOR_ELEM];
             isaac_float4 color[ISAAC_VECTOR_ELEM];
 
+            //set background color
             ISAAC_ELEM_ITERATE ( e )
             {
                 color[e] = background_color;
@@ -1161,35 +1190,37 @@ namespace isaac
                 );
                 if( !at_least_one[e] )
                 {
-                    if( !finish[e] )
-                    ISAAC_SET_COLOR ( pixels[pixel[e].x
-                                             + pixel[e].y * framebuffer_size.x],
-                        color[e] )
+                    if( !finish[e] ) {
+                        //if no source is found set all values to their defaults
+                        //color = background, ...
+                        ISAAC_SET_COLOR ( pixels[pixel[e].x
+                                                + pixel[e].y * framebuffer_size.x],
+                            color[e] )
+                    }
                     finish[e] = true;
                 }
             }
             ISAAC_ELEM_ALL_TRUE_RETURN ( finish )
 
-            isaac_float2 pixel_f[ISAAC_VECTOR_ELEM];
-            isaac_float4 start_p[ISAAC_VECTOR_ELEM];
-            isaac_float4 end_p[ISAAC_VECTOR_ELEM];
-            isaac_float3 start[ISAAC_VECTOR_ELEM];
-            isaac_float3 end[ISAAC_VECTOR_ELEM];
-            isaac_int3 move[ISAAC_VECTOR_ELEM];
-            isaac_float3 move_f[ISAAC_VECTOR_ELEM];
-            clipping_struct clipping[ISAAC_VECTOR_ELEM];
-            isaac_float3 vec[ISAAC_VECTOR_ELEM];
-            isaac_float l_scaled[ISAAC_VECTOR_ELEM];
-            isaac_float l[ISAAC_VECTOR_ELEM];
-            isaac_float3 step_vec[ISAAC_VECTOR_ELEM];
-            isaac_float3 count_start[ISAAC_VECTOR_ELEM];
-            isaac_float3 local_size_f[ISAAC_VECTOR_ELEM];
-            isaac_float3 count_end[ISAAC_VECTOR_ELEM];
-            isaac_float3 start_normal[ISAAC_VECTOR_ELEM];
-            bool global_front[ISAAC_VECTOR_ELEM];
+            isaac_float2 pixel_f[ISAAC_VECTOR_ELEM];        //relative pixel position in framebuffer [0.0 ... 1.0]
+            isaac_float4 start_p[ISAAC_VECTOR_ELEM];        //ray start position
+            isaac_float4 end_p[ISAAC_VECTOR_ELEM];          //ray end position
+            isaac_float3 start[ISAAC_VECTOR_ELEM];          //ray start position (world space)
+            isaac_float3 end[ISAAC_VECTOR_ELEM];            //ray end position (world space)
+            isaac_int3 move[ISAAC_VECTOR_ELEM];             //offset of subvolume
+            isaac_float3 move_f[ISAAC_VECTOR_ELEM];         //offset of subvolume as float
+            clipping_struct clipping[ISAAC_VECTOR_ELEM];    //clipping planes with transformed positions
+            isaac_float3 vec[ISAAC_VECTOR_ELEM];            //temp storage vector
+            isaac_float l_scaled[ISAAC_VECTOR_ELEM];        //scaled length of ray
+            isaac_float l[ISAAC_VECTOR_ELEM];               //isaac scaled length of ray
+            isaac_float3 step_vec[ISAAC_VECTOR_ELEM];       //ray direction vector scaled by step length
+            isaac_float3 count_start[ISAAC_VECTOR_ELEM];    //start index for ray
+            isaac_float3 local_size_f[ISAAC_VECTOR_ELEM];   //subvolume size as float
+            isaac_float3 count_end[ISAAC_VECTOR_ELEM];      //end index for ray
 
             ISAAC_ELEM_ITERATE ( e )
             {
+                //get normalized pixel position in framebuffer
                 global_front[e] = false;
                 pixel_f[e].x = isaac_float( pixel[e].x )
                                / ( isaac_float ) framebuffer_size.x
@@ -1197,7 +1228,8 @@ namespace isaac
                 pixel_f[e].y = isaac_float( pixel[e].y )
                                / ( isaac_float ) framebuffer_size.y
                                * isaac_float( 2 ) - isaac_float( 1 );
-
+                
+                //get ray start/end position
                 start_p[e].x = pixel_f[e].x * ISAAC_Z_NEAR;
                 start_p[e].y = pixel_f[e].y * ISAAC_Z_NEAR;
                 start_p[e].z = -1.0f * ISAAC_Z_NEAR;
@@ -1208,6 +1240,7 @@ namespace isaac
                 end_p[e].z = 1.0f * ISAAC_Z_FAR;
                 end_p[e].w = 1.0f * ISAAC_Z_FAR;
 
+                //apply inverse modelview transform to ray start/end and get ray start/end as worldspace
                 start[e].x = isaac_inverse_d[0] * start_p[e].x
                              + isaac_inverse_d[4] * start_p[e].y
                              + isaac_inverse_d[8] * start_p[e].z
@@ -1240,6 +1273,8 @@ namespace isaac
                 start[e] = start[e] * max_size;
                 end[e] = end[e] * max_size;
 
+                //set values for clipping planes
+                //scale position to global size
                 for( isaac_int i = 0; i < input_clipping.count; i++ )
                 {
                     clipping[e].elem[i].position =
@@ -1248,6 +1283,7 @@ namespace isaac
                 }
 
                 //move to local (scaled) grid
+                //get offset of subvolume in global volume
                 move[e].x = isaac_int(
                     isaac_size_d[0].global_size_scaled
                         .value
@@ -1280,20 +1316,25 @@ namespace isaac
                 move_f[e].y = isaac_float( move[e].y );
                 move_f[e].z = isaac_float( move[e].z );
 
+                //apply subvolume offset to start and end
                 start[e] = start[e] + move_f[e];
                 end[e] = end[e] + move_f[e];
+
+                //apply subvolume offset to position checked clipping plane
                 for( isaac_int i = 0; i < input_clipping.count; i++ )
                 {
                     clipping[e].elem[i].position =
                         clipping[e].elem[i].position + move_f[e];
                 }
 
+                //get ray length
                 vec[e] = end[e] - start[e];
                 l_scaled[e] = sqrt(
                     vec[e].x * vec[e].x + vec[e].y * vec[e].y
                     + vec[e].z * vec[e].z
                 );
 
+                //apply isaac scaling to start, end and position tested by clipping plane
                 start[e].x = start[e].x / scale.x;
                 start[e].y = start[e].y / scale.y;
                 start[e].z = start[e].z / scale.z;
@@ -1313,14 +1354,20 @@ namespace isaac
                                  .z / scale.z;
                 }
 
+                //get ray length (scaled by isaac scaling)
                 vec[e] = end[e] - start[e];
                 l[e] = sqrt(
                     vec[e].x * vec[e].x + vec[e].y * vec[e].y
                     + vec[e].z * vec[e].z
                 );
 
+                //get step vector
                 step_vec[e] = vec[e] / l[e] * step;
+
+                //start index for ray
                 count_start[e] = -start[e] / step_vec[e];
+
+                //get subvolume size as float
                 local_size_f[e].x = isaac_float(
                     isaac_size_d[0].local_size
                         .value
@@ -1337,6 +1384,7 @@ namespace isaac
                         .z
                 );
 
+                //end index for ray
                 count_end[e] = ( local_size_f[e] - start[e] ) / step_vec[e];
 
                 //count_start shall have the smaller values
@@ -1479,10 +1527,10 @@ namespace isaac
             }
             ISAAC_ELEM_ALL_TRUE_RETURN ( finish )
 
-            isaac_int first[ISAAC_VECTOR_ELEM];
-            isaac_int last[ISAAC_VECTOR_ELEM];
-            isaac_float first_f[ISAAC_VECTOR_ELEM];
-            isaac_float last_f[ISAAC_VECTOR_ELEM];
+            isaac_int first[ISAAC_VECTOR_ELEM];                 //start index of ray
+            isaac_int last[ISAAC_VECTOR_ELEM];                  //end index of ray
+            isaac_float first_f[ISAAC_VECTOR_ELEM];             //start index as float
+            isaac_float last_f[ISAAC_VECTOR_ELEM];              //end index as float
             isaac_float3 pos[ISAAC_VECTOR_ELEM];
             isaac_int3 coord[ISAAC_VECTOR_ELEM];
             isaac_float d[ISAAC_VECTOR_ELEM];
@@ -1492,6 +1540,7 @@ namespace isaac
 
             ISAAC_ELEM_ITERATE ( e )
             {
+                //set start and end index of ray
                 first[e] = isaac_int( ceil( count_start[e].x ) );
                 last[e] = isaac_int( floor( count_end[e].x ) );
 
@@ -1623,9 +1672,10 @@ namespace isaac
             ISAAC_ELEM_ALL_TRUE_RETURN ( finish )
 
 
-            isaac_float4 particle_color[ISAAC_VECTOR_ELEM];
-            isaac_float3 particle_normal[ISAAC_VECTOR_ELEM];
-            isaac_float3 particle_hitposition[ISAAC_VECTOR_ELEM];
+            isaac_float4 particle_color[ISAAC_VECTOR_ELEM];          //color at particle hist position
+            isaac_float3 particle_normal[ISAAC_VECTOR_ELEM];         //normal at particle hit position
+            isaac_float3 particle_hitposition[ISAAC_VECTOR_ELEM];    //hit position of particle
+            
             isaac_int result_particle[ISAAC_VECTOR_ELEM];
             isaac_float3 local_start[ISAAC_VECTOR_ELEM];
             isaac_float3 light_dir[ISAAC_VECTOR_ELEM];
