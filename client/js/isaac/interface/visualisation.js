@@ -483,7 +483,8 @@ function onClientMessage(response) {
 			document.getElementById("interpolation_checkbox").checked = response["interpolation"];
 			document.getElementById("step").value = response["step"];
 			document.getElementById("iso_surface_checkbox").checked = response["iso surface"];
-
+			
+			aoSetValues(response);
 
 			preview.width = response["framebuffer width"];
 			preview.height = response["framebuffer height"];
@@ -527,6 +528,7 @@ function onClientMessage(response) {
 			if (response.hasOwnProperty("iso surface"))
 				document.getElementById("iso_surface_checkbox").checked = response["iso surface"];
 
+			aoSetValues(response);
 
 			renderer.update();
 		}
@@ -1115,4 +1117,37 @@ function updateWireframe() {
 		255 - parseInt(background_color.jscolor.rgb[2]));
 	let enabled = document.getElementById("wireframe_checkbox").checked;
 	renderer.setWireframe(enabled, color);
+}
+
+/**
+ * 
+ * @param {IsaacResponse} response 
+ */
+function aoSetValues(response) {
+	
+	if (response.hasOwnProperty("ao isEnabled")) {
+
+		document.getElementById("ao_checkbox").checked = response["ao isEnabled"];
+		lastIsaacState["ao isEnabled"] = response["ao isEnabled"];
+	}
+	if (response.hasOwnProperty("ao weight")) {
+		let weightEl = document.getElementById("ao_weight");
+
+		document.getElementById("ao_weight").innerHTML = weightEl.value;
+		lastIsaacState["ao_weight"] = response["ao weight"];;
+	}
+}
+
+/**
+ * called when wheight value is set or isEnabled is changed
+ */
+function aoUpdate() {
+	let weight = parseFloat(document.getElementById("ao_weight").value);
+	let status = document.getElementById("ao_checkbox").checked;
+
+	let ao_object = {
+		"isEnabled": status,
+		"weight": weight
+	};
+	sendFeedback("ao", ao_object);
 }

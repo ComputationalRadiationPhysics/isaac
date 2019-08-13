@@ -2105,14 +2105,14 @@ namespace isaac
                     //the w component stores the particle depth and will be replaced later by new alpha values and 
                     //is therefore stored in march_length
                     //LINE 2044
-                    /*isaac_float3 depth_value = {
+                    isaac_float3 depth_value = {
                         0.0f,
                         0.0f,
-                        march_length[e];
+                        march_length[e]
                     };                
 
                     gDepth[pixel[e].x + pixel[e].y * framebuffer_size.x] = depth_value;
-                    */
+                    
                 }
             }
         }

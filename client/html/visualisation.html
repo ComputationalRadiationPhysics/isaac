@@ -65,6 +65,23 @@
 				<input type="button" value="Set" id="interval_change">
 				<input type="checkbox" id="controls_checkbox" onchange="controls_checkbox_click()"> Show controls
 			</form>
+			<div id="ambient_occ_div">
+				<table>
+					<h3>Ambient Occlusion</h3>
+					<tr>
+						<td>Enabled</td>
+						<td><input type="checkbox" id="ao_checkbox" checked onchange="aoUpdate()"></td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>Weight</td>
+						<td><input type="range" min="0" max="1" value="0.5" step="0.01" id="ao_weight"></td>				
+						<td><button onclick="aoUpdate()">Set</button></td>	
+					</tr>
+				</table>
+				
+				<br/>
+			</div>
 			<div id="stereo_div"></div>
 			<div id="functions_div"></div>
 			<div id="weight_div"></div>

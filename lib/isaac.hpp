@@ -2449,6 +2449,9 @@ namespace isaac
                         {
                             send_init_json = true;
                         }
+                        if(strcmp(target, "ao") == 0) {
+                            send_ao = true;
+                        }
                     }
                     //Search for scene changes
                     if( json_array_size(
@@ -3114,6 +3117,17 @@ namespace isaac
                         )
                     )
                 );
+            }
+
+            if ( js = json_object_get ( message, "ao" ) ) {
+                redraw = true;
+                json_t * isEnabled = json_object_get(js, "isEnabled");
+                json_t * weight = json_object_get(js, "weight");
+                
+                myself->ambientOcclusion.isEnabled = json_boolean_value ( isEnabled );
+                myself->ambientOcclusion.weight = (isaac_float)json_number_value ( weight );
+
+                send_ao = true;
             }
 
             json_t * metadata = json_object_get(
