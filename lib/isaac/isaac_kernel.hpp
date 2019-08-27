@@ -1985,6 +1985,7 @@ namespace isaac
             isaac_int result[ISAAC_VECTOR_ELEM];
             isaac_float oma[ISAAC_VECTOR_ELEM];
             isaac_float4 color_add[ISAAC_VECTOR_ELEM];
+            isaac_float ao_blend; //indicates how strong particle ao should be when gas is overlapping
 
             ISAAC_ELEM_ITERATE ( e )
             {
@@ -2080,6 +2081,7 @@ namespace isaac
                     particle_color[e].w = 1;
                     color[e] =
                         color[e] + particle_color[e] * ( 1 - color[e].w );
+                    ao_blend = (1 - color[e].w);
                 }
 
 #if ISAAC_SHOWBORDER == 1
@@ -2107,7 +2109,7 @@ namespace isaac
                     //LINE 2044
                     isaac_float3 depth_value = {
                         0.0f,
-                        0.0f,
+                        ao_blend,
                         march_length[e]
                     };                
 
@@ -2123,7 +2125,7 @@ namespace isaac
     /**
      * @brief Calculate SSAO factor
      * 
-     * Requires Color Buffer  (dim 4)
+     * Requires AO Buffer     (dim 1)
      *          Depth Buffer  (dim 1)
      *          Normal Buffer (dim 3)
      * 
@@ -2137,7 +2139,7 @@ namespace isaac
     __global__ void isaacSSAOKernel (
 #endif
             isaac_float * const gAOBuffer,       //ao buffer
-            isaac_float3 * const gDepth,         //depth buffer
+            isaac_float3 * const gDepth,         //depth buffer (will be used as y=blending of particles and volume, z=depth of pixels)
             isaac_float3 * const gNormal,        //normal buffer
             const isaac_size2 framebuffer_size,  //size of framebuffer
             const isaac_uint2 framebuffer_start, //framebuffer offset
@@ -2267,6 +2269,7 @@ namespace isaac
             //closer to the camera
             isaac_float occlusion = 0.0f;
             isaac_float ref_depth = gDepth[pixel.x + pixel.y * framebuffer_size.x].z;
+            int pixel_counter = 0;
             for(int i = -3; i <= 3; i++) {
                 for(int j = -3; j <= 3; j++) {
                     //avoid out of bounds by simple min max
@@ -2277,12 +2280,15 @@ namespace isaac
                     isaac_float depth_sample = gDepth[x + y * framebuffer_size.x].z;
 
                     //only increase the counter if the neighbour depth is closer to the camera
-                    if(depth_sample > ref_depth) {
-                        occlusion += 1.0f;
+                    if(depth_sample != 0.0f) {
+                        if(depth_sample < ref_depth) {
+                            occlusion += 1.0f;
+                        }
+                        pixel_counter++;
                     }
                 }
             }
-            isaac_float depth = (occlusion / 49.0f);
+            isaac_float depth = (occlusion / pixel_counter);
 
             //save the depth value in our ao buffer
             gAOBuffer[pixel.x + pixel.y * framebuffer_size.x] = depth;
@@ -2304,10 +2310,11 @@ namespace isaac
         ALPAKA_FN_ACC void operator() (
             TAcc__ const &acc,
 #else
-    __global__ void isaacSSAOKernel (
+    __global__ void isaacSSAOFilterKernel (
 #endif
             uint32_t * const gColor,             //ptr to output pixels
             isaac_float * const gAOBuffer,       //ambient occlusion values from ssao kernel
+            isaac_float3 * const gDepthBuffer,   //depth and blending values
             const isaac_size2 framebuffer_size,  //size of framebuffer
             const isaac_uint2 framebuffer_start, //framebuffer offset
             ao_struct ao_properties              //properties for ambient occlusion
@@ -2350,10 +2357,12 @@ namespace isaac
 
             //read the weight from the global ao settings and merge them with the color value
             isaac_float weight = ao_properties.weight;
+            isaac_float ao_factor = ((1.0f - weight) + weight * depth);
+            isaac_float particle_blend = gDepthBuffer[pixel.x + pixel.y * framebuffer_size.x].y;
             isaac_float4 final_color = { 
-                ((1.0f - weight) + weight * depth) * color_values.x, 
-                ((1.0f - weight) + weight * depth) * color_values.y, 
-                ((1.0f - weight) + weight * depth) * color_values.z, 
+                particle_blend * ao_factor * color_values.x + (1.0f - particle_blend) * color_values.x,
+                particle_blend * ao_factor * color_values.y + (1.0f - particle_blend) * color_values.y,
+                particle_blend * ao_factor * color_values.z + (1.0f - particle_blend) * color_values.z,
                 1.0f  * color_values.w
             };
         
@@ -2830,7 +2839,8 @@ N - 1
 
     template <
         typename TFramebuffer,
-        typename TFramebufferAO
+        typename TFramebufferAO,
+        typename TFramebufferDepth
 #if ISAAC_ALPAKA == 1
         ,typename TAccDim
         ,typename TAcc
@@ -2845,6 +2855,7 @@ N - 1
 #endif
             TFramebuffer framebuffer,
             TFramebufferAO aobuffer,
+            TFramebufferDepth depthbuffer,
             const isaac_size2& framebuffer_size,
             const isaac_uint2& framebuffer_start,
             IceTInt const * const readback_viewport,
@@ -2884,6 +2895,7 @@ N - 1
                         kernel,
                         alpaka::mem::view::getPtrNative(framebuffer),
                         alpaka::mem::view::getPtrNative(aobuffer),
+                        alpaka::mem::view::getPtrNative(depthbuffer),
                         framebuffer_size,
                         framebuffer_start,
                         ao_properties
@@ -2898,6 +2910,7 @@ N - 1
             (
                 framebuffer,
                 aobuffer,
+                depthbuffer,
                 framebuffer_size,
                 framebuffer_start,
                 ao_properties

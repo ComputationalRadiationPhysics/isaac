@@ -3928,6 +3928,12 @@ namespace isaac
                         TFraDim, 
                         ISAAC_IDX_TYPE
                     >,
+                    alpaka::mem::buf::Buf<
+                        TDevAcc, 
+                        isaac_float3, 
+                        TFraDim, 
+                        ISAAC_IDX_TYPE
+                    >,
                     TAccDim,
                     TAcc,
                     TStream
@@ -3936,6 +3942,7 @@ namespace isaac
                     myself->stream,
                     myself->framebuffer,
                     myself->framebufferAO,
+                    myself->framebufferDepth,
                     myself->framebuffer_size,
                     framebuffer_start,
                     readback_viewport,
@@ -4059,11 +4066,13 @@ namespace isaac
                 IsaacSSAOFilterKernelCaller
                 <
                 uint32_t*,
-                isaac_float*
+                isaac_float*,
+                isaac_float3*
                 >
                 ::call (
                     myself->framebuffer,
                     myself->framebufferAO,
+                    myself->framebufferDepth,
                     myself->framebuffer_size,
                     framebuffer_start,
                     readback_viewport,
