@@ -1534,6 +1534,18 @@ namespace isaac
                     "protocol",
                     json_version_array
                 );
+
+                //send inital ambientOcclusion settings
+                json_object_set_new(
+                    json_root, 
+                    "ao isEnabled", 
+                    json_boolean(ambientOcclusion.isEnabled)
+                );
+                json_object_set_new(
+                    json_root, 
+                    "ao weight", 
+                    json_real(ambientOcclusion.weight)
+                ); 
             }
 
 #if ISAAC_ALPAKA == 1
@@ -2329,6 +2341,7 @@ namespace isaac
             send_clipping = false;
             send_controller = false;
             send_init_json = false;
+            send_ao = false;
 
             //Handle messages
             json_t * message;
@@ -4552,8 +4565,9 @@ namespace isaac
                     json_object_set_new(
                         myself->json_root, 
                         "ao weight", 
-                        json_integer(myself->ambientOcclusion.weight)
-                    );          
+                        json_real(myself->ambientOcclusion.weight)
+                    );       
+                    //add ao params to initial response   
                     json_object_set_new(
                         myself->json_init_root, 
                         "ao isEnabled", 
@@ -4562,9 +4576,8 @@ namespace isaac
                     json_object_set_new(
                         myself->json_init_root, 
                         "ao weight", 
-                        json_integer(myself->ambientOcclusion.weight)
+                        json_real(myself->ambientOcclusion.weight)
                     );
-
                     myself->send_init_json = true;
                 }
                 myself->controller

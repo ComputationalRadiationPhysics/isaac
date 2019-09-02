@@ -1126,17 +1126,17 @@ function updateWireframe() {
 function aoSetValues(response) {
 	
 	if (response.hasOwnProperty("ao isEnabled")) {
-
+		console.log(response["ao weight"]);
 		document.getElementById("ao_checkbox").checked = response["ao isEnabled"];
 		lastIsaacState["ao isEnabled"] = response["ao isEnabled"];
 	}
+	
 	if (response.hasOwnProperty("ao weight")) {
-		let weightEl = document.getElementById("ao_weight");
-
-		document.getElementById("ao_weight").innerHTML = weightEl.value;
+		document.getElementById("ao_weight").value = response["ao weight"];
 		lastIsaacState["ao_weight"] = response["ao weight"];;
 	}
 }
+
 
 /**
  * called when wheight value is set or isEnabled is changed
