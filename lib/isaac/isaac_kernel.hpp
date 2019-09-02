@@ -1985,7 +1985,7 @@ namespace isaac
             isaac_int result[ISAAC_VECTOR_ELEM];
             isaac_float oma[ISAAC_VECTOR_ELEM];
             isaac_float4 color_add[ISAAC_VECTOR_ELEM];
-            isaac_float ao_blend; //indicates how strong particle ao should be when gas is overlapping
+            isaac_float ao_blend = 0.0f; //indicates how strong particle ao should be when gas is overlapping
 
             ISAAC_ELEM_ITERATE ( e )
             {
@@ -2077,11 +2077,13 @@ namespace isaac
                 {
                     //extracting real particle depth and override block march length
                     march_length[e] = particle_color[e].w;
+                    ao_blend = (1 - color[e].w);
 
                     particle_color[e].w = 1;
+                    
                     color[e] =
                         color[e] + particle_color[e] * ( 1 - color[e].w );
-                    ao_blend = (1 - color[e].w);
+                    
                 }
 
 #if ISAAC_SHOWBORDER == 1
@@ -2269,7 +2271,7 @@ namespace isaac
             //closer to the camera
             isaac_float occlusion = 0.0f;
             isaac_float ref_depth = gDepth[pixel.x + pixel.y * framebuffer_size.x].z;
-            int pixel_counter = 0;
+            //int pixel_counter = 0;
             for(int i = -3; i <= 3; i++) {
                 for(int j = -3; j <= 3; j++) {
                     //avoid out of bounds by simple min max
@@ -2279,16 +2281,15 @@ namespace isaac
                     //get the neighbour depth value
                     isaac_float depth_sample = gDepth[x + y * framebuffer_size.x].z;
 
-                    //only increase the counter if the neighbour depth is closer to the camera
-                    if(depth_sample != 0.0f) {
-                        if(depth_sample < ref_depth) {
-                            occlusion += 1.0f;
-                        }
-                        pixel_counter++;
+                    // only increase the counter if the neighbour depth is closer to the camera
+                    // use <= because we will discard pixels with a depth/ao value 0.0 (for background pixels and image merging), 
+                    // but planes will have pixels with depth/ao with 0 because of neighbor pixels
+                    if(depth_sample <= ref_depth) {
+                        occlusion += 1.0f;
                     }
                 }
             }
-            isaac_float depth = (occlusion / pixel_counter);
+            isaac_float depth = (occlusion / 49.0f);
 
             //save the depth value in our ao buffer
             gAOBuffer[pixel.x + pixel.y * framebuffer_size.x] = depth;
@@ -2357,8 +2358,9 @@ namespace isaac
 
             //read the weight from the global ao settings and merge them with the color value
             isaac_float weight = ao_properties.weight;
-            isaac_float ao_factor = ((1.0f - weight) + weight * depth);
+            isaac_float ao_factor = ((1.0f - weight) + weight * (1.0f - depth));
             isaac_float particle_blend = gDepthBuffer[pixel.x + pixel.y * framebuffer_size.x].y;
+            
             isaac_float4 final_color = { 
                 particle_blend * ao_factor * color_values.x + (1.0f - particle_blend) * color_values.x,
                 particle_blend * ao_factor * color_values.y + (1.0f - particle_blend) * color_values.y,
@@ -2369,7 +2371,7 @@ namespace isaac
             //if the depth value is 0 the ssao kernel found a background value and the color
             //merging is therefore removed
             if(depth == 0.0f) { 
-                final_color = { 0, 0, 0, 0 };
+                final_color = { 0, 0, 0, 1.0 };
             }
 
             //finally replace the old color value with the new ssao filtered color value
