@@ -2177,6 +2177,7 @@ namespace isaac
             * Possible errors could be mv or proj matrix
             */
 
+            //search radius for depth testing
             isaac_int radius = 10;
 
             /*
@@ -2271,7 +2272,6 @@ namespace isaac
             //closer to the camera
             isaac_float occlusion = 0.0f;
             isaac_float ref_depth = gDepth[pixel.x + pixel.y * framebuffer_size.x].z;
-            //int pixel_counter = 0;
             for(int i = -3; i <= 3; i++) {
                 for(int j = -3; j <= 3; j++) {
                     //avoid out of bounds by simple min max
