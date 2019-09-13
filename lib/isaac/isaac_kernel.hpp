@@ -67,14 +67,43 @@ namespace isaac
         isaac_int
     );
 
+    //inverse mvp matrix
     ISAAC_CONSTANT isaac_float
     isaac_inverse_d[16];
+
+    //modelview matrix
+    ISAAC_CONSTANT 
+    isaac_float isaac_modelview_d[16];
+
+    //projection matrix
+    ISAAC_CONSTANT 
+    isaac_float isaac_projection_d[16];
+
+    //simulation size properties
     ISAAC_CONSTANT isaac_size_struct< 3 >
     isaac_size_d[1]; //[1] to access it for cuda and alpaka the same way
+
     ISAAC_CONSTANT isaac_float4
     isaac_parameter_d[ ISAAC_MAX_SOURCES*ISAAC_MAX_FUNCTORS ];
+
     ISAAC_CONSTANT isaac_functor_chain_pointer_N
     isaac_function_chain_d[ ISAAC_MAX_SOURCES ];
+
+
+    /* 
+     * SSAO
+     * Kernels for ssao calculation
+     */
+
+    //filter kernel
+    ISAAC_CONSTANT 
+    isaac_float3 ssao_kernel_d[64];
+
+    //vector rotation noise kernel
+    ISAAC_CONSTANT 
+    isaac_float3 ssao_noise_d[16];
+
+
 
     template<
         typename T
@@ -1126,6 +1155,8 @@ namespace isaac
             __global__ void isaacRenderKernel(
 #endif
             uint32_t * const pixels,                //ptr to output pixels
+            isaac_float3 * const gDepth,            //depth buffer
+            isaac_float3 * const gNormal,           //normal buffer
             const isaac_size2 framebuffer_size,     //size of framebuffer
             const isaac_uint2 framebuffer_start,    //framebuffer offset
             const TParticleList particle_sources,   //source simulation particles
@@ -1137,6 +1168,7 @@ namespace isaac
             const TPointerArray pointerArray,
             const TScale scale,                     //isaac set scaling
             const clipping_struct input_clipping,   //clipping planes
+            const ao_struct ambientOcclusion        //ambient occlusion params
         )
 #if ISAAC_ALPAKA == 1
         const
@@ -1178,6 +1210,10 @@ namespace isaac
             bool at_least_one[ISAAC_VECTOR_ELEM];
             isaac_float4 color[ISAAC_VECTOR_ELEM];
 
+            //gNormalBuffer default value
+            isaac_float3 default_normal = {0.0, 0.0, 0.0};
+            isaac_float3 default_depth = {1.0, 1.0, 1.0};
+
             //set background color
             ISAAC_ELEM_ITERATE ( e )
             {
@@ -1193,9 +1229,12 @@ namespace isaac
                     if( !finish[e] ) {
                         //if no source is found set all values to their defaults
                         //color = background, ...
-                        ISAAC_SET_COLOR ( pixels[pixel[e].x
-                                                + pixel[e].y * framebuffer_size.x],
-                            color[e] )
+                        ISAAC_SET_COLOR ( 
+                            pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], 
+                            color[e] 
+                        )
+                        gNormal[pixel[e].x + pixel[e].y * framebuffer_size.x] = default_normal;
+                        gDepth[pixel[e].x + pixel[e].y * framebuffer_size.x] = default_depth;
                     }
                     finish[e] = true;
                 }
@@ -1217,11 +1256,15 @@ namespace isaac
             isaac_float3 count_start[ISAAC_VECTOR_ELEM];    //start index for ray
             isaac_float3 local_size_f[ISAAC_VECTOR_ELEM];   //subvolume size as float
             isaac_float3 count_end[ISAAC_VECTOR_ELEM];      //end index for ray
+            isaac_float3 start_normal[ISAAC_VECTOR_ELEM];
+            bool global_front[ISAAC_VECTOR_ELEM];
 
             ISAAC_ELEM_ITERATE ( e )
             {
-                //get normalized pixel position in framebuffer
+                
                 global_front[e] = false;
+
+                //get normalized pixel position in framebuffer
                 pixel_f[e].x = isaac_float( pixel[e].x )
                                / ( isaac_float ) framebuffer_size.x
                                * isaac_float( 2 ) - isaac_float( 1 );
@@ -1518,11 +1561,17 @@ namespace isaac
                 );
                 if( count_start[e].x > count_end[e].x )
                 {
-                    if( !finish[e] )
-                    ISAAC_SET_COLOR ( pixels[pixel[e].x
-                                             + pixel[e].y * framebuffer_size.x],
-                        color[e] )
-                    finish[e] = true;
+                    if ( !finish[e] ) {
+                        //TODO understand the superplanes stuff...
+                        ISAAC_SET_COLOR ( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], color[e] )
+
+                        //this function aborts drawing and therfore wont set any normal or depth values
+                        //defaults will be applied for clean images
+                        gNormal[pixel[e].x + pixel[e].y * framebuffer_size.x] = default_normal;
+                        gDepth[pixel[e].x + pixel[e].y * framebuffer_size.x] = default_depth;
+
+                        finish[e] = true;
+                    }
                 }
             }
             ISAAC_ELEM_ALL_TRUE_RETURN ( finish )
@@ -1936,6 +1985,7 @@ namespace isaac
             isaac_int result[ISAAC_VECTOR_ELEM];
             isaac_float oma[ISAAC_VECTOR_ELEM];
             isaac_float4 color_add[ISAAC_VECTOR_ELEM];
+            isaac_float ao_blend = 0.0f; //indicates how strong particle ao should be when gas is overlapping
 
             ISAAC_ELEM_ITERATE ( e )
             {
@@ -2025,9 +2075,15 @@ namespace isaac
                 }
                 if( result_particle[e] && !result[e] )
                 {
+                    //extracting real particle depth and override block march length
+                    march_length[e] = particle_color[e].w;
+                    ao_blend = (1 - color[e].w);
+
                     particle_color[e].w = 1;
+                    
                     color[e] =
                         color[e] + particle_color[e] * ( 1 - color[e].w );
+                    
                 }
 
 #if ISAAC_SHOWBORDER == 1
@@ -2044,18 +2100,288 @@ namespace isaac
 
                 if( !finish[e] )
                 {
-                    ISAAC_SET_COLOR ( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x],
-                        color[e] )
-                }
+                    ISAAC_SET_COLOR ( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], color[e] )
+                    //save the particle normal in the normal g buffer
+                    gNormal[pixel[e].x + pixel[e].y * framebuffer_size.x] = particle_normal[e];
+                    
+                    //save the cell depth in our g buffer (depth)
+                    //march_length takes the old particle_color w component 
+                    //the w component stores the particle depth and will be replaced later by new alpha values and 
+                    //is therefore stored in march_length
+                    //LINE 2044
+                    isaac_float3 depth_value = {
+                        0.0f,
+                        ao_blend,
+                        march_length[e]
+                    };                
 
+                    gDepth[pixel[e].x + pixel[e].y * framebuffer_size.x] = depth_value;
+                    
+                }
             }
         }
-
-
 #if ISAAC_ALPAKA == 1
     };
-
 #endif
+
+    /**
+     * @brief Calculate SSAO factor
+     * 
+     * Requires AO Buffer     (dim 1)
+     *          Depth Buffer  (dim 1)
+     *          Normal Buffer (dim 3)
+     * 
+     */
+#if ISAAC_ALPAKA == 1
+    struct isaacSSAOKernel {
+        template <typename TAcc__>
+        ALPAKA_FN_ACC void operator() (
+            TAcc__ const &acc,
+#else
+    __global__ void isaacSSAOKernel (
+#endif
+            isaac_float * const gAOBuffer,       //ao buffer
+            isaac_float3 * const gDepth,         //depth buffer (will be used as y=blending of particles and volume, z=depth of pixels)
+            isaac_float3 * const gNormal,        //normal buffer
+            const isaac_size2 framebuffer_size,  //size of framebuffer
+            const isaac_uint2 framebuffer_start, //framebuffer offset
+            ao_struct ao_properties              //properties for ambient occlusion
+            )
+#if ISAAC_ALPAKA == 1
+        const
+#endif
+        {
+
+            isaac_uint2 pixel;
+            //get pixel values from thread ids
+#if ISAAC_ALPAKA == 1
+                    auto alpThreadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
+                    pixel.x = isaac_uint ( alpThreadIdx[2] );
+                    pixel.y = isaac_uint ( alpThreadIdx[1] );
+#else
+                    pixel.x = isaac_uint ( threadIdx.x + blockIdx.x * blockDim.x );
+                    pixel.y = isaac_uint ( threadIdx.y + blockIdx.y * blockDim.y );
+#endif
+
+            pixel = pixel + framebuffer_start;    
+
+            
+
+
+            /*
+            * TODO
+            * 
+            * Old standart ssao by crytech 
+            * 
+            * First implemntation failed and the source code is below
+            * Possible errors could be mv or proj matrix
+            */
+
+            //search radius for depth testing
+            isaac_int radius = 10;
+
+            /*
+            //isaac_float3 origin = gDepth[pixel.x + pixel.y * framebuffer_size.x];
+
+            
+
+            //get the normal value from the gbuffer
+            isaac_float3 normal = gNormal[pixel.x + pixel.y * framebuffer_size.x];
+
+            //normalize the normal
+            isaac_float len = sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+            if(len == 0) {
+                gAOBuffer[pixel.x + pixel.y * framebuffer_size.x] = 0.0f;
+                return;
+            }
+
+            normal = normal / len;
+            
+            
+
+            isaac_float3 rvec = {0.7f, 0.1f, 0.3f};
+            isaac_float3 tangent = rvec - normal * (rvec.x * normal.x + rvec.y * normal.y + rvec.z * normal.z);
+            len = sqrt(tangent.x * tangent.x + tangent.y * tangent.y + tangent.z * tangent.z);
+            tangent = tangent / len;
+            isaac_float3 bitangent = {
+                normal.y * tangent.z - normal.z * tangent.y,
+                normal.z * tangent.x - normal.x * tangent.z,
+                normal.x * tangent.y - normal.y * tangent.y
+            };
+
+            isaac_float tbn[9];
+            tbn[0] = tangent.x;
+            tbn[1] = tangent.y;
+            tbn[2] = tangent.z;
+
+            tbn[3] = bitangent.x;
+            tbn[4] = bitangent.y;
+            tbn[5] = bitangent.z;
+
+            tbn[6] = normal.x;
+            tbn[7] = normal.y;
+            tbn[8] = normal.z;
+
+            isaac_float occlusion = 0.0f;
+            for(int i = 0; i < 1; i++) {
+                //sample = tbn * sample_kernel
+                isaac_float3 sample = {
+                    tbn[0] * ssao_kernel_d[i].x + tbn[3] * ssao_kernel_d[i].y + tbn[6] * ssao_kernel_d[i].z,
+                    tbn[1] * ssao_kernel_d[i].x + tbn[4] * ssao_kernel_d[i].y + tbn[7] * ssao_kernel_d[i].z,
+                    tbn[2] * ssao_kernel_d[i].x + tbn[5] * ssao_kernel_d[i].y + tbn[8] * ssao_kernel_d[i].z,
+                };
+
+                sample = sample * radius + origin;
+
+                isaac_float4 offset = {
+                    sample.x,
+                    sample.y,
+                    sample.z,
+                    1.0
+                };
+
+                //offset = projection * offset
+                offset = isaac_float4({
+                    isaac_projection_d[0] * offset.x + isaac_projection_d[4] * offset.y + isaac_projection_d[8 ] * offset.z + isaac_projection_d[12] * offset.w,
+                    isaac_projection_d[1] * offset.x + isaac_projection_d[5] * offset.y + isaac_projection_d[9 ] * offset.z + isaac_projection_d[13] * offset.w,
+                    isaac_projection_d[2] * offset.x + isaac_projection_d[6] * offset.y + isaac_projection_d[10] * offset.z + isaac_projection_d[14] * offset.w,
+                    isaac_projection_d[3] * offset.x + isaac_projection_d[7] * offset.y + isaac_projection_d[11] * offset.z + isaac_projection_d[15] * offset.w
+                });
+
+                isaac_float2 offset2d = isaac_float2({offset.x / offset.w, offset.y / offset.w});
+                offset2d.x = MAX(MIN(offset2d.x * 0.5 + 0.5, 1.0f), 0.0f);
+                offset2d.y = MAX(MIN(offset2d.y * 0.5 + 0.5, 1.0f), 0.0f);
+
+                isaac_uint2 offsetFramePos = {
+                    isaac_uint(framebuffer_size.x * offset2d.x) + framebuffer_start.x,
+                    isaac_uint(framebuffer_size.y * offset2d.y) + framebuffer_start.y,
+                };
+                //printf("%f %f -- %u %u\n", offset2d.x, offset2d.y, offsetFramePos.x, offsetFramePos.y);
+                isaac_float sampleDepth = gDepth[offsetFramePos.x + offsetFramePos.y * framebuffer_size.x].z; 
+                occlusion += (sampleDepth - sample.z ? 1.0f : 0.0f);
+            }*/
+            
+
+            /* 
+            * 1. compare all neighbour (+-2 pixel) depth values with the current one and increase the counter if the neighbour is
+            *    closer to the camera
+            * 
+            * 2. get average value by dividing the counter by the cell count (7x7=49)       * 
+            *
+            */
+            //closer to the camera
+            isaac_float occlusion = 0.0f;
+            isaac_float ref_depth = gDepth[pixel.x + pixel.y * framebuffer_size.x].z;
+            for(int i = -3; i <= 3; i++) {
+                for(int j = -3; j <= 3; j++) {
+                    //avoid out of bounds by simple min max
+                    isaac_int x = MAX(MIN(pixel.x + i * radius, framebuffer_start.x + framebuffer_size.x), framebuffer_start.x);
+                    isaac_int y = MAX(MIN(pixel.y + j * radius, framebuffer_start.y + framebuffer_size.y), framebuffer_start.y);
+
+                    //get the neighbour depth value
+                    isaac_float depth_sample = gDepth[x + y * framebuffer_size.x].z;
+
+                    // only increase the counter if the neighbour depth is closer to the camera
+                    // use <= because we will discard pixels with a depth/ao value 0.0 (for background pixels and image merging), 
+                    // but planes will have pixels with depth/ao with 0 because of neighbor pixels
+                    if(depth_sample <= ref_depth) {
+                        occlusion += 1.0f;
+                    }
+                }
+            }
+            isaac_float depth = (occlusion / 49.0f);
+
+            //save the depth value in our ao buffer
+            gAOBuffer[pixel.x + pixel.y * framebuffer_size.x] = depth;
+        }
+#if ISAAC_ALPAKA == 1
+    };
+#endif
+
+    /**
+     * @brief Filter SSAO artifacts and return the color with depth simulation
+     * 
+     * Requires Color Buffer      (dim 4)
+     * Requires AO Values Buffer  (dim 1)
+     * 
+     */
+#if ISAAC_ALPAKA == 1
+    struct isaacSSAOFilterKernel {
+        template <typename TAcc__>
+        ALPAKA_FN_ACC void operator() (
+            TAcc__ const &acc,
+#else
+    __global__ void isaacSSAOFilterKernel (
+#endif
+            uint32_t * const gColor,             //ptr to output pixels
+            isaac_float * const gAOBuffer,       //ambient occlusion values from ssao kernel
+            isaac_float3 * const gDepthBuffer,   //depth and blending values
+            const isaac_size2 framebuffer_size,  //size of framebuffer
+            const isaac_uint2 framebuffer_start, //framebuffer offset
+            ao_struct ao_properties              //properties for ambient occlusion
+            )
+#if ISAAC_ALPAKA == 1
+        const
+#endif
+        {
+
+            isaac_uint2 pixel;
+            //get pixel values from thread ids
+#if ISAAC_ALPAKA == 1
+                    auto alpThreadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
+                    pixel.x = isaac_uint ( alpThreadIdx[2] );
+                    pixel.y = isaac_uint ( alpThreadIdx[1] );
+#else
+                    pixel.x = isaac_uint ( threadIdx.x + blockIdx.x * blockDim.x );
+                    pixel.y = isaac_uint ( threadIdx.y + blockIdx.y * blockDim.y );
+#endif
+
+            //get real pixel coordinate by offset
+            pixel = pixel + framebuffer_start;
+
+            /* TODO
+            * Normally the depth values are smoothed
+            * in this case the smooting filter is not applied for simplicity
+            * 
+            * If the real ssao algorithm is implemented, a real filter will be necessary
+            */
+            isaac_float depth = gAOBuffer[pixel.x + pixel.y * framebuffer_size.x];
+            
+            //convert uint32 back to 4x 1 Byte color values
+            uint32_t color = gColor[pixel.x + pixel.y * framebuffer_size.x];
+            isaac_float4 color_values = {
+                ((color >>  0) & 0xff) / 255.0f,
+                ((color >>  8) & 0xff) / 255.0f,
+                ((color >> 16) & 0xff) / 255.0f,
+                ((color >> 24) & 0xff) / 255.0f
+            };        
+
+            //read the weight from the global ao settings and merge them with the color value
+            isaac_float weight = ao_properties.weight;
+            isaac_float ao_factor = ((1.0f - weight) + weight * (1.0f - depth));
+            isaac_float particle_blend = gDepthBuffer[pixel.x + pixel.y * framebuffer_size.x].y;
+            
+            isaac_float4 final_color = { 
+                particle_blend * ao_factor * color_values.x + (1.0f - particle_blend) * color_values.x,
+                particle_blend * ao_factor * color_values.y + (1.0f - particle_blend) * color_values.y,
+                particle_blend * ao_factor * color_values.z + (1.0f - particle_blend) * color_values.z,
+                1.0f  * color_values.w
+            };
+        
+            //if the depth value is 0 the ssao kernel found a background value and the color
+            //merging is therefore removed
+            if(depth == 0.0f) { 
+                final_color = { 0, 0, 0, 1.0 };
+            }
+
+            //finally replace the old color value with the new ssao filtered color value
+            ISAAC_SET_COLOR(gColor[pixel.x + pixel.y * framebuffer_size.x], final_color);
+            
+        }
+#if ISAAC_ALPAKA == 1
+    };
+#endif
+
 
     template<
         typename TSimDim,
@@ -2065,7 +2391,10 @@ namespace isaac
         typename TSourceWeight,
         typename TPointerArray,
         typename TFilter,
-        typename TFramebuffer, ISAAC_IDX_TYPE TTransfer_size,
+        typename TFramebuffer, 
+        typename TFramebufferDepth,
+        typename TFramebufferNormal,
+        ISAAC_IDX_TYPE TTransfer_size,
         typename TScale,
 #if ISAAC_ALPAKA == 1
         typename TAccDim,
@@ -2082,6 +2411,8 @@ namespace isaac
             TStream stream,
 #endif
             TFramebuffer framebuffer,
+            TFramebufferDepth depthBuffer,
+            TFramebufferNormal normalBuffer,
             const isaac_size2 & framebuffer_size,
             const isaac_uint2 & framebuffer_start,
             const TParticleList & particle_sources,
@@ -2095,7 +2426,8 @@ namespace isaac
             const isaac_int interpolation,
             const isaac_int iso_surface,
             const TScale & scale,
-            const clipping_struct & clipping
+            const clipping_struct & clipping,
+            const ao_struct & ambientOcclusion
         )
         {
             if( sourceWeight.value[mpl::size< TSourceList >::type::value
@@ -2114,6 +2446,8 @@ namespace isaac
                         mpl::false_
                     >::type,
                     TFramebuffer,
+                    TFramebufferDepth,
+                    TFramebufferNormal,
                     TTransfer_size,
                     TScale,
 #if ISAAC_ALPAKA == 1
@@ -2128,6 +2462,8 @@ N - 1
                     stream,
 #endif
                     framebuffer,
+                    depthBuffer,
+                    normalBuffer,
                     framebuffer_size,
                     framebuffer_start,
                     particle_sources,
@@ -2141,7 +2477,8 @@ N - 1
                     interpolation,
                     iso_surface,
                     scale,
-                    clipping
+                    clipping,
+                    ambientOcclusion
                 );
             }
             else
@@ -2158,6 +2495,8 @@ N - 1
                         mpl::true_
                     >::type,
                     TFramebuffer,
+                    TFramebufferDepth,
+                    TFramebufferNormal,
                     TTransfer_size,
                     TScale,
 #if ISAAC_ALPAKA == 1
@@ -2172,6 +2511,8 @@ N - 1
                     stream,
 #endif
                     framebuffer,
+                    depthBuffer,
+                    normalBuffer,
                     framebuffer_size,
                     framebuffer_start,
                     particle_sources,
@@ -2185,7 +2526,8 @@ N - 1
                     interpolation,
                     iso_surface,
                     scale,
-                    clipping
+                    clipping,
+                    ambientOcclusion
                 );
             }
         }
@@ -2199,7 +2541,10 @@ N - 1
         typename TSourceWeight,
         typename TPointerArray,
         typename TFilter,
-        typename TFramebuffer, ISAAC_IDX_TYPE TTransfer_size,
+        typename TFramebuffer, 
+        typename TFramebufferDepth,
+        typename TFramebufferNormal,
+        ISAAC_IDX_TYPE TTransfer_size,
         typename TScale
 #if ISAAC_ALPAKA == 1
         ,
@@ -2218,6 +2563,8 @@ N - 1
         TPointerArray,
         TFilter,
         TFramebuffer,
+        TFramebufferDepth,
+        TFramebufferNormal,
         TTransfer_size,
         TScale,
 #if ISAAC_ALPAKA == 1
@@ -2234,6 +2581,8 @@ N - 1
             TStream stream,
 #endif
             TFramebuffer framebuffer,
+            TFramebufferDepth depthBuffer,
+            TFramebufferNormal normalBuffer,
             const isaac_size2 & framebuffer_size,
             const isaac_uint2 & framebuffer_start,
             const TParticleList & particle_sources,
@@ -2247,7 +2596,8 @@ N - 1
             const isaac_int interpolation,
             const isaac_int iso_surface,
             const TScale & scale,
-            const clipping_struct & clipping
+            const clipping_struct & clipping,
+            const ao_struct & ambientOcclusion
         )
         {
             isaac_size2 block_size = {
@@ -2323,6 +2673,8 @@ N - 1
                         workdiv, \
                         kernel, \
                         alpaka::mem::view::getPtrNative(framebuffer), \
+                        alpaka::mem::view::getPtrNative(depthBuffer), \
+                        alpaka::mem::view::getPtrNative(normalBuffer), \
                         framebuffer_size, \
                         framebuffer_start, \
                         particle_sources, \
@@ -2333,7 +2685,8 @@ N - 1
                         sourceWeight, \
                         pointerArray, \
                         scale, \
-                        clipping \
+                        clipping, \
+                        ambientOcclusion \
                     ) \
                 ); \
                 alpaka::queue::enqueue(stream, instance); \
@@ -2363,6 +2716,8 @@ N - 1
                 <<<grid, block>>> \
                 ( \
                     framebuffer, \
+                    depthBuffer, \
+                    normalBuffer, \
                     framebuffer_size, \
                     framebuffer_start, \
                     particle_sources, \
@@ -2373,7 +2728,8 @@ N - 1
                     sourceWeight, \
                     pointerArray, \
                     scale, \
-                    clipping \
+                    clipping, \
+                    ambientOcclusion \
                 );
 
 #endif
@@ -2400,13 +2756,171 @@ N - 1
         }
     };
 
-    template<
-        int N
-    >
-    struct dest_array_struct
-    {
-        isaac_int nr[N];
+    template <
+        typename TAOBuffer,
+        typename TDepthBuffer,
+        typename TNormalBuffer
+#if ISAAC_ALPAKA == 1
+        ,typename TAccDim
+        ,typename TAcc
+        ,typename TStream
+#endif
+        >
+    struct IsaacSSAOKernelCaller {
+        
+        inline static void call (
+#if ISAAC_ALPAKA == 1
+            TStream stream,
+#endif
+            TAOBuffer aoBuffer,
+            TDepthBuffer depthBuffer,
+            TNormalBuffer normalBuffer,
+            const isaac_size2& framebuffer_size,
+            const isaac_uint2& framebuffer_start,
+            IceTInt const * const readback_viewport,
+            ao_struct ao_properties
+        )
+        {
+            isaac_size2 block_size= {
+                ISAAC_IDX_TYPE ( 8 ),
+                ISAAC_IDX_TYPE ( 16 )
+            };
+            isaac_size2 grid_size= {
+                ISAAC_IDX_TYPE ( ( readback_viewport[2]+block_size.x-1 ) /block_size.x + ISAAC_VECTOR_ELEM - 1 ) /ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ),
+                ISAAC_IDX_TYPE ( ( readback_viewport[3]+block_size.y-1 ) /block_size.y )
+            };
+#if ISAAC_ALPAKA == 1
+#if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
+            if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
+#endif
+            {
+                grid_size.x = ISAAC_IDX_TYPE ( readback_viewport[2] + ISAAC_VECTOR_ELEM - 1 ) /ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM );
+                grid_size.y = ISAAC_IDX_TYPE ( readback_viewport[3] );
+                block_size.x = ISAAC_IDX_TYPE ( 1 );
+                block_size.y = ISAAC_IDX_TYPE ( 1 );
+            }
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> threads ( ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ) );
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> blocks ( ISAAC_IDX_TYPE ( 1 ), block_size.y, block_size.x );
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> grid ( ISAAC_IDX_TYPE ( 1 ), grid_size.y, grid_size.x );
+            auto const workdiv ( alpaka::workdiv::WorkDivMembers<TAccDim, ISAAC_IDX_TYPE> ( grid,blocks,threads ) );
+
+            {
+                isaacSSAOKernel kernel;
+                auto const instance
+                (
+                    alpaka::kernel::createTaskKernel<TAcc>
+                    (
+                        workdiv,
+                        kernel,
+                        alpaka::mem::view::getPtrNative(aoBuffer),
+                        alpaka::mem::view::getPtrNative(depthBuffer),
+                        alpaka::mem::view::getPtrNative(normalBuffer),
+                        framebuffer_size,
+                        framebuffer_start,
+                        ao_properties
+                    )
+                );
+                alpaka::queue::enqueue(stream, instance);
+            }
+#else
+            dim3 block ( block_size.x, block_size.y );
+            dim3 grid ( grid_size.x, grid_size.y );
+            isaacSSAOKernel<<<grid, block>>>
+            (
+                aoBuffer,
+                depthBuffer,
+                normalBuffer,
+                framebuffer_size,
+                framebuffer_start,
+                ao_properties
+            );
+#endif
+        }
     };
+
+
+    template <
+        typename TFramebuffer,
+        typename TFramebufferAO,
+        typename TFramebufferDepth
+#if ISAAC_ALPAKA == 1
+        ,typename TAccDim
+        ,typename TAcc
+        ,typename TStream
+#endif
+        >
+    struct IsaacSSAOFilterKernelCaller {
+        
+        inline static void call (
+#if ISAAC_ALPAKA == 1
+            TStream stream,
+#endif
+            TFramebuffer framebuffer,
+            TFramebufferAO aobuffer,
+            TFramebufferDepth depthbuffer,
+            const isaac_size2& framebuffer_size,
+            const isaac_uint2& framebuffer_start,
+            IceTInt const * const readback_viewport,
+            ao_struct ao_properties
+        )
+        {
+            isaac_size2 block_size= {
+                ISAAC_IDX_TYPE ( 8 ),
+                ISAAC_IDX_TYPE ( 16 )
+            };
+            isaac_size2 grid_size= {
+                ISAAC_IDX_TYPE ( ( readback_viewport[2]+block_size.x-1 ) /block_size.x + ISAAC_VECTOR_ELEM - 1 ) /ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ),
+                ISAAC_IDX_TYPE ( ( readback_viewport[3]+block_size.y-1 ) /block_size.y )
+            };
+#if ISAAC_ALPAKA == 1
+#if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
+            if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
+#endif
+            {
+                grid_size.x = ISAAC_IDX_TYPE ( readback_viewport[2] + ISAAC_VECTOR_ELEM - 1 ) /ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM );
+                grid_size.y = ISAAC_IDX_TYPE ( readback_viewport[3] );
+                block_size.x = ISAAC_IDX_TYPE ( 1 );
+                block_size.y = ISAAC_IDX_TYPE ( 1 );
+            }
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> threads ( ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ) );
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> blocks ( ISAAC_IDX_TYPE ( 1 ), block_size.y, block_size.x );
+            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> grid ( ISAAC_IDX_TYPE ( 1 ), grid_size.y, grid_size.x );
+            auto const workdiv ( alpaka::workdiv::WorkDivMembers<TAccDim, ISAAC_IDX_TYPE> ( grid,blocks,threads ) );
+
+            {
+                isaacSSAOFilterKernel kernel;
+                auto const instance
+                (
+                    alpaka::kernel::createTaskKernel<TAcc>
+                    (
+                        workdiv,
+                        kernel,
+                        alpaka::mem::view::getPtrNative(framebuffer),
+                        alpaka::mem::view::getPtrNative(aobuffer),
+                        alpaka::mem::view::getPtrNative(depthbuffer),
+                        framebuffer_size,
+                        framebuffer_start,
+                        ao_properties
+                    )
+                );
+                alpaka::queue::enqueue(stream, instance);
+            }
+#else
+            dim3 block ( block_size.x, block_size.y );
+            dim3 grid ( grid_size.x, grid_size.y );
+            isaacSSAOFilterKernel<<<grid, block>>>
+            (
+                framebuffer,
+                aobuffer,
+                depthbuffer,
+                framebuffer_size,
+                framebuffer_start,
+                ao_properties
+            );
+#endif
+        }
+    };
+
 
 
     template<
@@ -2563,6 +3077,15 @@ N - 1
     };
 
 #endif
+
+
+    template<
+        int N
+    >
+    struct dest_array_struct
+    {
+        isaac_int nr[N];
+    };
 
 
     template<

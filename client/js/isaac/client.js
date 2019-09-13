@@ -118,7 +118,7 @@ class IsaacClient {
             this.onError(e);
         }).bind(this);
 
-        this.socket.onerror = (function(e) {
+        this.socket.onclose = (function(e) {
             this.onClose(e);
         }).bind(this);
     }
@@ -193,12 +193,14 @@ class IsaacClient {
     onError(e) {
         if(this.onErrorCallback) {
             this.onErrorCallback(e);
+            console.log("Error");
         }
     }
 
     onClose(e) {
         if(this.onCloseCallback) {
             this.onCloseCallback(e);
+            console.log("Closed");
         }
     }
 

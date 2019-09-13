@@ -905,6 +905,33 @@ namespace isaac
                 framebuffer_prod
             )
         ),
+        framebufferAO(
+            alpaka::mem::buf::alloc<
+                isaac_float,
+                ISAAC_IDX_TYPE
+            >(
+                acc,
+                framebuffer_prod
+            )
+        ),
+        framebufferDepth(
+            alpaka::mem::buf::alloc<
+                isaac_float3,
+                ISAAC_IDX_TYPE
+            >(
+                acc,
+                framebuffer_prod
+            )
+        ),
+        framebufferNormal(
+            alpaka::mem::buf::alloc<
+                isaac_float3,
+                ISAAC_IDX_TYPE
+            >(
+                acc,
+                framebuffer_prod
+            )
+        ),
         functor_chain_d(
             alpaka::mem::buf::alloc<
                 isaac_functor_chain_pointer_N,
@@ -949,6 +976,18 @@ namespace isaac
             ISAAC_CUDA_CHECK ( cudaMalloc(
                 ( uint32_t * * ) & framebuffer,
                 sizeof( uint32_t ) * framebuffer_prod
+            ) );
+            ISAAC_CUDA_CHECK ( cudaMalloc(
+                ( isaac_float * * ) & framebufferAO,
+                sizeof( isaac_float ) * framebuffer_prod
+            ) );
+            ISAAC_CUDA_CHECK ( cudaMalloc(
+                ( isaac_float3 * * ) & framebufferDepth,
+                sizeof( isaac_float3 ) * framebuffer_prod
+            ) );
+            ISAAC_CUDA_CHECK ( cudaMalloc(
+                ( isaac_float3 * * ) & framebufferNormal,
+                sizeof( isaac_float3 ) * framebuffer_prod
             ) );
             ISAAC_CUDA_CHECK ( cudaMalloc(
                 ( isaac_functor_chain_pointer_N ** ) &functor_chain_d,
@@ -1495,7 +1534,136 @@ namespace isaac
                     "protocol",
                     json_version_array
                 );
+
+                //send inital ambientOcclusion settings
+                json_object_set_new(
+                    json_root, 
+                    "ao isEnabled", 
+                    json_boolean(ambientOcclusion.isEnabled)
+                );
+                json_object_set_new(
+                    json_root, 
+                    "ao weight", 
+                    json_real(ambientOcclusion.weight)
+                ); 
             }
+
+#if ISAAC_ALPAKA == 1
+            //allocate ssao kernel (16x16 matrix)
+            alpaka::mem::buf::Buf<
+                THost, 
+                isaac_float3, 
+                TFraDim, 
+                ISAAC_IDX_TYPE
+            > ssao_kernel_h_buf (
+                alpaka::mem::buf::alloc<
+                    isaac_float3, 
+                    ISAAC_IDX_TYPE
+                > (
+                    host, 
+                    ISAAC_IDX_TYPE(64)
+                )
+            );
+            isaac_float3* ssao_kernel_h = reinterpret_cast<isaac_float3*> ( alpaka::mem::view::getPtrNative ( ssao_kernel_h_buf ) );
+
+            //allocate ssao noise kernel (4x4 matrix)
+            alpaka::mem::buf::Buf<
+                THost, 
+                isaac_float3, 
+                TFraDim, 
+                ISAAC_IDX_TYPE
+            > ssao_noise_h_buf (
+                alpaka::mem::buf::alloc<
+                    isaac_float3, 
+                    ISAAC_IDX_TYPE
+                > (
+                    host, 
+                    ISAAC_IDX_TYPE(16)
+                )
+            );
+            isaac_float3* ssao_noise_h = reinterpret_cast<isaac_float3*> ( alpaka::mem::view::getPtrNative ( ssao_noise_h_buf ) );
+    
+#else
+
+            isaac_float3 ssao_kernel_h[64];
+            isaac_float3 ssao_noise_h[16];
+    
+#endif
+            
+            std::uniform_real_distribution<float> randomFloats(0.0, 1.0);
+            std::default_random_engine generator;
+
+            //set ssao_kernel values
+            for (unsigned int i = 0; i < 64; i++ ) {
+                isaac_float3 sample({
+                    randomFloats(generator) * 2.0f - 1.0f,
+                    randomFloats(generator) * 2.0f - 1.0f,
+                    randomFloats(generator)
+                });
+                isaac_float sample_length = sqrt(sample.x * sample.x + sample.y * sample.y + sample.z * sample.z);
+                sample = sample / sample_length;
+                sample = sample * randomFloats(generator);
+                isaac_float scale = (isaac_float)i / 64.0;
+                //lerp
+                scale = 0.1f + (scale * scale) * (1.0f - 0.1f);
+                ssao_kernel_h[i] = sample;
+            }
+
+            //set ssao_noise values
+            for(unsigned int i = 0; i < 16; i++) {
+                isaac_float3 noise({
+                    randomFloats(generator) * 2.0f - 1.0f,
+                    randomFloats(generator) * 2.0f - 1.0f,
+                    0.0f
+                });
+                ssao_noise_h[i] = noise;
+            }
+
+            //move ssao kernel to device
+#if ISAAC_ALPAKA == 1
+            //copy ssao kernel to constant memory
+            alpaka::vec::Vec<alpaka::dim::DimInt<1u>, ISAAC_IDX_TYPE> const 
+                ssao_kernel_d_extent(ISAAC_IDX_TYPE(64));
+
+            auto ssao_kernel_d_view (
+                alpaka::mem::view::createStaticDevMemView(
+                    &ssao_kernel_d[0u], 
+                    acc, 
+                    ssao_kernel_d_extent
+                )
+            );
+            alpaka::mem::view::copy(
+                stream, 
+                ssao_kernel_d_view, 
+                ssao_kernel_h_buf, 
+                ISAAC_IDX_TYPE(64)
+            );
+
+            //copy ssao noise kernel to constant memory
+            alpaka::vec::Vec<alpaka::dim::DimInt<1u>, ISAAC_IDX_TYPE> const 
+                ssao_noise_d_extent(ISAAC_IDX_TYPE(16));
+
+            auto ssao_noise_d_view ( 
+                alpaka::mem::view::createStaticDevMemView(
+                    &ssao_noise_d[0u], 
+                    acc, 
+                    ssao_noise_d_extent
+                )
+            );
+            alpaka::mem::view::copy ( 
+                stream, 
+                ssao_noise_d_view, 
+                ssao_noise_h_buf, 
+                ISAAC_IDX_TYPE(16)
+            );
+    
+#else
+
+            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol ( ssao_kernel_d, ssao_kernel_h, 64 * sizeof ( isaac_float3 ) ) );
+            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol ( ssao_noise_d, ssao_noise_h, 16 * sizeof ( isaac_float3 ) ) );
+
+#endif
+
         }
 
 
@@ -2173,6 +2341,7 @@ namespace isaac
             send_clipping = false;
             send_controller = false;
             send_init_json = false;
+            send_ao = false;
 
             //Handle messages
             json_t * message;
@@ -2292,6 +2461,9 @@ namespace isaac
                         ) == 0 )
                         {
                             send_init_json = true;
+                        }
+                        if(strcmp(target, "ao") == 0) {
+                            send_ao = true;
                         }
                     }
                     //Search for scene changes
@@ -2960,6 +3132,17 @@ namespace isaac
                 );
             }
 
+            if ( js = json_object_get ( message, "ao" ) ) {
+                redraw = true;
+                json_t * isEnabled = json_object_get(js, "isEnabled");
+                json_t * weight = json_object_get(js, "weight");
+                
+                myself->ambientOcclusion.isEnabled = json_boolean_value ( isEnabled );
+                myself->ambientOcclusion.weight = (isaac_float)json_number_value ( weight );
+
+                send_ao = true;
+            }
+
             json_t * metadata = json_object_get(
                 message,
                 "metadata"
@@ -3311,7 +3494,10 @@ namespace isaac
             IceTImage result
         )
         {
+            //allocate memory for inverse mvp, mv and p matrix and simulation size properties
 #if ISAAC_ALPAKA == 1
+
+            //inverse mvp
             alpaka::mem::buf::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
                 inverse_h_buf(
                 alpaka::mem::buf::alloc<
@@ -3322,19 +3508,57 @@ namespace isaac
                     ISAAC_IDX_TYPE( 16 )
                 )
             );
+            isaac_float * inverse_h =
+                reinterpret_cast<float *> ( alpaka::mem::view::getPtrNative( inverse_h_buf ) );
+
+
+            //model-view matrix
+            alpaka::mem::buf::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
+                modelview_h_buf(
+                alpaka::mem::buf::alloc<
+                    isaac_float,
+                    ISAAC_IDX_TYPE
+                >(
+                    myself->host,
+                    ISAAC_IDX_TYPE( 16 )
+                )
+            );
+            isaac_float * modelview_h =
+                reinterpret_cast<float *> ( alpaka::mem::view::getPtrNative( modelview_h_buf ) );
+
+
+            //projection matrix
+            alpaka::mem::buf::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
+                projection_h_buf(
+                alpaka::mem::buf::alloc<
+                    isaac_float,
+                    ISAAC_IDX_TYPE
+                >(
+                    myself->host,
+                    ISAAC_IDX_TYPE( 16 )
+                )
+            );
+            isaac_float * projection_h =
+                reinterpret_cast<float *> ( alpaka::mem::view::getPtrNative( modelview_h_buf ) );
+
+
+            //sim size values
             alpaka::mem::buf::Buf <THost, isaac_size_struct< TSimDim::value >, TFraDim, ISAAC_IDX_TYPE>
                 size_h_buf(
                 alpaka::mem::buf::alloc < isaac_size_struct < TSimDim::value > ,
                 ISAAC_IDX_TYPE > ( myself->host, ISAAC_IDX_TYPE( 1 ) )
             );
-            isaac_float * inverse_h =
-                reinterpret_cast<float *> ( alpaka::mem::view::getPtrNative( inverse_h_buf ) );
             isaac_size_struct < TSimDim::value > *size_h =
                 reinterpret_cast<isaac_size_struct< TSimDim::value > *> ( alpaka::mem::view::getPtrNative( size_h_buf ) );
+
 #else
             isaac_float inverse_h[16];
+            isaac_float modelview_h[16];
+            isaac_float projection_h[16];
             isaac_size_struct < TSimDim::value > size_h[1];
 #endif
+
+            //calculate inverse mvp matrix for render kernel
             IceTDouble inverse[16];
             calcInverse(
                 inverse,
@@ -3343,9 +3567,13 @@ namespace isaac
             );
             for( int i = 0; i < 16; i++ )
             {
+                //set values for inverse, mv and p matrix
                 inverse_h[i] = static_cast<float> ( inverse[i] );
+                modelview_h[i] = static_cast<float>(modelview_matrix[i]);
+                projection_h[i] = static_cast<float>(projection_matrix[i]);
             }
 
+            //set global simulation size
             size_h[0].global_size
                 .value
                 .x = myself->global_size[0];
@@ -3370,6 +3598,8 @@ namespace isaac
                     .value
                     .z = myself->position[2];
             }
+
+            //set subvolume size
             size_h[0].local_size
                 .value
                 .x = myself->local_size[0];
@@ -3394,6 +3624,8 @@ namespace isaac
                     .value
                     .z = myself->local_particle_size[2];
             }
+            
+            //get maximum size from biggest dimesnion MAX(x-dim, y-dim, z-dim)
             size_h[0].max_global_size = static_cast<float> ( ISAAC_MAX(
                 ISAAC_MAX(
                     uint32_t( myself->global_size[0] ),
@@ -3402,6 +3634,7 @@ namespace isaac
                 uint32_t( myself->global_size[2] )
             ) );
 
+            //set global size with cellcount scaled
             size_h[0].global_size_scaled
                 .value
                 .x = myself->global_size_scaled[0];
@@ -3414,6 +3647,8 @@ namespace isaac
                     .value
                     .z = myself->global_size_scaled[2];
             }
+
+            //set position in subvolume (adjusted to cellcount scale)
             size_h[0].position_scaled
                 .value
                 .x = myself->position_scaled[0];
@@ -3438,6 +3673,8 @@ namespace isaac
                     .value
                     .z = myself->local_size_scaled[2];
             }
+
+            //get maximum size from biggest dimesnion after scaling MAX(x-dim, y-dim, z-dim)
             size_h[0].max_global_size_scaled = static_cast<float> ( ISAAC_MAX(
                 ISAAC_MAX(
                     uint32_t( myself->global_size_scaled[0] ),
@@ -3446,22 +3683,59 @@ namespace isaac
                 uint32_t( myself->global_size_scaled[2] )
             ) );
 
+            //set volume scale parameters
             isaac_float3 isaac_scale = {
                 myself->scale[0],
                 myself->scale[1],
                 myself->scale[2]
             };
 
+            //copy matrices and simulation size properties to constant memory
 #if ISAAC_ALPAKA == 1
+
+            //inverse matrix
             alpaka::vec::Vec <alpaka::dim::DimInt< 1u >, ISAAC_IDX_TYPE> const
                 inverse_d_extent( ISAAC_IDX_TYPE( 16 ) );
+            //get view
             auto inverse_d_view(
                 alpaka::mem::view::createStaticDevMemView ( & isaac_inverse_d[0u],
                 myself -> acc, inverse_d_extent ) );
+            //copy to constant memory
             alpaka::mem::view::copy(
                 myself->stream,
                 inverse_d_view,
                 inverse_h_buf,
+                ISAAC_IDX_TYPE( 16 )
+            );
+
+            //modelview matrix
+            alpaka::vec::Vec <alpaka::dim::DimInt< 1u >, ISAAC_IDX_TYPE> const
+                modelview_d_extent( ISAAC_IDX_TYPE( 16 ) );
+            //get view
+            auto modelview_d_view(
+                alpaka::mem::view::createStaticDevMemView ( & isaac_modelview_d[0u],
+                myself -> acc, modelview_d_extent ) );
+            //copy to constant memory 
+            alpaka::mem::view::copy(
+                myself->stream,
+                modelview_d_view,
+                modelview_h_buf,
+                ISAAC_IDX_TYPE( 16 )
+            );
+
+
+            //projection matrix
+            alpaka::vec::Vec <alpaka::dim::DimInt< 1u >, ISAAC_IDX_TYPE> const
+                projection_d_extent( ISAAC_IDX_TYPE( 16 ) );
+            //get view
+            auto projection_d_view(
+                alpaka::mem::view::createStaticDevMemView ( & isaac_projection_d[0u],
+                myself -> acc, projection_d_extent ) );
+            //copy to constant memory
+            alpaka::mem::view::copy(
+                myself->stream,
+                projection_d_view,
+                projection_h_buf,
                 ISAAC_IDX_TYPE( 16 )
             );
 
@@ -3476,31 +3750,61 @@ namespace isaac
                 size_h_buf,
                 ISAAC_IDX_TYPE( 1 )
             );
+
 #else
+
+            //copy inverse matrix to constant memory
             ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol(
                 isaac_inverse_d,
                 inverse_h,
                 16 * sizeof( float )
             ) );
+
+            //copy modelview matrix to constant memory
+            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol(
+                isaac_modelview_d,
+                modelview_h,
+                16 * sizeof( float )
+            ) );
+
+            //copy projection matrix to constant memory
+            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol(
+                isaac_projection_d,
+                projection_h,
+                16 * sizeof( float )
+            ) );
+
+            //copy simulation size values to constant memory
             ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol(
                 isaac_size_d,
                 size_h,
                 sizeof( isaac_size_struct< TSimDim::value > )
             ) );
+
 #endif
+
+            //get pixel pointer from image as unsigned byte
             IceTUByte * pixels = icetImageGetColorub( result );
+
+            //start time for performance measurment
             ISAAC_START_TIME_MEASUREMENT ( kernel,
                 myself->getTicksUs( ) )
+
+            //set color values for background color
             isaac_float4 bg_color = {
                 isaac_float( background_color[3] ),
                 isaac_float( background_color[2] ),
                 isaac_float( background_color[1] ),
                 isaac_float( background_color[0] )
             };
+
+            //set framebuffer offset calculated from icet
             isaac_uint2 framebuffer_start = {
                 isaac_uint( readback_viewport[0] ),
                 isaac_uint( readback_viewport[1] )
             };
+
+            //call render kernel
 #if ISAAC_ALPAKA == 1
             IsaacRenderKernelCaller<
                 TSimDim,
@@ -3525,16 +3829,45 @@ namespace isaac
                     )
                 >,
                 mpl::vector< >,
-            alpaka::mem::buf::Buf < TDevAcc, uint32_t, TFraDim, ISAAC_IDX_TYPE
-                                                                >, TTransfer_size, isaac_float3, TAccDim, TAcc, TStream,
-                alpaka::mem::buf::Buf
-                < TDevAcc, isaac_functor_chain_pointer_N, TFraDim,
-                ISAAC_IDX_TYPE >, (
-                                      boost::mpl::size< TSourceList >::type::value
-                                      + boost::mpl::size< TParticleList >::type::value
-                                  ) > ::call(
+                alpaka::mem::buf::Buf< 
+                    TDevAcc, 
+                    uint32_t, 
+                    TFraDim, 
+                    ISAAC_IDX_TYPE
+                >, 
+                alpaka::mem::buf::Buf<
+                    TDevAcc, 
+                    isaac_float3, 
+                    TFraDim, 
+                    ISAAC_IDX_TYPE
+                >,
+                alpaka::mem::buf::Buf<
+                    TDevAcc, 
+                    isaac_float3, 
+                    TFraDim, 
+                    ISAAC_IDX_TYPE
+                >,
+                TTransfer_size, 
+                isaac_float3, 
+                TAccDim, 
+                TAcc, 
+                TStream,
+                alpaka::mem::buf::Buf< 
+                    TDevAcc, 
+                    isaac_functor_chain_pointer_N, 
+                    TFraDim,
+                    ISAAC_IDX_TYPE 
+                >, 
+                (
+                    boost::mpl::size< TSourceList >::type::value +
+                    boost::mpl::size< TParticleList >::type::value
+                ) 
+            > 
+            ::call(
                 myself->stream,
                 myself->framebuffer,
+                myself->framebufferDepth,
+                myself->framebufferNormal,
                 myself->framebuffer_size,
                 framebuffer_start,
                 myself->particle_sources,
@@ -3548,15 +3881,100 @@ namespace isaac
                 myself->interpolation,
                 myself->iso_surface,
                 isaac_scale,
-                myself->clipping
+                myself->clipping,
+                myself->ambientOcclusion
             );
+
+            //wait until render kernel has finished
             alpaka::wait::wait( myself->stream );
+
+            //process color and depth values for depth simulation
+            if(myself->ambientOcclusion.isEnabled && myself->ambientOcclusion.weight > 0.0f) {
+                IsaacSSAOKernelCaller<
+                    alpaka::mem::buf::Buf<
+                        TDevAcc, 
+                        isaac_float, 
+                        TFraDim, 
+                        ISAAC_IDX_TYPE
+                    >,
+                    alpaka::mem::buf::Buf<
+                        TDevAcc, 
+                        isaac_float3, 
+                        TFraDim, 
+                        ISAAC_IDX_TYPE
+                    >,
+                    alpaka::mem::buf::Buf<
+                        TDevAcc, 
+                        isaac_float3, 
+                        TFraDim, 
+                        ISAAC_IDX_TYPE
+                    >,
+                    TAccDim,
+                    TAcc,
+                    TStream
+                >
+                ::call (
+                    myself->stream,
+                    myself->framebufferAO,
+                    myself->framebufferDepth,
+                    myself->framebufferNormal,
+                    myself->framebuffer_size,
+                    framebuffer_start,
+                    readback_viewport,
+                    myself->ambientOcclusion
+                );
+
+                //wait until render kernel has finished
+                alpaka::wait::wait ( myself->stream );
+
+                IsaacSSAOFilterKernelCaller
+                <
+                    alpaka::mem::buf::Buf<
+                        TDevAcc, 
+                        uint32_t, 
+                        TFraDim, 
+                        ISAAC_IDX_TYPE
+                    >,
+                    alpaka::mem::buf::Buf<
+                        TDevAcc, 
+                        isaac_float, 
+                        TFraDim, 
+                        ISAAC_IDX_TYPE
+                    >,
+                    alpaka::mem::buf::Buf<
+                        TDevAcc, 
+                        isaac_float3, 
+                        TFraDim, 
+                        ISAAC_IDX_TYPE
+                    >,
+                    TAccDim,
+                    TAcc,
+                    TStream
+                >
+                ::call (
+                    myself->stream,
+                    myself->framebuffer,
+                    myself->framebufferAO,
+                    myself->framebufferDepth,
+                    myself->framebuffer_size,
+                    framebuffer_start,
+                    readback_viewport,
+                    myself->ambientOcclusion
+                );
+
+                //wait until render kernel has finished
+                alpaka::wait::wait ( myself->stream );
+            }
+
+            //stop and restart time for delta calculation
             ISAAC_STOP_TIME_MEASUREMENT ( myself->kernel_time,
                 +=,
                 kernel,
                 myself->getTicksUs( ) )
             ISAAC_START_TIME_MEASUREMENT ( copy,
                 myself->getTicksUs( ) )
+
+            //get memory view from IceT pixels on host
             alpaka::mem::view::ViewPlainPtr <THost, uint32_t, TFraDim, ISAAC_IDX_TYPE>
                 result_buffer(
                 ( uint32_t * )( pixels ),
@@ -3566,6 +3984,8 @@ namespace isaac
                     ISAAC_IDX_TYPE
                 >( myself->framebuffer_prod )
             );
+
+            //copy device framebuffer to result IceT pixel buffer
             alpaka::mem::view::copy(
                 myself->stream,
                 result_buffer,
@@ -3600,14 +4020,19 @@ namespace isaac
                 >,
                 mpl::vector< >,
                 uint32_t *,
+                isaac_float3*,
+                isaac_float3*,
                 TTransfer_size,
                 isaac_float3,
                 (
                     boost::mpl::size< TSourceList >::type::value
                     + boost::mpl::size< TParticleList >::type::value
                 )
-            >::call(
+            >
+            ::call(
                 myself->framebuffer,
+                myself->framebufferDepth,
+                myself->framebufferNormal,
                 myself->framebuffer_size,
                 framebuffer_start,
                 myself->particle_sources,
@@ -3621,26 +4046,80 @@ namespace isaac
                 myself->interpolation,
                 myself->iso_surface,
                 isaac_scale,
-                myself->clipping
+                myself->clipping,
+                myself->ambientOcclusion
             );
-            ISAAC_CUDA_CHECK ( cudaDeviceSynchronize( ) );
+
+            //wait until render kernel has finished
+            ISAAC_CUDA_CHECK ( cudaDeviceSynchronize() );
+
+            //process depth/color information for depth simulation
+            if(myself->ambientOcclusion.isEnabled && myself->ambientOcclusion.weight > 0.0f) {
+                //call render kernel
+                IsaacSSAOKernelCaller
+                <
+                isaac_float*,
+                isaac_float3*,
+                isaac_float3*
+                >
+                ::call (
+                    myself->framebufferAO,
+                    myself->framebufferDepth,
+                    myself->framebufferNormal,
+                    myself->framebuffer_size,
+                    framebuffer_start,
+                    readback_viewport,
+                    myself->ambientOcclusion
+                );
+
+                //wait until render kernel has finished
+                ISAAC_CUDA_CHECK ( cudaDeviceSynchronize() );
+
+                //call render kernel
+                IsaacSSAOFilterKernelCaller
+                <
+                uint32_t*,
+                isaac_float*,
+                isaac_float3*
+                >
+                ::call (
+                    myself->framebuffer,
+                    myself->framebufferAO,
+                    myself->framebufferDepth,
+                    myself->framebuffer_size,
+                    framebuffer_start,
+                    readback_viewport,
+                    myself->ambientOcclusion
+                );
+
+                //wait until render kernel has finished
+                ISAAC_CUDA_CHECK ( cudaDeviceSynchronize() );
+            }
+
+            //stop and restart time for delta calculation
             ISAAC_STOP_TIME_MEASUREMENT ( myself->kernel_time,
                 +=,
                 kernel,
                 myself->getTicksUs( ) )
             ISAAC_START_TIME_MEASUREMENT ( copy,
                 myself->getTicksUs( ) )
+
+            //copy filled framebuffer to IceT result buffer
             ISAAC_CUDA_CHECK ( cudaMemcpy(
                 ( uint32_t * )( pixels ),
                 myself->framebuffer,
                 sizeof( uint32_t ) * myself->framebuffer_prod,
                 cudaMemcpyDeviceToHost
             ) );
+
 #endif
+
+            //stop timer and calculate copy time
             ISAAC_STOP_TIME_MEASUREMENT ( myself->copy_time,
                 +=,
                 copy,
-                myself->getTicksUs( ) )
+                myself->getTicksUs( ) 
+            )
         }
 
 
@@ -4076,6 +4555,31 @@ namespace isaac
                         );
                     }
                 }
+                if(myself->send_ao) {
+                    //add ambient occlusion parameters
+                    json_object_set_new(
+                        myself->json_root, 
+                        "ao isEnabled", 
+                        json_boolean(myself->ambientOcclusion.isEnabled)
+                    );
+                    json_object_set_new(
+                        myself->json_root, 
+                        "ao weight", 
+                        json_real(myself->ambientOcclusion.weight)
+                    );       
+                    //add ao params to initial response   
+                    json_object_set_new(
+                        myself->json_init_root, 
+                        "ao isEnabled", 
+                        json_boolean(myself->ambientOcclusion.isEnabled)
+                    );
+                    json_object_set_new(
+                        myself->json_init_root, 
+                        "ao weight", 
+                        json_real(myself->ambientOcclusion.weight)
+                    );
+                    myself->send_init_json = true;
+                }
                 myself->controller
                     .sendFeedback(
                         myself->json_root,
@@ -4213,12 +4717,39 @@ namespace isaac
             TFraDim,
             ISAAC_IDX_TYPE
         > framebuffer_prod;
+
+        //framebuffer pixel values
         alpaka::mem::buf::Buf<
             TDevAcc,
             uint32_t,
             TFraDim,
             ISAAC_IDX_TYPE
         > framebuffer;
+
+        //ambient occlusion factor values
+        alpaka::mem::buf::Buf<
+            TDevAcc, 
+            isaac_float, 
+            TFraDim, 
+            ISAAC_IDX_TYPE
+        > framebufferAO;
+
+        //pixel depth information
+        alpaka::mem::buf::Buf<
+            TDevAcc, 
+            isaac_float3, 
+            TFraDim, 
+            ISAAC_IDX_TYPE
+        > framebufferDepth;
+
+        //pixel normal information
+        alpaka::mem::buf::Buf<
+            TDevAcc, 
+            isaac_float3, 
+            TFraDim, 
+            ISAAC_IDX_TYPE
+        > framebufferNormal;  
+
         alpaka::mem::buf::Buf<
             TDevAcc,
             isaac_functor_chain_pointer_N,
@@ -4245,7 +4776,10 @@ namespace isaac
         > local_particle_minmax_array_d;
 #else
         ISAAC_IDX_TYPE framebuffer_prod;
-        isaac_uint * framebuffer;
+        isaac_uint* framebuffer;                                //color values storage
+        isaac_float* framebufferAO;                             //ao/depth indicator storage
+        isaac_float3* framebufferDepth;                         //depth value storage
+        isaac_float3* framebufferNormal;                        //normal values storage
         isaac_functor_chain_pointer_N * functor_chain_d;
         isaac_functor_chain_pointer_N * functor_chain_choose_d;
         minmax_struct * local_minmax_array_d;
@@ -4263,6 +4797,8 @@ namespace isaac
         IceTDouble look_at[3];
         IceTDouble rotation[9];
         IceTDouble distance;
+
+        //true if properties should be sent by server
         bool send_look_at;
         bool send_rotation;
         bool send_distance;
@@ -4278,11 +4814,14 @@ namespace isaac
         bool send_clipping;
         bool send_controller;
         bool send_init_json;
+        bool send_ao;
+
+
         bool interpolation;
         bool iso_surface;
         bool icet_bounding_box;
         isaac_float step;
-        IceTDouble modelview[16];
+        IceTDouble modelview[16];                           //modelview matrix
         IsaacCommunicator * communicator;
         json_t * json_root;
         json_t * json_init_root;
@@ -4296,6 +4835,7 @@ namespace isaac
         IceTContext icetContext[TController::pass_count];
         IsaacVisualizationMetaEnum thr_metaTargets;
         pthread_t visualizationThread;
+        ao_struct ambientOcclusion;                         //state of ambient occlusion on client site
 #if ISAAC_ALPAKA == 1
         std::vector <alpaka::mem::buf::Buf<
             TDevAcc,

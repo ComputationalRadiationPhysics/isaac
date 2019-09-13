@@ -268,6 +268,20 @@ struct clipping_struct
     } elem[ ISAAC_MAX_CLIPPING ];
 };
 
+/**
+ * @brief Container for ambient occlusion parameters
+ * 
+ */
+struct ao_struct {
+    ISAAC_HOST_DEVICE_INLINE ao_struct() {}
+
+    //weight value (0.0-1.0) for mixing color with depth component (darken) 
+    //1.0 = 100% depth component 0.0 = 0% depth component  
+    isaac_float weight = 0.5; 
+
+    //true if pseudo ambient occlusion should be visible
+    bool isEnabled = false; 
+};
 
 
 typedef enum
