@@ -10,7 +10,7 @@
     }
 </style>
 <body>
-<script src="jscolor.js"></script>
+<script src="../js/jscolor.js"></script>
 <h3>Preview and camera setting</h3>
 <p>Usage:
 <ul>
@@ -28,7 +28,6 @@
 </form>
 <div id="status">Status: Not connected</div>
 </p>
-<table id="metadata_table" border="1"></table>
 <table><tr>
 <td id="video_td" valign="top">
 	<!--canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas-->
@@ -54,7 +53,7 @@
 				<input type="button" value="↓" id="ctl_down"> <input type="button" value="5 x" id="ctl_down_5">
 			</div></td>
 			</tr></table>
-			<form>
+				<form>
 				<input type="button" value="Pause" id="pause">
 				<input type="button" value="Stop observing" id="stop">
 				<input type="button" value="Reset view" id="panic">
@@ -67,6 +66,23 @@
 				<input type="button" value="Set" id="interval_change">
 				<input type="checkbox" id="controls_checkbox" onchange="controls_checkbox_click()"> Show controls
 			</form>
+			<div id="ambient_occ_div">
+				<table>
+					<h3>Ambient Occlusion [Test]</h3>
+					<tr>
+						<td>Enabled</td>
+						<td><input type="checkbox" id="ao_checkbox" checked onchange="ao_update()"></td>
+						<td></td>
+					</tr>
+					<tr>
+						<td id="ao_maxCellParticles">Maximum Particles in Cell</td>
+						<td><input type="range" min="1" max="1000" value="500" id="ao_maxCellParticles_range"></td>
+						<td><button onclick="ao_update()">Set</button></td>
+					</tr>
+				</table>
+				
+				<br/>
+			</div>
 			<div id="stereo_div"></div>
 			<div id="functions_div"></div>
 			<div id="weight_div"></div>
@@ -283,6 +299,13 @@ function drawUnitCube()
 	line( edges[3], edges[7] );
 }
 
+var particle_count = 0; //no underscore in json!
+var time_step = 0; //no underscore in json!
+var cell_count = 0; //no underscore in json!
+var simulation_time = 0;
+var drawing_time = 0;
+var nodes = 0;
+
 function redraw()
 {
 	//recalc modelview
@@ -332,6 +355,20 @@ function redraw()
 	}
 	p_ctx.stroke();
 	p_ctx.globalAlpha=1.0;
+
+	if (preview.clientWidth == stream_img.width && preview.clientHeight == stream_img.height)
+	{
+		p_ctx.font = "30px Arial";
+		p_ctx.fillStyle = wireframe_color;
+		p_ctx.textAlign = "right";
+		p_ctx.fillText( parseInt(Math.round(particle_count/1000000)) + " Mio. Particles",parseInt(preview.clientWidth)-10,parseInt(32));
+		p_ctx.fillText( parseInt(Math.round(cell_count/1000000)) + " Mio. Cells",parseInt(preview.clientWidth)-10,parseInt(57));
+		p_ctx.fillText( parseInt(nodes) + " GPUs",parseInt(preview.clientWidth)-10,parseInt(preview.clientHeight)-10);
+		p_ctx.textAlign = "left";
+		p_ctx.fillText( "Step " + parseInt(time_step),parseInt(10),parseInt(preview.clientHeight)-10);
+		p_ctx.fillText( parseInt(Math.round(simulation_time/1000)) + " ms Simulation",parseInt(10),parseInt(32));
+		p_ctx.fillText( parseInt(Math.round(drawing_time/1000)) + " ms Rendering",parseInt(10),parseInt(57));
+	}
 }
 
 var last_feedback_send = 0;
@@ -688,20 +725,18 @@ function updateMetaDataTable(metadata)
 {
 	if (Object.keys(metadata).length === 0 && JSON.stringify(metadata) === JSON.stringify({}))
 		return;
-	var metadata_table = document.getElementById("metadata_table");
-	while (metadata_table.firstChild) {
-		metadata_table.removeChild(metadata_table.firstChild);
-	}
 	for (element in metadata)
 	{
-		var row = metadata_table.insertRow(-1);
-		var cell = row.insertCell(-1);
-		cell.innerHTML += "<b>" + element + "</b>";
-		cell = row.insertCell(-1);
-		var cell_string = String(metadata[element]);
-		if (cell_string.length > 50)
-			cell_string = cell_string.substring(0,50) + "...";
-		cell.innerHTML += cell_string;
+		if (element == "particle count")
+			particle_count = metadata[element];
+		if (element == "time step")
+			time_step = metadata[element];
+		if (element == "cell count")
+			cell_count = metadata[element];
+		if (element == "simulation_time")
+			simulation_time = metadata[element];
+		if (element == "drawing_time")
+			drawing_time = metadata[element];
 	}
 }
 
@@ -753,6 +788,7 @@ document.getElementById("connect").onclick = function()
 					row.insertCell(0).innerHTML = obj["name"];
 					row.insertCell(1).innerHTML = obj["id"];
 					row.insertCell(2).innerHTML = obj["nodes"];
+					nodes = obj["nodes"];
 					row.insertCell(3).innerHTML = obj["max functors"];
 
 					var cell = row.insertCell(4);
@@ -812,6 +848,10 @@ document.getElementById("connect").onclick = function()
 						document.getElementById("step").value = obj["step"];
 						document.getElementById("iso_surface_checkbox").checked = obj["iso surface"];
 
+						//issue when sending objects with janso -> "ao ..." temp workaround
+ 						ao_set_values(obj);
+						console.log(obj);
+
 						preview.width = obj["framebuffer width"];
 						preview.height = obj["framebuffer height"];
 						video.width = obj["framebuffer width"];
@@ -859,6 +899,8 @@ document.getElementById("connect").onclick = function()
 							document.getElementById("step").checked = obj["step"];
 						if (obj.hasOwnProperty("iso surface"))
 							document.getElementById("iso_surface_checkbox").checked = obj["iso surface"];
+						
+						ao_set_values(obj);
 					}
 					if (obj.hasOwnProperty("functions"))
 					{
@@ -1034,7 +1076,14 @@ document.getElementById("connect").onclick = function()
 								for (var i in transfer_points[s])
 								{
 									var subnode = document.createElement("DIV");
-									subnode.innerHTML = '<font face="monospace">' + (transfer_points[s][i].value / transfer_array[s].length).toFixed(3) + ": </font>";
+									var transfer = document.createElement("INPUT");
+									transfer.type = "text";
+									transfer.value = (transfer_points[s][i].value / transfer_array[s].length).toFixed(3);
+									transfer.size = 4;
+									transfer.id = "p_" + s + "_" + i + "_transfer";
+									if (i == 0 || i == transfer_points[s].length - 1)
+										transfer.disabled = true;
+									subnode.appendChild(transfer);
 									var input = document.createElement("INPUT");
 									input.type = button;
 									var picker = new jscolor(input);
@@ -1088,6 +1137,16 @@ document.getElementById("connect").onclick = function()
 										transfer_points[s][i].g = color.jscolor.rgb[1]/255;
 										transfer_points[s][i].b = color.jscolor.rgb[2]/255;
 										transfer_points[s][i].a = parseFloat(alpha.value);
+										if (i > 0 && i < transfer_points[s].length - 1)
+										{
+											var transfer = document.getElementById( base + "_transfer");
+											var transfer_value = Math.round(parseFloat(transfer.value) * transfer_array[s].length);
+											if (transfer_value < 1)
+												transfer_value = 1;
+											if (transfer_value >= transfer_array[s].length)
+												transfer_value = transfer_array[s].length - 1;
+											transfer_points[s][i].value = transfer_value;
+										}
 									}
 								sendFeedback( "transfer points", transfer_points );
 							};
@@ -1241,6 +1300,7 @@ document.getElementById("stop").onclick = function()
 
 document.getElementById("pause").onclick = function()
 {
+
 	var metadata =
 	{
 		"pause" : true
@@ -1462,5 +1522,28 @@ function controls_checkbox_click()
 	else
 		document.getElementById("controls").style.display = 'none';
 }
+
+function ao_update() {
+	let range = parseInt(document.getElementById("ao_maxCellParticles_range").value);
+	let status = document.getElementById("ao_checkbox").checked;
+
+	let ao_object = {
+		"isEnabled" : status,
+		"maxCellParticles": range
+	};
+	console.log(ao_object);
+	sendFeedback("ao", ao_object);
+}
+
+function ao_set_values(json_object) {
+	let ao_object = json_object;
+	console.log(ao_object);
+	if(ao_object) {
+		document.getElementById("ao_checkbox").checked = ao_object["ao isEnabeld"];
+		document.getElementById("ao_maxCellParticles_range").value = ao_object["ao maxCellParticles"];
+		document.getElementById("ao_maxCellParticles").innerHTML = "max. " + ao_object["ao maxCellParticles"] + " Particles/Cell";
+	}
+}
+
 </script>
 </html>

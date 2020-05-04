@@ -18,7 +18,7 @@
 #include <boost/preprocessor.hpp>
 
 #ifndef ISAAC_VECTOR_ELEM
-    #define ISAAC_VECTOR_ELEM 2
+    #define ISAAC_VECTOR_ELEM 1
 #endif
 
 #ifndef ISAAC_MAX_DIFFERENCE
@@ -54,7 +54,7 @@
 #endif
 
 #define ISAAC_MAX_RECEIVE 262144 //256kb
-#define ISAAC_Z_NEAR 1.0f
+#define ISAAC_Z_NEAR 0.002f
 #define ISAAC_Z_FAR 100.0f
 
 #if ISAAC_ALPAKA == 1
@@ -104,7 +104,7 @@
 }
 
 #if ISAAC_ALPAKA == 1
-    #define ISAAC_CONSTANT ALPAKA_STATIC_DEV_MEM_CONSTANT
+    #define ISAAC_CONSTANT ALPAKA_STATIC_ACC_MEM_CONSTANT
 #else
     #define ISAAC_CONSTANT __constant__
 #endif

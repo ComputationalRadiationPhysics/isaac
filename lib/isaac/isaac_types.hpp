@@ -22,6 +22,11 @@
 namespace isaac
 {
 
+/*
+ * TODO
+ * cleanup this mess
+ * 
+ */
 typedef float isaac_float;
 typedef int32_t isaac_int;
 typedef uint32_t isaac_uint;
@@ -185,17 +190,23 @@ BOOST_PP_REPEAT( 3, ISAAC_DIM_DEF, ~ )
 #undef ISAAC_DIM_TYPES
 #undef ISAAC_DIM_TYPES_DIM
 
+/**
+ * @brief Container for all simulation sizes
+ * 
+ * @tparam simdim 
+ */
 template < ISAAC_IDX_TYPE simdim >
 struct isaac_size_struct
 {
-    isaac_size_dim < simdim > global_size;
-    ISAAC_IDX_TYPE max_global_size;
-    isaac_size_dim < simdim > position;
-    isaac_size_dim < simdim > local_size;
-    isaac_size_dim < simdim > global_size_scaled;
-    ISAAC_IDX_TYPE max_global_size_scaled;
-    isaac_size_dim < simdim > position_scaled;
-    isaac_size_dim < simdim > local_size_scaled;
+    isaac_size_dim < simdim > global_size;         //size of volume
+    ISAAC_IDX_TYPE max_global_size;                //each dimension has a size and this value contains the value of the greatest dimension
+    isaac_size_dim < simdim > position;            //local position of subvolume
+    isaac_size_dim < simdim > local_size;          //size of local volume grid
+    isaac_size_dim < simdim > local_particle_size; //size of local particle grid 
+    isaac_size_dim < simdim > global_size_scaled;  //scaled version of global size with cells = scale * cells
+    ISAAC_IDX_TYPE max_global_size_scaled;         //same as global_size_scaled
+    isaac_size_dim < simdim > position_scaled;     //scaled position of local subvolume
+    isaac_size_dim < simdim > local_size_scaled;   //same as global_size_scaled
 };
 
 
@@ -257,6 +268,20 @@ struct clipping_struct
     } elem[ ISAAC_MAX_CLIPPING ];
 };
 
+/**
+ * @brief Container for ambient occlusion parameters
+ * 
+ */
+struct ao_struct {
+    ISAAC_HOST_DEVICE_INLINE ao_struct() {}
+
+    //weight value (0.0-1.0) for mixing color with depth component (darken) 
+    //1.0 = 100% depth component 0.0 = 0% depth component  
+    isaac_float weight = 0.5; 
+
+    //true if pseudo ambient occlusion should be visible
+    bool isEnabled = false; 
+};
 
 
 typedef enum

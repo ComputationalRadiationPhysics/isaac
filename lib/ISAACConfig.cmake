@@ -17,7 +17,22 @@
 # ISAAC
 ###############################################################################
 cmake_minimum_required (VERSION 3.3.0)
-cmake_policy(SET CMP0048 OLD)
+
+
+################################################################################
+# CMake Policies
+###############################################################################
+# TODO update our VERSION syntax in project
+#   https://cmake.org/cmake/help/v3.12/policy/CMP0048.html
+if(POLICY CMP0048)
+    cmake_policy(SET CMP0048 OLD)
+endif()
+
+# Search in <PackageName>_ROOT:
+#   https://cmake.org/cmake/help/v3.12/policy/CMP0074.html
+if(POLICY CMP0074)
+    cmake_policy(SET CMP0074 NEW)
+endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/ISAACBaseDir.cmake")
 
@@ -41,17 +56,35 @@ if ( (NOT ISAAC_CUDA) AND (NOT ISAAC_ALPAKA) )
     message( FATAL_ERROR "At least Alpaka or Cuda have to be activated!" )
 endif()
 
-option(ISAAC_JPEG "Use JPEG compression between visualization and isaac server. Deactivating will not work with big images. And with big I am talking about bigger than 800x600." ON)
+###############################################################################
+# JPEGLIB
+###############################################################################
+set( JPEG_DESCRIPTION "Use JPEG compression between visualization and isaac server. Deactivating will not work with big images. And with big I am talking about bigger than 800x600." )
+option(ISAAC_JPEG ${JPEG_DESCRIPTION} ON)
 if (ISAAC_JPEG)
         find_package(JPEG)
         if (JPEG_FOUND)
-            set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JPEG_INCLUDE_DIR})
-            set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JPEG_LIBRARY})
-            set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_JPEG")
-        else()
-            message( WARNING "Using ISAAC without libjpeg is not recommended." )
-        endif()
+            # Checking whether the libjpeg-turbo extension JCS_EXT_RGBX is available
+            file( READ ${JPEG_INCLUDE_DIR}/jpeglib.h JPEGHEADER )
+            string( FIND "${JPEGHEADER}" "JCS_EXT_RGBX" JCS_EXT_RGBX_FOUND )
+            if ( ${JCS_EXT_RGBX_FOUND} GREATER "-1" )
+                set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JPEG_INCLUDE_DIR})
+                set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JPEG_LIBRARY})
+                set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_JPEG")
+            else()
+                set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   wrong libjpeg flavour found, needing libjpeg-turbo!")
+                message( WARNING "wrong libjpeg flavour found, needing libjpeg-turbo!" )
+                set( JPEG_FOUND FALSE )
+            endif()
+        endif(JPEG_FOUND)
+        if (NOT JPEG_FOUND)
+            set( ISAAC_JPEG OFF CACHE BOOL ${JPEG_DESCRIPTION} FORCE)
+        endif(NOT JPEG_FOUND)
 endif (ISAAC_JPEG)
+if (NOT ISAAC_JPEG)
+    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Using ISAAC without libjpeg is not recommended. Set ISAAC_JPEG to ON to enable libjpeg compression." )
+    message( WARNING "Using ISAAC without libjpeg is not recommended. Set ISAAC_JPEG to ON to enable libjpeg compression." )
+endif (NOT ISAAC_JPEG)
 
 set(ISAAC_VECTOR_ELEM "1" CACHE STRING "The amounts of elements used for vectorization. On GPU 1 should be fine, on CPU 4..32, depending on the vectorization capabilities" )
 set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_VECTOR_ELEM=${ISAAC_VECTOR_ELEM})
@@ -141,12 +174,7 @@ if (ISAAC_ALPAKA)
         set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} ${alpaka_DEFINITIONS})
         set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} ${ALPAKA_DEV_COMPILE_OPTIONS})
         set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_ALPAKA")
-        set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}" )
     endif()
-endif()
-
-if (CUDA_NVCC_FLAGS)
-    list(REMOVE_DUPLICATES CUDA_NVCC_FLAGS)
 endif()
 
 

@@ -1,6 +1,12 @@
 cmake_minimum_required (VERSION 3.3)
 project (example)
 
+# Search in <PackageName>_ROOT:
+#   https://cmake.org/cmake/help/v3.12/policy/CMP0074.html
+if(POLICY CMP0074)
+    cmake_policy(SET CMP0074 NEW)
+endif()
+
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 11)
 
@@ -33,7 +39,7 @@ endif()
 
 if (ISAAC_ALPAKA)
 	ALPAKA_ADD_EXECUTABLE(isaac_example_alpaka ${CMAKE_SOURCE_DIR}/example.cpp)
-	target_link_libraries(isaac_example_alpaka ${ISAAC_LIBRARIES})
+	target_link_libraries(isaac_example_alpaka PUBLIC ${ISAAC_LIBRARIES})
 	install(TARGETS isaac_example_alpaka DESTINATION bin )
 endif()
 

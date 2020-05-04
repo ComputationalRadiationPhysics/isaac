@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ISAAC Control Page</title>
+<style>
+    * {
+      font-family: sans-serif;
+    }
+
+input {
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  -webkit-box-shadow: inset 0 0 1px 1px #f6f6f6;
+  box-shadow: inset 0 0 1px 1px #f6f6f6;
+  padding: 8px 8px 8px;
+  text-shadow: 0 1px 0 #fff;
+}
+input[type=button] {
+  background: #e3e3e3;
+  padding: 8px 8px 8px;
+  text-align: center;
+}
+input[type=button]:hover {
+    background: #d9d9d9;
+    -webkit-box-shadow: inset 0 0 1px 1px #eaeaea;
+    box-shadow: inset 0 0 1px 1px #eaeaea;
+    color: #222;
+    cursor: pointer;
+}
+input[type=button]:active {
+    background: #d0d0d0;
+    -webkit-box-shadow: inset 0 0 1px 1px #e3e3e3;
+    box-shadow: inset 0 0 1px 1px #e3e3e3;
+    color: #000;
+}
+
+table {
+  border: 1px solid #000;
+}
+td, th {
+  border: 0;
+}
+td:not(:last-child), th:not(:last-child) {
+  border-right: 1px solid #000;
+}
+th {
+  border-bottom: 1px solid #000;
+}
+</style>
+</head>
+<body>
+<script src="../js/jscolor.js"></script>
+<div>
+    <h3>Preview and camera setting</h3>
+    Usage:
+    <ul>
+    <li>Left click + Mouse movement: Change view angle</li>
+    <li>Right/Middle click + Mouse movement: Change position</li>
+    <li>Mousewheel: zoom</li>
+    </ul>
+    <form>
+	    Server URL:<input type="text" id="url" value="hypnos5">
+	    Port:<input type="text" id="port" value="12459">
+	    <input type="button" value="Connect" id="connect">
+	    <br /><input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()"> Show video and control in one window
+	    <br /><input type="checkbox" id="wireframe_checkbox" checked onchange="wireframe_checkbox_click()"> Show wireframe bounding box
+	    <br /><input type="checkbox" id="dropable_checkbox" onchange="dropable_checkbox_click()"> Meta data can be dropped (Select before observing!)
+    </form>
+    <div id="status">Status: Not connected</div>
+</div>
+<div>
+<div id="video_td" style="vertical-align:top;">
+	<!--canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas-->
+	<div id="video_container_div" style="position: relative;">
+		<div id="video_div" style="position: relative; top: 0; left: 0;">
+			<table style="border:0;"><tr>
+			<td>
+				<canvas id="video" width="512" height="512"></canvas>
+				<div id="url_div" style="display:none;"></div>
+			</td>
+			<td style="text-align:center;"><div id="controls" style="display:none;">
+				<input type="button" value="+" id="zoom_in"> <input type="button" value="5 x" id="zoom_in_5"><br/>
+				<input type="button" value="-" id="zoom_out"> <input type="button" value="5 x" id="zoom_out_5"><br/>
+				<input type="button" value="X+" id="plus_x"> <input type="button" value="5 x" id="plus_x_5"><br/>
+				<input type="button" value="X-" id="minus_x"> <input type="button" value="5 x" id="minus_x_5"><br/>
+				<input type="button" value="Y+" id="plus_y"> <input type="button" value="5 x" id="plus_y_5"><br/>
+				<input type="button" value="Y-" id="minus_y"> <input type="button" value="5 x" id="minus_y_5"><br/>
+				<input type="button" value="Z+" id="plus_z"> <input type="button" value="5 x" id="plus_z_5"><br/>
+				<input type="button" value="Z-" id="minus_z"> <input type="button" value="5 x" id="minus_z_5"><br/>
+				<input type="button" value="←" id="ctl_left"> <input type="button" value="5 x" id="ctl_left_5"><br/>
+				<input type="button" value="→" id="ctl_right"> <input type="button" value="5 x" id="ctl_right_5"><br/>
+				<input type="button" value="↑" id="ctl_up"> <input type="button" value="5 x" id="ctl_up_5"><br/>
+				<input type="button" value="↓" id="ctl_down"> <input type="button" value="5 x" id="ctl_down_5">
+			</div></td>
+			</tr></table>
+				<form>
+				<input type="button" value="Pause" id="pause">
+				<input type="button" value="Stop observing" id="stop">
+				<input type="button" value="Reset view" id="panic">
+				<input type="button" value="Stop simulation" id="exit">
+				<input type="button" value="Toogle bounding box" id="bounding">
+				Background color: <input id="background_color" class="jscolor" value="000000" size="6">
+				<input type="button" value="Apply" id="background_change">
+				Interval: <input type="range" value="1" min="1" max="32" id="interval_range">
+				<span id="interval_span">1</span>
+				<input type="button" value="Set" id="interval_change">
+				<input type="checkbox" id="controls_checkbox" onchange="controls_checkbox_click()"> Show controls
+			</form>
+			<div id="weight_div"></div>
+			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation
+			<input type="checkbox" id="iso_surface_checkbox" checked onchange="iso_surface_checkbox_click()"> Iso Surface
+			<input id="step" size="4"><input type="button" value="Change step" id="step_button" onclick="step_button_click()"><br/>
+			<div id="clipping_add_div">
+				<b>Clipping planes:</b><br/>
+				<span> Position: </span><input type="text"   value="0" size="4" id="clip_px"><input type="text"   value="0" size="4" id="clip_py"><input type="text"   value="0" size="4" id="clip_pz">
+				<span> Normal: </span>  <input type="text"   value="0" size="4" id="clip_nx"><input type="text"   value="0" size="4" id="clip_ny"><input type="text"   value="1" size="4" id="clip_nz">
+				                      <input type="button" value="X"          id="clip_bx"><input type="button" value="Y"          id="clip_by"><input type="button" value="Z"          id="clip_bz">
+				                      <input type="button" value="Add"        id="clip_add">
+			</div>
+			<div id="clipping_list_div"></div>
+			<table border="1"><tr id="transfer_form"><td></td></tr></table>
+			<canvas id="transfer" width="412" height="16"></canvas>
+			<div id="stereo_div"></div>
+			<div id="functions_div"></div>
+		</div>
+		<div id="preview_div" style="position: absolute; top: 0; left: 0; opacity: 0.5;">
+			<canvas id="preview" width="512" height="512" style="border:1px solid #000000;"></canvas>
+			<canvas id="fft" width="1" height="1"></canvas>
+		</div>
+		<div id="live_div" style="position: absolute; top: 10px; left: 10px">
+			<span style="font-size:60px; color:#ffffff"><img src="record.gif" width="48" height="48" alt="live"/> LIVE</span>
+		</div>
+	</div>
+</div>
+<div id="preview_td" style="vertical-align:top;">
+	<div id="preview_container_div" style="position: relative;">
+	</div>
+</div>
+</div>
+<div id="list_td" style="display:none">
+	<h3 id="isaac_name"></h3>
+	<table id="list_table" border="1">
+	<tr>
+		<th>Name</th>
+		<th>ID</th>
+		<th>Nodes</th>
+		<th>Max Functors</th>
+		<th>Functors</th>
+		<th>Dimension</th>
+		<th>Sources</th>
+		<th>Meta data</th>
+		<th>Observe</th>
+	</tr>
+	</table>
+</div>
+<script>
+/**
+ * ISAAC Client - Reference client implementation for ISAAC
+ *
+ * @link    https://github.com/ComputationalRadiationPhysics/isaac
+ * @license GPLv3
+ * @author  Alexander Matthes
+ */
+var video = document.getElementById("video");
+var fft_view = document.getElementById("fft");
+var preview = document.getElementById("preview");
+var p_ctx = preview.getContext("2d");
+var transfer = document.getElementById("transfer");
+var t_ctx = transfer.getContext("2d");
+var socket = null;
+var observe_id = -1;
+var particles = null;
+var plugins = new Array();
+var one_window = document.getElementById("one_window_checkbox").checked;
+var wireframe = document.getElementById("wireframe_checkbox").checked;
+var dropable = document.getElementById("dropable_checkbox").checked;
+document.getElementById("preview_div").style.opacity = '1.0';
+const default_image_src = "data:image/gif;base64,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";
+var stream_img = new Image;
+stream_img.src = default_image_src;
+var wireframe_color = '#ffffff';
+
+var functions = new Array();
+var weight = new Array();
+
+var projection = [
+	1, 0, 0, 0,
+	0, 1, 0, 0,
+	0, 0, 1, 0,
+	0, 0, 0, 1
+];
+var position = [
+	0,
+	0,
+	0
+];
+var rotation = [
+	1, 0, 0,
+	0, 1, 0,
+	0, 0, 1
+];
+var distance = 0;
+var modelview = [
+	1, 0, 0, 0,
+	0, 1, 0, 0,
+	0, 0, 1, 0,
+	0, 0, 0, 1
+];
+
+var znear = 0;
+var transfer_array = [];
+var transfer_points = [];
+const s_per_timestep = 1.804479741767268012E-17;
+const fs_per_timestep = s_per_timestep * 1.0e15;
+
+var edges = [
+	[ -1,  1,  1 ],
+	[  1,  1,  1 ],
+	[  1, -1,  1 ],
+	[ -1, -1,  1 ],
+	[ -1,  1, -1 ],
+	[  1,  1, -1 ],
+	[  1, -1, -1 ],
+	[ -1, -1, -1 ]
+];
+
+function updateZNear()
+{
+	znear = projection[ 0] * preview.clientWidth / 2;
+}
+
+function mulMatrix( matrix1 , matrix2)
+{
+	var result = new Array(16);
+	for (x = 0; x < 4; x++)
+		for (y = 0; y < 4; y++)
+			result[y+x*4] = matrix1[y+0*4] * matrix2[0+x*4]
+			              + matrix1[y+1*4] * matrix2[1+x*4]
+			              + matrix1[y+2*4] * matrix2[2+x*4]
+			              + matrix1[y+3*4] * matrix2[3+x*4];
+	return result;
+}
+
+function mulMatrix4(matrix,p)
+{
+	var t = new Array(4);
+	t[0] =  matrix[ 0] * p[0] + matrix[ 4] * p[1] +  matrix[ 8] * p[2] + matrix[12] * p[3];
+	t[1] =  matrix[ 1] * p[0] + matrix[ 5] * p[1] +  matrix[ 9] * p[2] + matrix[13] * p[3];
+	t[2] =  matrix[ 2] * p[0] + matrix[ 6] * p[1] +  matrix[10] * p[2] + matrix[14] * p[3];
+	t[3] =  matrix[ 3] * p[0] + matrix[ 7] * p[1] +  matrix[11] * p[2] + matrix[15] * p[3];
+	return t;
+}
+
+function rotateMatrix( x, y, z, rad )
+{
+	//Rotation matrix:
+	var s = Math.sin( rad * Math.PI / 180.0);
+	var c = Math.cos( rad * Math.PI / 180.0);
+	var l = Math.sqrt( x * x + y * y + z * z);
+	if ( l == 0 )
+		return;
+	x = x / l;
+	y = y / l;
+	z = z / l;
+	var rotate = new Array(9);
+	rotate[0] = c + x * x * ( 1 - c );
+	rotate[3] = x * y * ( 1 - c ) - z * s;
+	rotate[6] = x * z * ( 1 - c ) + y * s;
+	rotate[1] = y * x * ( 1 - c ) + z * s;
+	rotate[4] = c + y * y * ( 1 - c );
+	rotate[7] = y * z * ( 1 - c ) - x * s;
+	rotate[2] = z * x * ( 1 - c ) - y * s;
+	rotate[5] = z * y * ( 1 - c ) + x * s;
+	rotate[8] = c + z * z * ( 1 - c );
+	return rotate;
+}
+
+function mulMatrix3(matrix,p)
+{
+	return mulMatrix4(matrix,[p[0],p[1],p[2],1]);
+}
+
+function project(p)
+{
+	var m = mulMatrix4(projection,mulMatrix3(modelview,p));
+	var t = new Array(2);
+	t[0] = preview.clientWidth/2  + m[0] / m[3] * preview.clientWidth/2;
+	t[1] = preview.clientHeight/2 + m[1] / m[3] * preview.clientHeight/2;
+	t[2] = m[2] / m[3];
+    return t;
+}
+
+function line(p1,p2)
+{
+	var t1 = project(p1);
+	var t2 = project(p2);
+	if ((Math.abs(t1[2]) > 1) || (Math.abs(t2[2]) > 1))
+		return;
+	p_ctx.moveTo( t1[0], t1[1] );
+	p_ctx.lineTo( t2[0], t2[1] );
+}
+
+function point(p,nocheck)
+{
+	var t = project(p);
+	if (!nocheck && Math.abs(t[2]) > 1)
+		return;
+	p_ctx.fillRect( t[0], t[1], 3, 3 );
+}
+
+
+function drawUnitCube()
+{
+	//front
+	line( edges[0], edges[1] );
+	line( edges[1], edges[2] );
+	line( edges[2], edges[3] );
+	line( edges[3], edges[0] );
+	//back
+	line( edges[4], edges[5] );
+	line( edges[5], edges[6] );
+	line( edges[6], edges[7] );
+	line( edges[7], edges[4] );
+	//connetion
+	line( edges[0], edges[4] );
+	line( edges[1], edges[5] );
+	line( edges[2], edges[6] );
+	line( edges[3], edges[7] );
+}
+
+var particle_count = 0; //no underscore in json!
+var time_step = 0; //no underscore in json!
+var cell_count = 0; //no underscore in json!
+var simulation_time = 0;
+var drawing_time = 0;
+var nodes = 0;
+
+function redraw()
+{
+	//recalc modelview
+	var position_m = [
+		1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, 1, 0,
+		position[0], position[1], position[2], 1
+	];
+	var rotation_m = [
+		rotation[0], rotation[1], rotation[2], 0,
+		rotation[3], rotation[4], rotation[5], 0,
+		rotation[6], rotation[7], rotation[8], 0,
+		0, 0, 0, 1
+	];
+	var distance_m = [
+		1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, 1, 0,
+		0, 0, distance, 1
+	];
+	modelview = mulMatrix( distance_m, mulMatrix( rotation_m, position_m ) );
+	if (preview.clientWidth != stream_img.width || preview.clientHeight != stream_img.height)
+	{
+		p_ctx.beginPath();
+		p_ctx.rect(0, 0, preview.clientWidth, preview.clientHeight);
+		p_ctx.fillStyle = "#000000";
+		p_ctx.fill();
+	}
+	p_ctx.drawImage(stream_img,(parseInt(preview.clientWidth)-parseInt(stream_img.width))/2,(parseInt(preview.clientHeight)-parseInt(stream_img.height))/2);
+	p_ctx.fillStyle = "#000000";
+	if (one_window)
+	{
+		p_ctx.globalAlpha=0.5;
+		p_ctx.strokeStyle = wireframe_color;
+	}
+	else
+		p_ctx.strokeStyle = '#000000';
+	p_ctx.lineWidth = 2;
+	p_ctx.beginPath();
+
+	if (wireframe)
+		drawUnitCube();
+	for (p in particles)
+	{
+		point( particles[p], false);
+	}
+	p_ctx.stroke();
+	p_ctx.globalAlpha=1.0;
+
+	if (preview.clientWidth == stream_img.width && preview.clientHeight == stream_img.height)
+	{
+		p_ctx.font = "30px Arial";
+		p_ctx.fillStyle = wireframe_color;
+		p_ctx.textAlign = "right";
+		p_ctx.fillText( parseInt(Math.round(particle_count/1000000)) + " Mio. Particles",parseInt(preview.clientWidth)-10,parseInt(32));
+		p_ctx.fillText( parseInt(Math.round(cell_count/1000000)) + " Mio. Cells",parseInt(preview.clientWidth)-10,parseInt(57));
+		p_ctx.fillText( parseInt(nodes) + " GPUs",parseInt(preview.clientWidth)-10,parseInt(preview.clientHeight)-10);
+		p_ctx.textAlign = "left";
+		p_ctx.fillText( "Simulation time " + (parseFloat(time_step) * fs_per_timestep).toFixed(2) + " fs",parseInt(10),parseInt(preview.clientHeight)-10);
+	}
+}
+
+var last_feedback_send = 0;
+var sources = null;
+
+function sendFeedback(name,feedback)
+{
+	var d = new Date();
+	last_feedback_send = d.getTime();
+	var obj =
+	{
+		"type" : "feedback",
+		"observe id" : observe_id
+	};
+	obj[name] = feedback;
+	socket.send(JSON.stringify(obj));
+}
+
+function zoom(delta)
+{
+	distance += delta;
+	redraw();
+	p_ctx.fillText("Delta: " + delta,1,10);
+	sendFeedback("distance relative",delta);
+}
+
+function mouseWheelHandler(e)
+{
+	document.body.style.overflowY = "hidden";
+	zoom(Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail))) * 0.1);
+}
+
+var mousedown = [0,0,0];
+var mousex = 0;
+var mousey = 0;
+function mouseDownHandler(e)
+{
+	mousedown[e.button] = 1;
+	mousex = e.clientX;
+	mousey = e.clientY;
+}
+function mouseUpHandler(e)
+{
+	mousedown[e.button] = 0;
+}
+function mouseResetHandler()
+{
+	mousedown[0] = 0;
+	mousedown[1] = 0;
+	mousedown[2] = 0;
+}
+
+function move(add)
+{
+	var add_p = [
+		rotation[0] * add[0] + rotation[1] * add[1] + rotation[2] * add[2],
+		rotation[3] * add[0] + rotation[4] * add[1] + rotation[5] * add[2],
+		rotation[6] * add[0] + rotation[7] * add[1] + rotation[8] * add[2]
+	];
+	position[0] += add_p[0];
+	position[1] += add_p[1];
+	position[2] += add_p[2];
+	sendFeedback("position relative",add);
+	redraw();
+}
+
+function rotate(dx,dy,dz)
+{
+	var l = Math.sqrt( dx * dx + dy * dy + dz * dz );
+	if (l > 0)
+	{
+		dx /= l;
+		dy /= l;
+		dz /= l;
+		var add = rotateMatrix(dy,dx,dz,l/2);
+		var result = new Array(9);
+		for (x = 0; x < 3; x++)
+			for (y = 0; y < 3; y++)
+				result[y+x*3] = add[y+0*3] * rotation[0+x*3]
+							  + add[y+1*3] * rotation[1+x*3]
+							  + add[y+2*3] * rotation[2+x*3];
+		rotation = result;
+		sendFeedback("rotation axis",[dy, dx, dz, l/2]);
+		redraw();
+	}
+}
+
+function mouseMoveHandler(e)
+{
+	var dx = e.clientX - mousex;
+	var dy = e.clientY - mousey;
+	var obj;
+	if (mousedown[0])
+	{
+		rotate(dx,-dy,0);
+	}
+	if (mousedown[2] || mousedown[1])
+	{
+		move([dx/100, dy/100, 0]);
+	}
+	mousex = e.clientX;
+	mousey = e.clientY;
+}
+
+p_ctx.font = "10px Arial";
+redraw();
+preview.addEventListener("mousewheel", mouseWheelHandler, false);
+preview.addEventListener("DOMMouseScroll", mouseWheelHandler, false);
+preview.addEventListener("mousemove", mouseMoveHandler, false);
+preview.addEventListener("mousedown", mouseDownHandler, false);
+preview.addEventListener("mouseup", mouseUpHandler, false);
+preview.onmouseout = function(){mouseResetHandler(); document.body.style.overflowY = "scroll";};
+
+transfer.addEventListener("mousedown", transferMouseDownHandler, false);
+
+document.getElementById("video_td").style.display = 'none';
+document.getElementById("preview_td").style.display = 'none';
+
+function stopObserverSimulation()
+{
+	if (observe_id < 0)
+		return;
+	var obj =
+	{
+		"type" : "stop",
+		"observe id" : observe_id
+	};
+	socket.send(JSON.stringify(obj));
+	observe_id = -1;
+	var transfer_form = document.getElementById("transfer_form");
+	while (transfer_form.firstChild) {
+		transfer_form.removeChild(transfer_form.firstChild);
+	}
+	stream_img.src = default_image_src;
+}
+
+function observeSimulation(id)
+{
+	stopObserverSimulation();
+	observe_id = id;
+	var connector_id = 2; //jpeg uri
+	var obj =
+	{
+		"type" : "observe",
+		"stream" : connector_id,
+		"dropable" : dropable,
+		"observe id" : observe_id
+	};
+	socket.send(JSON.stringify(obj));
+}
+
+function transferRectangle(x,y,w,h,color)
+{
+	t_ctx.beginPath();
+	t_ctx.rect(x,y,w,h);
+	t_ctx.fillStyle=color;
+	t_ctx.fill();
+}
+
+var transfer_high = 64;
+
+function transferMouseDownHandler(e)
+{
+	var rect = transfer.getBoundingClientRect();
+	var X = Math.floor(e.clientX - rect.left);
+	var Y = Math.floor(e.clientY - rect.top);
+	var source = Math.floor(Y / (transfer_high+2));
+	var value = Math.round(X / transfer.width * transfer_array[source].length);
+	var localY = Math.floor(Y - source * (transfer_high+2));
+	var element =
+	{
+		"value" : value,
+		"r" : transfer_array[source][value][0]/255,
+		"g" : transfer_array[source][value][1]/255,
+		"b" : transfer_array[source][value][2]/255,
+		"a" : 1-localY/(transfer_high+2)
+	}
+	transfer_points[source].push( element );
+	sendFeedback( "transfer points", transfer_points );
+}
+
+function updateTransfer()
+{
+	transfer.width = video.width;
+	transfer.height = transfer_array.length*transfer_high + (transfer_array.length - 1) * 2;
+	for (var f = 0; f < transfer_array.length; f++)
+	{
+		var lastX = 0;
+		for (var i = 0; i < transfer_array[f].length; i++)
+		{
+			var newX = Math.round( i* transfer.width / transfer_array[f].length );
+			if (newX != lastX)
+			{
+				var bg1 = [127,127,127];
+				var bg2 = [255,255,255];
+				if (Math.round((lastX+transfer_high/4) / (transfer_high/2)) % 2 == 0)
+				{
+					var bgt = bg1;
+					bg1 = bg2;
+					bg2 = bgt;
+				}
+				var rgba = transfer_array[f][i];
+				var fg1 = new Array(3);
+				fg1[0] = Math.round((rgba[0] * rgba[3] + bg1[0] * (255 - rgba[3]) )/ 255);
+				fg1[1] = Math.round((rgba[1] * rgba[3] + bg1[1] * (255 - rgba[3]) )/ 255);
+				fg1[2] = Math.round((rgba[2] * rgba[3] + bg1[2] * (255 - rgba[3]) )/ 255);
+				var fg2 = new Array(3);
+				fg2[0] = Math.round((rgba[0] * rgba[3] + bg2[0] * (255 - rgba[3]) )/ 255);
+				fg2[1] = Math.round((rgba[1] * rgba[3] + bg2[1] * (255 - rgba[3]) )/ 255);
+				fg2[2] = Math.round((rgba[2] * rgba[3] + bg2[2] * (255 - rgba[3]) )/ 255);
+				transferRectangle(lastX,f*(transfer_high+2)                ,newX-lastX,transfer_high/2,"rgb("+ fg1[0] +","+ fg1[1] +","+ fg1[2] +")");
+				transferRectangle(lastX,f*(transfer_high+2)+transfer_high/2,newX-lastX,transfer_high/2,"rgb("+ fg2[0] +","+ fg2[1] +","+ fg2[2] +")");
+			}
+			lastX = newX;
+		}
+		t_ctx.beginPath();
+		var first = true;
+		for (p in transfer_points[f])
+		{
+			var point = [
+				transfer_points[f][p].value * transfer.width / transfer_array[f].length,
+				f*(transfer_high+2) + transfer_high - transfer_points[f][p].a * transfer_high
+			];
+			if (first)
+			{
+				t_ctx.moveTo( point[0], point[1] );
+				first = false;
+			}
+			else
+				t_ctx.lineTo( point[0], point[1] );
+		}
+		t_ctx.stroke();
+		transferRectangle(0,f*(transfer_high+2)+transfer_high,transfer.width,2,"black");
+	}
+}
+
+function removePoint( e )
+{
+	var elements = e.target.id.split("_");
+	var s = parseInt(elements[1]);
+	var i = parseInt(elements[2]);
+	transfer_points[s].splice( i, 1 );
+	sendFeedback( "transfer points", transfer_points );
+}
+
+function pad(num, size) {
+    var s = num.toString();
+    var l = size - s.length;
+    for (var i = 0; i < l; i++)
+		s =	"&nbsp;" + s;
+    return s;
+}
+
+document.getElementById("interval_range").oninput = function()
+{
+	var interval_range = document.getElementById("interval_range");
+	var interval_span = document.getElementById("interval_span");
+	interval_span.innerHTML = interval_range.value;
+};
+
+document.getElementById("interval_change").onclick = function()
+{
+	var metadata =
+	{
+		"interval" : parseInt(document.getElementById("interval_range").value)
+	};
+	sendFeedback("metadata", metadata);
+};
+
+document.getElementById("clip_add").onclick = function()
+{
+	var clipping_add =
+	{
+		"position" : [ parseFloat(document.getElementById("clip_px").value), parseFloat(document.getElementById("clip_py").value), parseFloat(document.getElementById("clip_pz").value) ],
+		"normal"   : [ parseFloat(document.getElementById("clip_nx").value), parseFloat(document.getElementById("clip_ny").value), parseFloat(document.getElementById("clip_nz").value) ]
+	};
+	sendFeedback("clipping add", clipping_add);
+};
+
+document.getElementById("clip_bx").onclick = function()
+{
+	document.getElementById("clip_nx").value = "1";
+	document.getElementById("clip_ny").value = "0";
+	document.getElementById("clip_nz").value = "0";
+};
+
+document.getElementById("clip_by").onclick = function()
+{
+	document.getElementById("clip_nx").value = "0";
+	document.getElementById("clip_ny").value = "1";
+	document.getElementById("clip_nz").value = "0";
+};
+
+document.getElementById("clip_bz").onclick = function()
+{
+	document.getElementById("clip_nx").value = "0";
+	document.getElementById("clip_ny").value = "0";
+	document.getElementById("clip_nz").value = "1";
+};
+
+function createRemoveClippingFeedback( c )
+{
+	return function()
+	{
+		sendFeedback( "clipping remove", parseInt(c) );
+	};
+}
+
+function createEditClippingFeedback( c )
+{
+	return function()
+	{
+		var clipping_edit =
+		{
+			"nr"       : parseInt(c),
+			"position" : [ parseFloat(document.getElementById("clip_" + c + "_px").value), parseFloat(document.getElementById("clip_" + c + "_py").value), parseFloat(document.getElementById("clip_" + c + "_pz").value) ],
+			"normal"   : [ parseFloat(document.getElementById("clip_" + c + "_nx").value), parseFloat(document.getElementById("clip_" + c + "_ny").value), parseFloat(document.getElementById("clip_" + c + "_nz").value) ]
+		};
+		sendFeedback("clipping edit", clipping_edit);
+	};
+};
+
+function createWeightFeedback( w, range_name, value_name )
+{
+	return function()
+	{
+		var myself = document.getElementById( range_name );
+		weight[w] = (myself.value/100)*(myself.value/100);
+		var value = document.getElementById( value_name );
+		if ( weight[w] == 0 )
+			value.innerHTML = ' <b><font color="red">Off</font></b> ';
+		else
+			value.innerHTML = ' <b><font color="green">' + weight[w].toFixed(1) + '</font></b> ';
+	};
+}
+
+function createOptimizedFunction( i, minmax, with_add )
+{
+	return function()
+	{
+		var mul = 1 / (minmax["max"] - minmax["min"]);
+		var function_string = document.getElementById("f_" + i + "_string");
+		if (function_string.value == "idem" || function_string.value == "")
+			functions[i] = "mul(" + mul.toFixed(5) + ")";
+		else
+			functions[i] = function_string.value + " | mul(" + mul.toFixed(5) + ")";
+		if (with_add)
+			functions[i] += " | add(0.5)";
+		function_string.value = functions[i];
+	};
+}
+
+function updateMetaDataTable(metadata)
+{
+	if (Object.keys(metadata).length === 0 && JSON.stringify(metadata) === JSON.stringify({}))
+		return;
+	for (element in metadata)
+	{
+		if (element == "particle count")
+			particle_count = metadata[element];
+		if (element == "time step")
+			time_step = metadata[element];
+		if (element == "cell count")
+			cell_count = metadata[element];
+		if (element == "simulation_time")
+			simulation_time = metadata[element];
+		if (element == "drawing_time")
+			drawing_time = metadata[element];
+	}
+}
+
+function RGB2HTML(red, green, blue)
+{
+	var decColor =0x1000000+ blue + 0x100 * green + 0x10000 *red ;
+	return '#'+decColor.toString(16).substr(1);
+}
+
+document.getElementById("connect").onclick = function()
+{
+	if (socket != null && socket.readyState == 1)
+	{
+		socket.send(JSON.stringify({"type" : "closed"}));
+		socket.close();
+		socket.onclose();
+	}
+	else //Open
+	{
+		url = "ws://" + document.getElementById("url").value + ":" + document.getElementById("port").value;
+		if (typeof MozWebSocket != "undefined")
+			socket = new MozWebSocket( url , "isaac-json-protocol" );
+		else
+			socket = new WebSocket( url , "isaac-json-protocol" );
+		try
+		{
+			socket.onopen = function()
+			{
+				document.getElementById("status").textContent = "Status: Connected";
+				document.getElementById("connect").value = "Close";
+			};
+			socket.onmessage = function got_packet(msg)
+			{
+				var obj = JSON.parse(msg.data);
+				if (obj["type"] == "hello")
+				{
+					document.getElementById("isaac_name").textContent = obj["name"];
+					var table = document.getElementById("list_table");
+					while (table.rows.length > 1)
+						table.deleteRow(1);
+					document.getElementById("list_td").style.display = 'initial';
+				}
+				if (obj["type"] == "register")
+				{
+					plugins.push(obj);
+					var table = document.getElementById("list_table");
+					var row = table.insertRow(-1);
+					row.id = obj["id"];
+					row.insertCell(0).innerHTML = obj["name"];
+					row.insertCell(1).innerHTML = obj["id"];
+					row.insertCell(2).innerHTML = obj["nodes"];
+					nodes = obj["nodes"];
+					row.insertCell(3).innerHTML = obj["max functors"];
+
+					var cell = row.insertCell(4);
+					for (element in obj["functors"])
+					{
+						var e = obj["functors"][element]
+						cell.innerHTML += "<b>" + e["name"] + ":</b> ";
+						cell.innerHTML += e["description"] + "<br/>";
+					}
+					var cell = row.insertCell(5);
+					var d = obj["dimension"];
+					cell.innerHTML += obj["width"];
+					if (d > 1)
+						cell.innerHTML += " * " + obj["height"];
+					if (d > 2)
+						cell.innerHTML += " * " + obj["depth"];
+					var cell = row.insertCell(6);
+					for (element in obj["sources"])
+					{
+						var e = obj["sources"][element]
+						cell.innerHTML += "<b>" + e["name"] + ":</b><br/>";
+						cell.innerHTML += " Feature dimension(" + e["feature dimension"] + ")<br/>";
+					}
+					var cell = row.insertCell(7);//.innerHTML = obj["metadata"].toSource();
+					for (element in obj["metadata"])
+					{
+						cell.innerHTML += "<b>" + element + ":</b> ";
+						cell.innerHTML += obj["metadata"][element];
+						cell.innerHTML += "<br/>";
+					}
+					var observeCell = row.insertCell(8);
+					var button = document.createElement("input");
+					button.type = "button";
+					button.value = "Observe";
+					button.onclick = function()
+					{
+						var global_size = [ obj["width"],  obj["height"], obj["depth"] ];
+						var m = Math.max( global_size[0], global_size[1], global_size[2] );
+						edges = [
+							[ -global_size[0] / m,  global_size[1] / m,  global_size[2] / m ],
+							[  global_size[0] / m,  global_size[1] / m,  global_size[2] / m ],
+							[  global_size[0] / m, -global_size[1] / m,  global_size[2] / m ],
+							[ -global_size[0] / m, -global_size[1] / m,  global_size[2] / m ],
+							[ -global_size[0] / m,  global_size[1] / m, -global_size[2] / m ],
+							[  global_size[0] / m,  global_size[1] / m, -global_size[2] / m ],
+							[  global_size[0] / m, -global_size[1] / m, -global_size[2] / m ],
+							[ -global_size[0] / m, -global_size[1] / m, -global_size[2] / m ]
+						];
+						document.getElementById("video_td").style.display = 'table-cell';
+						document.getElementById("preview_td").style.display = 'table-cell';
+						projection = obj["projection"];
+						position = obj["position"];
+						distance = obj["distance"];
+						rotation = obj["rotation"];
+						sources = obj["sources"];
+						document.getElementById("interpolation_checkbox").checked = obj["interpolation"];
+						document.getElementById("step").value = obj["step"];
+						document.getElementById("iso_surface_checkbox").checked = obj["iso surface"];
+
+						preview.width = obj["framebuffer width"];
+						preview.height = obj["framebuffer height"];
+						video.width = obj["framebuffer width"];
+						video.height = obj["framebuffer height"];
+						observeSimulation(obj["id"]);
+						redraw();
+					};
+					observeCell.appendChild(button);
+				}
+				if (obj["type"] == "period" || obj["type"] == "update")
+				{
+					if (obj.hasOwnProperty("payload"))
+					{
+						stream_img.src = obj["payload"];
+					}
+					if (obj.hasOwnProperty("metadata"))
+					{
+						if (obj["metadata"].hasOwnProperty("interval"))
+						{
+							var interval_range = document.getElementById("interval_range");
+							var interval_span = document.getElementById("interval_span");
+							interval_range.value = obj["metadata"]["interval"];
+							interval_span.innerHTML = obj["metadata"]["interval"];
+							delete obj["metadata"]["interval"];
+						}
+						if (obj["metadata"].hasOwnProperty("radiation sum field x"))
+							fft_view.width = parseInt(obj["metadata"]["radiation sum field x"]);
+						if (obj["metadata"].hasOwnProperty("radiation sum field y"))
+							fft_view.height = parseInt(obj["metadata"]["radiation sum field y"]);
+						if (obj["metadata"].hasOwnProperty("radiation sum field"))
+						{
+							blob = atob(obj["metadata"]["radiation sum field"]);
+							var len = blob.length;
+							var bytes = new Uint8Array( len );
+							for (var i = 0; i < len; i++)
+								bytes[i] = blob.charCodeAt(i);
+							var floats = new Float32Array(bytes.buffer,0,bytes.length/4);
+							var ctx = fft_view.getContext('2d');
+							var image = ctx.createImageData(fft_view.width, fft_view.height);
+							var pixels = image.data;
+							for (var i = 0; i < floats.length; i++)
+							{
+								var l = Math.log10(floats[i]);
+								var v = (-2.0+l)*0.2;
+								if (v < 0.0)
+									v = 0.0;
+								if (v > 2.0)
+									v = 2.0;
+								var r = 0;
+								var g;
+								var b = 0;
+								if (v < 1.0)
+								{
+									g = v*128.0;
+									b = v*128.0;
+								}
+								else
+								{
+									b = (2.0-v)*128.0;
+									g = (v+1.0)*64.0;
+									r = (v-1.0)*192.0;
+								}
+								pixels[i*4 + 0] = Math.floor(r);
+								pixels[i*4 + 1] = Math.floor(g);
+								pixels[i*4 + 2] = Math.floor(b);
+								pixels[i*4 + 3] = 255;
+							}
+							ctx.putImageData(image, 0, 0);
+						}
+
+						updateMetaDataTable( obj["metadata"] );
+						if (obj["metadata"].hasOwnProperty("reference particles"))
+							particles = obj["metadata"]["reference particles"];
+					}
+					var d = new Date();
+					var	now = d.getTime();
+					if (now - last_feedback_send > 100)
+					{
+						if (obj.hasOwnProperty("projection"))
+							projection = obj["projection"];
+						if (obj.hasOwnProperty("position"))
+							position = obj["position"];
+						if (obj.hasOwnProperty("rotation"))
+							rotation = obj["rotation"];
+						if (obj.hasOwnProperty("distance"))
+							distance = obj["distance"];
+						if (obj.hasOwnProperty("interpolation"))
+							document.getElementById("interpolation_checkbox").checked = obj["interpolation"];
+						if (obj.hasOwnProperty("step"))
+							document.getElementById("step").checked = obj["step"];
+						if (obj.hasOwnProperty("iso surface"))
+							document.getElementById("iso_surface_checkbox").checked = obj["iso surface"];
+					}
+					if (obj.hasOwnProperty("functions"))
+					{
+						var functions_div = document.getElementById("functions_div");
+						while (functions_div.firstChild) {
+							functions_div.removeChild(functions_div.firstChild);
+						}
+						functions = obj["functions"];
+						for (var f in functions)
+						{
+							var title = document.createElement("SPAN");
+							title.innerHTML = sources[f].name + " function: ";
+							functions_div.appendChild(title);
+							var function_string = document.createElement("INPUT");
+							function_string.value = functions[f].source;
+							function_string.size = 80;
+							function_string.id = "f_" + f + "_string";
+							functions_div.appendChild(function_string);
+							var error = document.createElement("SPAN");
+							switch (functions[f].error)
+							{
+								case 0:
+									error.innerHTML = ' <b><font color="green">Ok</font></b>';
+									break;
+								case 1:
+									error.innerHTML = ' <b><font color="orange">Too much functors, ignoring at least one</font></b>';
+									break;
+								case 2:
+									error.innerHTML = ' <b><font color="orange">Too much parameters, ignoring at least one</font></b>';
+									break;
+								case -1:
+									error.innerHTML = ' <b><font color="red">Missing )</font></b>';
+									break;
+								case -2:
+									error.innerHTML = ' <b><font color="red">Unknown functor</font></b>';
+									break;
+								default:
+									error.innerHTML = ' <b><font color="red">Fatal error</font></b>';
+							}
+							functions_div.appendChild(error);
+							var minmax = document.createElement("SPAN");
+							minmax.id = "i_" + f + "_string";
+							functions_div.appendChild(minmax);
+							functions_div.appendChild(document.createElement("BR"));
+						}
+						var function_button = document.createElement("INPUT");
+						function_button.type = "button";
+						function_button.value = "Update functions";
+						function_button.id = "f_button";
+						function_button.onclick = function()
+						{
+							for (var f in functions)
+								functions[f] = document.getElementById("f_" + f + "_string").value;
+							sendFeedback( "functions", functions );
+						};
+						functions_div.appendChild(function_button);
+						var minmax_button = document.createElement("INPUT");
+						minmax_button.type = "button";
+						minmax_button.value = "Update minmax interval";
+						minmax_button.id = "i_button";
+						minmax_button.onclick = function()
+						{
+							sendFeedback( "request", "minmax" );
+						};
+						functions_div.appendChild(minmax_button);
+					}
+					if (obj.hasOwnProperty("eye distance"))
+					{
+						var stereo_div = document.getElementById("stereo_div");
+						while (stereo_div.firstChild) {
+							stereo_div.removeChild(stereo_div.firstChild);
+						}
+						eye_distance = obj["eye distance"];
+						var title = document.createElement("SPAN");
+						title.innerHTML = "Eye Distance: ";
+						stereo_div.appendChild(title);
+						var stereo_range = document.createElement("INPUT");
+						stereo_range.type = "range";
+						stereo_range.min = 0;
+						stereo_range.max = 200;
+						stereo_range.id = "stereo_range";
+						stereo_range.value = Math.floor(eye_distance * 1000.0);
+						stereo_div.appendChild(stereo_range);
+						var submit = document.createElement("INPUT");
+						submit.type = "button";
+						submit.value = "Set distance";
+						submit.onclick = function()
+						{
+							sendFeedback( "eye distance", parseFloat(document.getElementById("stereo_range").value) / 1000.0 );
+						};
+						stereo_div.appendChild(submit);
+					}
+					if (obj.hasOwnProperty("minmax"))
+					{
+						for (var i in obj["minmax"])
+						{
+							var parent = document.getElementById("i_" + i + "_string");
+							while (parent.firstChild) {
+								parent.removeChild(parent.firstChild);
+							}
+							var title = document.createElement("SPAN");
+							title.innerHTML = " [ "+obj["minmax"][i]["min"].toFixed(3)+" , "+obj["minmax"][i]["max"].toFixed(3)+" ]";
+							parent.appendChild(title);
+							var apply = document.createElement("INPUT");
+							apply.type = "button";
+							apply.value = "Optimize";
+							apply.id = "i_" + i + "_button";
+							apply.onclick = createOptimizedFunction( i, obj["minmax"][i], false);
+							parent.appendChild(apply);
+							    apply = document.createElement("INPUT");
+							apply.type = "button";
+							apply.value = "With add";
+							apply.id = "i_" + i + "_button_add";
+							apply.onclick = createOptimizedFunction( i, obj["minmax"][i], true);
+							parent.appendChild(apply);
+						}
+					}
+					if (obj.hasOwnProperty("weight"))
+					{
+						var weight_div = document.getElementById("weight_div");
+						while (weight_div.firstChild) {
+							weight_div.removeChild(weight_div.firstChild);
+						}
+						weight = obj["weight"];
+						for (var w in weight)
+						{
+							var title = document.createElement("SPAN");
+							title.innerHTML = sources[w].name + ": ";
+							weight_div.appendChild(title);
+							var weight_range = document.createElement("INPUT");
+							weight_range.type = "range";
+							weight_range.min = 0;
+							weight_range.max = 447;
+							weight_range.value = Math.floor(Math.sqrt(weight[w])*100);
+							var range_name = "w_" + w + "_range";
+							var value_name = "w_" + w + "_value";
+							weight_range.id = range_name
+							weight_range.oninput = createWeightFeedback( w, range_name, value_name );
+							weight_div.appendChild(weight_range);
+							var value = document.createElement("SPAN");
+							if ( weight[w] == 0 )
+								value.innerHTML = ' <b><font color="red">Off</font></b> ';
+							else
+								value.innerHTML = ' <b><font color="green">' + weight[w].toFixed(1) + '</font></b> ';
+							value.id = value_name;
+							weight_div.appendChild(value);
+						}
+						var weight_button = document.createElement("INPUT");
+						weight_button.type = "button";
+						weight_button.value = "Update weights";
+						weight_button.id = "w_button";
+						weight_button.onclick = function()
+						{
+							sendFeedback( "weight", weight );
+						};
+						weight_div.appendChild(weight_button);
+					}
+					if (obj.hasOwnProperty("transfer array"))
+					{
+						transfer_array = obj["transfer array"];
+						if (obj.hasOwnProperty("transfer points"))
+						{
+							transfer_points = obj["transfer points"];
+							var transfer_form = document.getElementById("transfer_form");
+							while (transfer_form.firstChild) {
+								transfer_form.removeChild(transfer_form.firstChild);
+							}
+							for (var s in transfer_points)
+							{
+								var node = document.createElement("TD");
+								node.innerHTML = "<b>" + sources[s].name + "</b>";
+								node.style.vertical_align = "bottom";
+								for (var i in transfer_points[s])
+								{
+									var subnode = document.createElement("DIV");
+									var transfer = document.createElement("INPUT");
+									transfer.type = "text";
+									transfer.value = (transfer_points[s][i].value / transfer_array[s].length).toFixed(3);
+									transfer.size = 4;
+									transfer.id = "p_" + s + "_" + i + "_transfer";
+									if (i == 0 || i == transfer_points[s].length - 1)
+										transfer.disabled = true;
+									subnode.appendChild(transfer);
+									var input = document.createElement("INPUT");
+									input.type = button;
+									var picker = new jscolor(input);
+									input.jscolor = picker;
+									input.size = 6;
+									picker.closable = true;
+									picker.closeText = "Close";
+									picker.fromRGB( transfer_points[s][i].r * 255, transfer_points[s][i].g * 255, transfer_points[s][i].b * 255 );
+									input.id = "p_" + s + "_" + i + "_color";
+									subnode.appendChild(input);
+									var alpha = document.createElement("INPUT");
+									alpha.value = transfer_points[s][i].a;
+									alpha.size = 10;
+									alpha.id = "p_" + s + "_" + i + "_alpha";
+									subnode.appendChild(alpha);
+									if (i != 0 && i != transfer_points[s].length-1)
+									{
+										var remove = document.createElement("INPUT");
+										remove.type = "button";
+										remove.value = "Remove";
+										remove.id = "p_" + s + "_" + i + "_remove";
+										remove.onclick = removePoint;
+										subnode.appendChild(remove);
+									}
+									node.appendChild(subnode);
+								}
+								transfer_form.appendChild(node);
+							}
+							var node = document.createElement("TD");
+							node.innerHTML = "<b> Controls </b><br/>";
+							var redo = document.createElement("INPUT");
+							redo.type = "button";
+							redo.value = "Reset";
+							redo.onclick = function ()
+							{
+								sendFeedback("request", "transfer");
+							};
+							node.appendChild(redo);
+							var submit = document.createElement("INPUT");
+							submit.type = "button";
+							submit.value = "Submit changes";
+							submit.onclick = function()
+							{
+								for (var s in transfer_points)
+									for (var i in transfer_points[s])
+									{
+										var base = "p_" + s + "_" + i;
+										var color = document.getElementById( base + "_color");
+										var alpha = document.getElementById( base + "_alpha");
+										transfer_points[s][i].r = color.jscolor.rgb[0]/255;
+										transfer_points[s][i].g = color.jscolor.rgb[1]/255;
+										transfer_points[s][i].b = color.jscolor.rgb[2]/255;
+										transfer_points[s][i].a = parseFloat(alpha.value);
+										if (i > 0 && i < transfer_points[s].length - 1)
+										{
+											var transfer = document.getElementById( base + "_transfer");
+											var transfer_value = Math.round(parseFloat(transfer.value) * transfer_array[s].length);
+											if (transfer_value < 1)
+												transfer_value = 1;
+											if (transfer_value >= transfer_array[s].length)
+												transfer_value = transfer_array[s].length - 1;
+											transfer_points[s][i].value = transfer_value;
+										}
+									}
+								sendFeedback( "transfer points", transfer_points );
+							};
+							node.appendChild(submit);
+							transfer_form.appendChild(node);
+						}
+						updateTransfer();
+					}
+					if (obj.hasOwnProperty("clipping"))
+					{
+						clipping = obj["clipping"];
+						var clipping_div = document.getElementById("clipping_list_div");
+						while (clipping_div.firstChild) {
+							clipping_div.removeChild(clipping_div.firstChild);
+						}
+						for (var c in clipping)
+						{
+							var node = document.createElement("DIV");
+
+							var span = document.createElement("SPAN");
+							span.innerHTML = " Position: ";
+							node.appendChild(span);
+
+							var input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].position[0];
+							input.size = 4;
+							input.id = "clip_" + c + "_px";
+							node.appendChild(input);
+
+							input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].position[1];
+							input.size = 4;
+							input.id = "clip_" + c + "_py";
+							node.appendChild(input);
+
+							input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].position[2];
+							input.size = 4;
+							input.id = "clip_" + c + "_pz";
+							node.appendChild(input);
+
+							span = document.createElement("SPAN");
+							span.innerHTML = " Normal: ";
+							node.appendChild(span);
+
+							input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].normal[0];
+							input.size = 4;
+							input.id = "clip_" + c + "_nx";
+							node.appendChild(input);
+
+							input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].normal[1];
+							input.size = 4;
+							input.id = "clip_" + c + "_ny";
+							node.appendChild(input);
+
+							input = document.createElement("INPUT");
+							input.type = "text";
+							input.value = clipping[c].normal[2];
+							input.size = 4;
+							input.id = "clip_" + c + "_nz";
+							node.appendChild(input);
+
+							span = document.createElement("SPAN");
+							span.innerHTML = " ";
+							node.appendChild(span);
+
+							input = document.createElement("INPUT");
+							input.type = "button";
+							input.value = "Edit";
+							input.onclick = createEditClippingFeedback( c );
+							node.appendChild(input);
+
+							span = document.createElement("SPAN");
+							span.innerHTML = " ";
+							node.appendChild(span);
+
+							input = document.createElement("INPUT");
+							input.type = "button";
+							input.value = "Remove";
+							input.onclick = createRemoveClippingFeedback( c );
+							node.appendChild(input);
+
+							clipping_div.appendChild(node);
+						}
+					}
+					if (obj.hasOwnProperty("background color"))
+					{
+						var background_color = document.getElementById("background_color");
+						background_color.jscolor.fromRGB(
+							obj["background color"][0] * 255,
+							obj["background color"][1] * 255,
+							obj["background color"][2] * 255 );
+						wireframe_color = RGB2HTML(
+							255 - parseInt(background_color.jscolor.rgb[0]),
+							255 - parseInt(background_color.jscolor.rgb[1]),
+							255 - parseInt(background_color.jscolor.rgb[2]));
+					}
+					redraw();
+				}
+				if (obj["type"] == "exit")
+				{
+					var table = document.getElementById("list_table");
+					for (var c = 1; c < table.rows.length;c++)
+						if (table.rows[c].id == obj["id"])
+						{
+							table.deleteRow(c);
+							break;
+						}
+					if (observe_id == obj["id"])
+					{
+						document.getElementById("video_td").style.display = 'none';
+						document.getElementById("preview_td").style.display = 'none';
+					}
+					stream_img.src = default_image_src;
+				}
+			};
+			socket.onclose = function()
+			{
+				if (document.getElementById("status").textContent != "Status: An error occured. Wrong address, network gone or server not started?")
+					document.getElementById("status").textContent = "Status: Closed";
+				document.getElementById("connect").value = "Connect";
+				document.getElementById("list_td").style.display = 'none';
+				document.getElementById("video_td").style.display = 'none';
+				document.getElementById("preview_td").style.display = 'none';
+			};
+			socket.onerror = function()
+			{
+				document.getElementById("status").textContent = "Status: An error occured. Wrong address, network gone or server not started?";
+			};
+		}
+		catch(exception)
+		{
+			document.getElementById("status").textContent = "Status: Error" + exception;
+		}
+	}
+};
+
+document.getElementById("stop").onclick = function()
+{
+	document.getElementById("video_td").style.display = 'none';
+	document.getElementById("preview_td").style.display = 'none';
+	stopObserverSimulation();
+}
+
+document.getElementById("pause").onclick = function()
+{
+
+	var metadata =
+	{
+		"pause" : true
+	};
+	sendFeedback("metadata", metadata);
+}
+
+document.getElementById("exit").onclick = function()
+{
+	if (confirm("Do you really want to stop the simulation?"))
+	{
+		var metadata =
+		{
+			"exit" : 1
+		};
+		sendFeedback("metadata", metadata);
+		document.getElementById("stop").onclick();
+	}
+}
+
+document.getElementById("panic").onclick = function()
+{
+	if (confirm("Do you really want to reset the view?"))
+	{
+		position = [0, 0, 0];
+		distance = -4.5;
+		rotation = [1, 0, 0, 0, 1, 0, 0, 0, 1]
+		sendFeedback("position absolute",position);
+		sendFeedback("distance absolute",distance);
+		sendFeedback("rotation absolute",rotation);
+	}
+}
+
+document.getElementById("bounding").onclick = function()
+{
+	sendFeedback("bounding box",true);
+}
+
+document.getElementById("background_change").onclick = function()
+{
+	var background_color = new Array(3);
+	background_color[0] = document.getElementById("background_color").jscolor.rgb[0]/255;
+	background_color[1] = document.getElementById("background_color").jscolor.rgb[1]/255;
+	background_color[2] = document.getElementById("background_color").jscolor.rgb[2]/255;
+	sendFeedback("background color",background_color);
+}
+
+function one_window_checkbox_click()
+{
+	one_window = document.getElementById("one_window_checkbox").checked;
+	if (one_window)
+	{
+		var node = document.getElementById("preview_div");
+		document.getElementById("video_container_div").appendChild(node);
+		redraw();
+	}
+	else
+	{
+		var node = document.getElementById("preview_div");
+		document.getElementById("preview_container_div").appendChild(node);
+		redraw();
+	}
+};
+
+function wireframe_checkbox_click()
+{
+	wireframe = document.getElementById("wireframe_checkbox").checked;
+};
+
+
+function dropable_checkbox_click()
+{
+	dropable = document.getElementById("dropable_checkbox").checked;
+};
+
+function interpolation_checkbox_click()
+{
+	var status = document.getElementById("interpolation_checkbox").checked;
+	sendFeedback( "interpolation", status );
+};
+
+function step_button_click()
+{
+	var status = parseFloat(document.getElementById("step").value);
+	sendFeedback( "step", status );
+};
+
+function iso_surface_checkbox_click()
+{
+	var status = document.getElementById("iso_surface_checkbox").checked;
+	sendFeedback( "iso surface", status );
+};
+
+document.getElementById("zoom_in").onclick = function()
+{
+	zoom(+0.1);
+}
+
+document.getElementById("zoom_out").onclick = function()
+{
+	zoom(-0.1);
+}
+
+document.getElementById("plus_x").onclick = function()
+{
+	rotate(+5,0,0);
+}
+
+document.getElementById("minus_x").onclick = function()
+{
+	rotate(-5,0,0);
+}
+
+document.getElementById("plus_y").onclick = function()
+{
+	rotate(0,+5,0);
+}
+
+document.getElementById("minus_y").onclick = function()
+{
+	rotate(0,-5,0);
+}
+
+document.getElementById("plus_z").onclick = function()
+{
+	rotate(0,0,+5);
+}
+
+document.getElementById("minus_z").onclick = function()
+{
+	rotate(0,0,-5);
+}
+
+document.getElementById("ctl_left").onclick = function()
+{
+	move([-0.05,0,0]);
+}
+
+document.getElementById("ctl_right").onclick = function()
+{
+	move([+0.05,0,0]);
+}
+
+document.getElementById("ctl_up").onclick = function()
+{
+	move([0,-0.05,0]);
+}
+
+document.getElementById("ctl_down").onclick = function()
+{
+	move([0,+0.05,0]);
+}
+
+
+document.getElementById("zoom_in_5").onclick = function()
+{
+	zoom(+0.5);
+}
+
+document.getElementById("zoom_out_5").onclick = function()
+{
+	zoom(-0.5);
+}
+
+document.getElementById("plus_x_5").onclick = function()
+{
+	rotate(+25,0,0);
+}
+
+document.getElementById("minus_x_5").onclick = function()
+{
+	rotate(-25,0,0);
+}
+
+document.getElementById("plus_y_5").onclick = function()
+{
+	rotate(0,+25,0);
+}
+
+document.getElementById("minus_y_5").onclick = function()
+{
+	rotate(0,-25,0);
+}
+
+document.getElementById("plus_z_5").onclick = function()
+{
+	rotate(0,0,+25);
+}
+
+document.getElementById("minus_z_5").onclick = function()
+{
+	rotate(0,0,-25);
+}
+
+document.getElementById("ctl_left_5").onclick = function()
+{
+	move([-0.25,0,0]);
+}
+
+document.getElementById("ctl_right_5").onclick = function()
+{
+	move([+0.25,0,0]);
+}
+
+document.getElementById("ctl_up_5").onclick = function()
+{
+	move([0,-0.25,0]);
+}
+
+document.getElementById("ctl_down_5").onclick = function()
+{
+	move([0,+0.25,0]);
+}
+
+function controls_checkbox_click()
+{
+	if (document.getElementById("controls_checkbox").checked)
+		document.getElementById("controls").style.display = 'initial';
+	else
+		document.getElementById("controls").style.display = 'none';
+}
+
+</script>
+</body>
+</html>

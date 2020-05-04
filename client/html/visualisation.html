@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ISAAC Control Page</title>
+</head>
+<style>
+    * {
+      font-family: sans-serif;
+    }
+</style>
+<body>
+<h3>Preview and camera setting</h3>
+<p>Usage:
+<ul>
+<li>Left click + Mouse movement: Change view angle</li>
+<li>Right/Middle click + Mouse movement: Change position</li>
+<li>Mousewheel: zoom</li>
+</ul>
+<form>
+	Server URL:<input type="text" id="server_url" value="127.0.0.1">
+	Port:<input type="text" id="server_port" value="2459">
+	<input type="button" value="Connect" id="connect">
+	<br/><input type="checkbox" id="one_window_checkbox" checked onchange="one_window_checkbox_click()"> Show video and control in one window
+	<br/><input type="checkbox" id="wireframe_checkbox" checked onchange="wireframe_checkbox_click()"> Show wireframe bounding box
+	<br/><input type="checkbox" id="dropable_checkbox" onchange="dropable_checkbox_click()"> Meta data can be dropped (Select before observing!)
+</form>
+<div id="status">Status: Not connected</div>
+</p>
+<table><tr>
+<td id="video_td" valign="top">
+	<!--canvas id="video" width="512" height="512" style="border:1px solid #000000;"></canvas-->
+	<div id="video_container_div" style="position: relative;">
+		<div id="video_div" style="position: relative; top: 0; left: 0;">
+			<table><tr>
+			<td>
+				<canvas id="video" width="512" height="512"></canvas>
+				<div id="url_div" style="display:none;"></div>
+			</td>
+			<td align="center"><div id="controls" style="display:none;">
+				<input type="button" value="+" id="zoom_in"> <input type="button" value="5 x" id="zoom_in_5"><br/>
+				<input type="button" value="-" id="zoom_out"> <input type="button" value="5 x" id="zoom_out_5"><br/>
+				<input type="button" value="X+" id="plus_x"> <input type="button" value="5 x" id="plus_x_5"><br/>
+				<input type="button" value="X-" id="minus_x"> <input type="button" value="5 x" id="minus_x_5"><br/>
+				<input type="button" value="Y+" id="plus_y"> <input type="button" value="5 x" id="plus_y_5"><br/>
+				<input type="button" value="Y-" id="minus_y"> <input type="button" value="5 x" id="minus_y_5"><br/>
+				<input type="button" value="Z+" id="plus_z"> <input type="button" value="5 x" id="plus_z_5"><br/>
+				<input type="button" value="Z-" id="minus_z"> <input type="button" value="5 x" id="minus_z_5"><br/>
+				<input type="button" value="←" id="ctl_left"> <input type="button" value="5 x" id="ctl_left_5"><br/>
+				<input type="button" value="→" id="ctl_right"> <input type="button" value="5 x" id="ctl_right_5"><br/>
+				<input type="button" value="↑" id="ctl_up"> <input type="button" value="5 x" id="ctl_up_5"><br/>
+				<input type="button" value="↓" id="ctl_down"> <input type="button" value="5 x" id="ctl_down_5">
+			</div></td>
+			</tr></table>
+				<form>
+				<input type="button" value="Pause" id="pause">
+				<input type="button" value="Stop observing" id="stop">
+				<input type="button" value="Reset view" id="panic">
+				<input type="button" value="Stop simulation" id="exit">
+				<input type="button" value="Toogle bounding box" id="bounding">
+				Background color: <input id="background_color" class="jscolor" value="000000" size="6">
+				<input type="button" value="Apply" id="background_change">
+				Interval: <input type="range" value="1" min="1" max="32" id="interval_range">
+				<span id="interval_span">1</span>
+				<input type="button" value="Set" id="interval_change">
+				<input type="checkbox" id="controls_checkbox" onchange="controls_checkbox_click()"> Show controls
+			</form>
+			<div id="ambient_occ_div">
+				<table>
+					<h3>Ambient Occlusion</h3>
+					<tr>
+						<td>Enabled</td>
+						<td><input type="checkbox" id="ao_checkbox" checked onchange="aoUpdate()"></td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>Weight</td>
+						<td><input type="range" min="0" max="1" value="0.5" step="0.01" id="ao_weight"></td>				
+						<td><button onclick="aoUpdate()">Set</button></td>	
+					</tr>
+				</table>
+				
+				<br/>
+			</div>
+			<div id="stereo_div"></div>
+			<div id="functions_div"></div>
+			<div id="weight_div"></div>
+			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation
+			<input type="checkbox" id="iso_surface_checkbox" checked onchange="iso_surface_checkbox_click()"> Iso Surface
+			<input id="step" size="4"><input type="button" value="Change step" id="step_button" onclick="step_button_click()"><br/>
+			<div id="clipping_add_div">
+				<b>Clipping planes:</b><br/>
+				<span> Position: </span><input type="text"   value="0" size="4" id="clip_px"><input type="text"   value="0" size="4" id="clip_py"><input type="text"   value="0" size="4" id="clip_pz">
+				<span> Normal: </span>  <input type="text"   value="0" size="4" id="clip_nx"><input type="text"   value="0" size="4" id="clip_ny"><input type="text"   value="1" size="4" id="clip_nz">
+				                      <input type="button" value="X"          id="clip_bx"><input type="button" value="Y"          id="clip_by"><input type="button" value="Z"          id="clip_bz">
+				                      <input type="button" value="Add"        id="clip_add">
+			</div>
+			<div id="clipping_list_div"></div>
+			<table border="1"><tr id="transfer_form"></tr></table>
+			<canvas id="transfer" width="412" height="16"></canvas>
+		</div>
+		<div id="preview_div" style="position: absolute; top: 0; left: 0; opacity: 0.5;">
+			<canvas id="preview" width="512" height="512" style="border:1px solid #000000;"></canvas>
+		</div>
+	</div>
+<td>
+<td id="preview_td" valign="top">
+	<div id="preview_container_div" style="position: relative;">
+	</div>
+</td>
+</tr></table>
+<div id="list_td" style="display:none">
+	<h3 id="isaac_name"></h3>
+	<table id="list_table" border="1">
+	<tr>
+		<th>Name</th>
+		<th>ID</th>
+		<th>Nodes</th>
+		<th>Max Functors</th>
+		<th>Functors</th>
+		<th>Dimension</th>
+		<th>Sources</th>
+		<th>Meta data</th>
+		<th>Observe</th>
+	</tr>
+	</table>
+</div>
+</body>
+<script src="../js/jscolor.js"></script>
+<script src="../js/isaac/client.js"></script>
+<script src="../js/isaac/draw.js"></script>
+<script src="../js/isaac/interface/visualisation.js"></script>
+</html>
