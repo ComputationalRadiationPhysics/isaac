@@ -160,7 +160,10 @@ static int callback_isaac(
 	case LWS_CALLBACK_RECEIVE:
 		if (pss->client)
 		{
-			json_t* input = json_loads((const char *)in, 0, NULL);
+			json_error_t error;
+			json_t* input = json_loadb((const char *)in, len, 0, &error);
+			if(!input)
+				printf("JSON ERROR: %s", error.text);
 			MessageContainer* message = new MessageContainer(NONE,input);
 			int finish = (message->type == CLOSED);
 			json_object_set_new( message->json_root, "url", json_string( pss->url ) );
@@ -172,6 +175,7 @@ static int callback_isaac(
 
 	case LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION:
 	{
+		printf("callback_isaac: LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION\n");
 		char name[256];
 		char rip[256];
 		lws_get_peer_addresses(wsi,lws_get_socket_fd(wsi),name,256,rip,256);
@@ -206,7 +210,8 @@ errorCode WebSocketDataConnector::init(int port,std::string interface)
 {
 	setlogmask(LOG_UPTO (LOG_DEBUG));
 	openlog("lwsts", LOG_PID | LOG_PERROR, LOG_DAEMON);
-	lws_set_log_level(7, lwsl_emit_syslog);
+	int logs = LLL_USER | LLL_ERR | LLL_WARN | LLL_NOTICE;
+	lws_set_log_level(logs, lwsl_emit_syslog);
 	struct lws_context_creation_info info;
 	memset(&info, 0, sizeof info);
 	info.protocols = protocols;
