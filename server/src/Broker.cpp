@@ -66,13 +66,13 @@ errorCode Broker::addDataConnector(MetaDataConnector *dataConnector)
 	return 0;
 }
 
-errorCode Broker::addImageConnector(ImageConnector *imageConnector)
+errorCode Broker::addImageConnector(ImageConnector *imageConnector, int id)
 {
 	imageConnector->setBroker(this);
 	ImageConnectorContainer d;
 	d.connector = imageConnector;
 	d.thread = 0;
-	imageConnectorList.push_back(d);
+	imageConnectorList[id] = d;
 	if (imageConnector->showClient)
 	{
 		json_t* element = json_object();
@@ -294,8 +294,8 @@ errorCode Broker::run()
 	}
 	for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 	{
-		printf("Launching %s\n",(*it).connector->getName().c_str());
-		pthread_create(&((*it).thread),NULL,Runable::run_runable,(*it).connector);
+		printf("Launching %s\n",(*it).second.connector->getName().c_str());
+		pthread_create(&((*it).second.thread),NULL,Runable::run_runable,(*it).second.connector);
 	}
 	while (force_exit == 0)
 	{
@@ -349,7 +349,7 @@ errorCode Broker::run()
 								container->image->suicide();
 							else
 								for(auto ic=imageConnectorList.begin();ic!=imageConnectorList.end();ic++)
-									(*ic).connector->masterSendMessage(container);
+									(*ic).second.connector->masterSendMessage(container);
 						}
 						else
 						{
@@ -412,7 +412,7 @@ errorCode Broker::run()
 							dc = dc->next;
 						}
 						for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
-							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_ADDED,NULL,group,1));
+							(*it).second.connector->masterSendMessage(new ImageBufferContainer(GROUP_ADDED,NULL,group,1));
 					}
 				}
 				else
@@ -434,7 +434,7 @@ errorCode Broker::run()
 							dc = dc->next;
 						}
 						for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
-							(*it).connector->masterSendMessage(new ImageBufferContainer(GROUP_FINISHED,NULL,group,1));
+							(*it).second.connector->masterSendMessage(new ImageBufferContainer(GROUP_FINISHED,NULL,group,1));
 						//Now let's remove the whole group
 						group->master->group = NULL;
 						printf("Removed group %i\n",group->id);
@@ -497,11 +497,12 @@ errorCode Broker::run()
 				{
 					int id = json_integer_value( json_object_get(message->json_root, "observe id") );
 					int stream = json_integer_value( json_object_get(message->json_root, "stream") );
+					//printf("%d\n", stream);
 					bool dropable = json_boolean_value( json_object_get(message->json_root, "dropable") );
-					if ( stream < 0 )
-						stream = 0;
-					if ( stream >= int(imageConnectorList.size()) )
-						stream = imageConnectorList.size()-1;
+					//if ( stream < 0 )
+					//	stream = 0;
+					//if ( stream >= int(imageConnectorList.size()) )
+					//	stream = imageConnectorList.size()-1;
 					const char* url = json_string_value( json_object_get(message->json_root, "url") );
 					void* ref = (void*)dc->t;
 					dc->t->observe( id, stream, dropable );
@@ -518,6 +519,7 @@ errorCode Broker::run()
 					}
 					if (group)
 					{
+						//printf("%d\n", stream);
 						json_t *js, *root = json_object();
 						if (json_array_size( js = json_object_get( group->initData, "projection") ) == 16)
 							json_object_set( root, "projection", js );
@@ -529,7 +531,8 @@ errorCode Broker::run()
 							json_object_set( root, "distance", js );
 						json_object_set_new( root, "type", json_string( "update" ) );
 						dc->t->masterSendMessage(new MessageContainer(UPDATE,root));
-						imageConnectorList[ stream ].connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED,NULL,group,1,url,ref));
+						if(imageConnectorList.find(stream) != imageConnectorList.end())
+							imageConnectorList[ stream ].connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED,NULL,group,1,url,ref));
 						//Send request for (transfer) functions and most recent frame
 						char buffer[] =
 							"{\"type\": \"feedback\", \"request\": \"transfer\"} "
@@ -560,7 +563,8 @@ errorCode Broker::run()
 						}
 						it = it->next;
 					}
-					if (group)
+					// TODO: Check for define, not necessary if not activated
+					if (group && imageConnectorList.find(stream) != imageConnectorList.end())
 						imageConnectorList[ stream ].connector->masterSendMessage(new ImageBufferContainer(GROUP_OBSERVED_STOPPED,NULL,group,1,url,ref));
 				}
 				if (message->type == CLOSED)
@@ -584,23 +588,22 @@ errorCode Broker::run()
 			}
 			dc = next;
 		}
-
 		///////////////////////////////////////
 		// Iterate over all image connectors //
 		///////////////////////////////////////
 		for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 		{
-			while (ImageBufferContainer* message = (*it).connector->masterGetMessage())
+			while (ImageBufferContainer* message = (*it).second.connector->masterGetMessage())
 			{
 				if (message->type == REGISTER_STREAM)
 				{
 					pthread_mutex_lock(&message->group->streams_mutex);
-					message->group->streams[(*it).connector->getName()].insert( std::pair< void*,std::string >( message->reference, std::string((char*)message->image->buffer) ));
+					message->group->streams[(*it).second.connector->getName()].insert( std::pair< void*,std::string >( message->reference, std::string((char*)message->image->buffer) ));
 					pthread_mutex_unlock(&message->group->streams_mutex);
 					json_t* root = json_object();
 					json_object_set_new( root, "type", json_string ("register video") );
 					json_object_set_new( root, "name", json_string ( message->group->getName().c_str() ) );
-					json_object_set_new( root, "connector", json_string ( (*it).connector->getName().c_str() ) );
+					json_object_set_new( root, "connector", json_string ( (*it).second.connector->getName().c_str() ) );
 					json_object_set_new( root, "reference", json_integer ( (long)message->reference ) );
 					ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
 					while (dc)
@@ -651,8 +654,8 @@ errorCode Broker::run()
 	}
 	for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 	{
-		printf("Asking %s to exit\n",(*it).connector->getName().c_str());
-		(*it).connector->masterSendMessage(new ImageBufferContainer(IMG_FORCE_EXIT,NULL,NULL,1));
+		printf("Asking %s to exit\n",(*it).second.connector->getName().c_str());
+		(*it).second.connector->masterSendMessage(new ImageBufferContainer(IMG_FORCE_EXIT,NULL,NULL,1));
 	}
 	for (auto it = dataConnectorList.begin(); it != dataConnectorList.end(); it++)
 	{
@@ -661,8 +664,8 @@ errorCode Broker::run()
 	}
 	for (auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
 	{
-		pthread_join((*it).thread,NULL);
-		printf("%s finished\n",(*it).connector->getName().c_str());
+		pthread_join((*it).second.thread,NULL);
+		printf("%s finished\n",(*it).second.connector->getName().c_str());
 	}
 	signal(SIGINT, SIG_DFL);
 	return 0;

@@ -19,6 +19,8 @@
 #include <string.h>
 #include <jansson.h>
 
+#include <iostream>
+
 typedef int ClientRef;
 typedef int ObserverRef;
 typedef int errorCode;
