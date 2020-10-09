@@ -757,6 +757,7 @@ namespace isaac
                             normal = start + t0 * dir - particle_pos;
                             if( t0 < 0 && is_clipped )
                             {
+                                color.w = 0;
                                 normal = -clipping_normal;
                             }
                         }
