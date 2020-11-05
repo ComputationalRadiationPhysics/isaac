@@ -124,7 +124,15 @@ errorCode InsituConnectorMaster::run()
 					{
 						int add = recv(fd_array[i].fd,&(con_array[i]->connector->jlcb.buffer[con_array[i]->connector->jlcb.count]),4096,MSG_DONTWAIT);
 						if (add > 0)
+						{
 							con_array[i]->connector->jlcb.count += add;
+							if(con_array[i]->connector->jlcb.count > ISAAC_MAX_RECEIVE)
+							{
+								fprintf(stderr,"Fatal error: Socket received %d bytes but buffer is only %d bytes! To increase the allowed size set ISAAC_MAX_RECEIVE to a higher value.\n", 
+										con_array[i]->connector->jlcb.count, ISAAC_MAX_RECEIVE);
+								return -1;
+							}
+						}
 						else
 							break;
 					}

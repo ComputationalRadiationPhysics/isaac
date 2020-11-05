@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <vector>
 
 #include <syslog.h>
 #include <sys/time.h>
@@ -97,7 +98,7 @@ static int callback_isaac(
 		size_t len )
 {
 	int n, m;
-     
+
 	struct per_session_data__isaac *pss = (struct per_session_data__isaac *)user;
 	Broker** broker_ptr = (Broker**)lws_context_user(lws_get_context(wsi));
 	Broker* broker = NULL;
@@ -115,10 +116,6 @@ static int callback_isaac(
 	case LWS_CALLBACK_SERVER_WRITEABLE:
 		if (pss->client)
 		{
-            char* buf = new char[LWS_SEND_BUFFER_PRE_PADDING + ISAAC_MAX_RECEIVE +
-                        LWS_SEND_BUFFER_POST_PADDING];
-                         
-            char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
 			MessageContainer* message = NULL;
 			int l = 0;
 			do
@@ -130,6 +127,7 @@ static int callback_isaac(
 				{
 					printf("WebSocketDataConnector: Dropped one dropable package!\n");
 					delete message;
+					message = NULL;
 					l--;
 				}
 				if (message) //New message from master sama!
@@ -138,6 +136,17 @@ static int callback_isaac(
 					char* buffer = json_dumps( message->json_root, 0 );
 					pthread_mutex_unlock(&MessageContainer::deep_copy_mutex);
 					n = strlen(buffer);
+
+					std::vector<char> buf(LWS_SEND_BUFFER_PRE_PADDING + n + LWS_SEND_BUFFER_POST_PADDING + 1);
+					if(buf.size() > ISAAC_MAX_RECEIVE)
+					{
+						printf("The maximum set size of %d bytes per lws packet was exceeded! To increase the allowed package size set ISAAC_MAX_RECEIVE to a higher value. \n", 
+							ISAAC_MAX_RECEIVE);
+						fflush(stdout);
+					}
+
+					char *p = buf.data() + LWS_SEND_BUFFER_PRE_PADDING;
+
 					sprintf(p,"%s",buffer);
 					m = lws_write(wsi, (unsigned char*)p, n, LWS_WRITE_TEXT);
 					free(buffer);
@@ -148,10 +157,10 @@ static int callback_isaac(
 						return -1;
 					}
 					delete message;
+					message = NULL;
 				}
 			}
 			while (l > 1 && !lws_send_pipe_choked(wsi));
-            delete[] buf;
 		}
 		break;
 	//case LWS_CALLBACK_CLOSED:
