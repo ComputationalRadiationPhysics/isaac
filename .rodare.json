@@ -1,0 +1,40 @@
+{
+    "creators": [
+        {
+            "name": "Matthes, Alexander"
+        },
+        {
+            "name": "Meyer, Felix",
+            "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf"
+        },
+        {
+            "name": "Pausch, Richard",
+            "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+            "orcid": "0000-0001-7990-9564"
+        },
+        {
+            "name": "Widera, René",
+            "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+            "orcid": "0000-0003-1642-0459"
+        },
+        {
+            "name": "Huebl, Axel",
+            "orcid": "0000-0003-1943-7141"
+        },
+        {
+            "name": "Gerber, Vincent"
+        },
+        {
+            "name": "Zenker, Erik"
+        },
+        {
+            "name": "Kosukhin, Sergey"
+        }
+    ],
+    "title": "ISAAC - In Situ Animation of Accelerated Computations",
+    "access_right": "open",
+    "upload_type": "software",
+    "license": "LGPL-3.0",
+    "pub_id": "31686",
+    "description": "Many computations like physics or biologists simulations these days run on accelerated hardware like CUDA GPUs or Intel Xeon Phi, which are itself distributed in a big compute cluster communicating over MPI. The goal of ISAAC is to visualize this data without the need to download it to the host while using the high computation speed of the accelerator."
+}
