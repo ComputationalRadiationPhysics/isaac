@@ -30,6 +30,7 @@ class ImageConnector;
 #include "InsituConnectorMaster.hpp"
 #include <memory>
 #include <map>
+#include <unordered_map> 
 
 typedef struct MetaDataConnectorContainer_struct
 {
@@ -102,7 +103,7 @@ class Broker
 		Broker(std::string name,int inner_port,std::string interface);
 		~Broker();
 		errorCode addDataConnector(MetaDataConnector *dataConnector);
-		errorCode addImageConnector(ImageConnector *imageConnector);
+		errorCode addImageConnector(ImageConnector *imageConnector, int id);
 		MetaDataClient* addDataClient();
 		void receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char* payload);
 		errorCode run();
@@ -114,7 +115,7 @@ class Broker
 		json_t* masterHelloConnectorList;
 		std::string name;
 		std::vector< MetaDataConnectorContainer > dataConnectorList;
-		std::vector< ImageConnectorContainer > imageConnectorList;
+		std::unordered_map< int, ImageConnectorContainer > imageConnectorList;
 		ThreadList< InsituConnectorGroup* > insituConnectorGroupList;
 		ThreadList< MetaDataClient* > dataClientList;
 		int inner_port;

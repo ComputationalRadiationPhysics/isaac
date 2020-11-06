@@ -12,6 +12,7 @@
 #  ISAAC_CUDA
 #  ISAAC_ALPAKA
 #  ISAAC_JPEG
+#  ISAAC_AO_BUG_FIX
 
 ###############################################################################
 # ISAAC
@@ -55,6 +56,8 @@ option(ISAAC_ALPAKA "Using ALPKA" OFF)
 if ( (NOT ISAAC_CUDA) AND (NOT ISAAC_ALPAKA) )
     message( FATAL_ERROR "At least Alpaka or Cuda have to be activated!" )
 endif()
+
+option(ISAAC_AO_BUG_FIX "fix ambient occlusion bug" ON)
 
 ###############################################################################
 # JPEGLIB

@@ -37,6 +37,16 @@
 		return 1; \
 	}
 
+enum ImageConnectorType
+{
+	RTP_H264 	= 0,
+	RTP_JPEG 	= 1,
+	URI_JPEG 	= 2,
+	TWITCH 		= 3,
+	SDL 		= 4,
+	SAVE_FILE 	= 5
+};
+
 int main(int argc, char **argv)
 {
 	json_object_seed(0);
@@ -189,15 +199,15 @@ int main(int argc, char **argv)
 	#ifdef ISAAC_GST
 		RTPImageConnector* rTPImageConnector_h264 = new RTPImageConnector(url,false,false);
 		if (rTPImageConnector_h264->init(5000,5099) == 0)
-			broker.addImageConnector(rTPImageConnector_h264);
+			broker.addImageConnector(rTPImageConnector_h264, ImageConnectorType::RTP_H264);
 		RTPImageConnector* rTPImageConnector_jpeg = new RTPImageConnector(url,false,true);
 		if (rTPImageConnector_jpeg->init(5100,5199) == 0)
-			broker.addImageConnector(rTPImageConnector_jpeg);
+			broker.addImageConnector(rTPImageConnector_jpeg, ImageConnectorType::RTP_JPEG);
 	#endif
 	#ifdef ISAAC_JPEG
 		URIImageConnector* uRIImageConnector = new URIImageConnector();
 		if (uRIImageConnector->init(0,0) == 0)
-			broker.addImageConnector(uRIImageConnector);
+			broker.addImageConnector(uRIImageConnector, ImageConnectorType::URI_JPEG);
 	#endif
 	#ifdef ISAAC_GST
 		RTMPImageConnector* twitchImageConnector = NULL;
@@ -208,13 +218,13 @@ int main(int argc, char **argv)
 			else
 				twitchImageConnector = new RTMPImageConnector( std::string("Twitch"), std::string(twitch_apikey), std::string("live-fra.twitch.tv/app"), twitch_bitrate, true );
 			if (twitchImageConnector->init(0,0) == 0)
-				broker.addImageConnector(twitchImageConnector);
+				broker.addImageConnector(twitchImageConnector, ImageConnectorType::TWITCH);
 		}
 	#endif
 	#ifdef ISAAC_SDL
 		SDLImageConnector* sDLImageConnector = new SDLImageConnector();
 		if (sDLImageConnector->init(0,0) == 0)
-			broker.addImageConnector(sDLImageConnector);
+			broker.addImageConnector(sDLImageConnector, ImageConnectorType::SDL);
 	#endif
 	#ifdef ISAAC_JPEG
 		SaveFileImageConnector* saveFileImageConnector = NULL;
@@ -222,7 +232,7 @@ int main(int argc, char **argv)
 		{
 			saveFileImageConnector = new SaveFileImageConnector(std::string(dump));
 			if (saveFileImageConnector->init(0,0) == 0)
-				broker.addImageConnector(saveFileImageConnector);
+				broker.addImageConnector(saveFileImageConnector, ImageConnectorType::SAVE_FILE);
 		}
 	#endif
 	int return_code = 0;

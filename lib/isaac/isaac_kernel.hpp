@@ -757,6 +757,9 @@ namespace isaac
                             normal = start + t0 * dir - particle_pos;
                             if( t0 < 0 && is_clipped )
                             {
+                                #if ISAAC_AO_BUG_FIX == 1
+                                   color.w = 0;
+                                #endif
                                 normal = -clipping_normal;
                             }
                         }
@@ -2275,8 +2278,8 @@ namespace isaac
             for(int i = -3; i <= 3; i++) {
                 for(int j = -3; j <= 3; j++) {
                     //avoid out of bounds by simple min max
-                    isaac_int x = MAX(MIN(pixel.x + i * radius, framebuffer_start.x + framebuffer_size.x), framebuffer_start.x);
-                    isaac_int y = MAX(MIN(pixel.y + j * radius, framebuffer_start.y + framebuffer_size.y), framebuffer_start.y);
+                    isaac_int x = ISAAC_MAX(ISAAC_MIN(pixel.x + i * radius, framebuffer_start.x + framebuffer_size.x), framebuffer_start.x);
+                    isaac_int y = ISAAC_MAX(ISAAC_MIN(pixel.y + j * radius, framebuffer_start.y + framebuffer_size.y), framebuffer_start.y);
 
                     //get the neighbour depth value
                     isaac_float depth_sample = gDepth[x + y * framebuffer_size.x].z;
