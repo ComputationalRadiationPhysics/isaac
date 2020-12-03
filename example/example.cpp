@@ -372,55 +372,55 @@ int main(
 #if ISAAC_ALPAKA == 1
 
     // Alpaka specific initialization
-    using AccDim = alpaka::dim::DimInt< 3 >;
-    using SimDim = alpaka::dim::DimInt< 3 >;
-    using DatDim = alpaka::dim::DimInt< 1 >;
+    using AccDim = alpaka::DimInt< 3 >;
+    using SimDim = alpaka::DimInt< 3 >;
+    using DatDim = alpaka::DimInt< 1 >;
     
-    //using Acc = alpaka::acc::AccGpuCudaRt<AccDim, ISAAC_IDX_TYPE>;
-    //using Stream  = alpaka::queue::QueueCudaRtSync;
+    //using Acc = alpaka::AccGpuCudaRt<AccDim, ISAAC_IDX_TYPE>;
+    //using Stream  = alpaka::QueueCudaRtSync;
 
-    using Acc = alpaka::acc::AccCpuOmp2Blocks<
+    using Acc = alpaka::AccCpuOmp2Blocks<
         AccDim,
         ISAAC_IDX_TYPE
     >;
-    using Stream  = alpaka::queue::QueueCpuSync;
+    using Stream  = alpaka::QueueCpuSync;
 
-    //using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, ISAAC_IDX_TYPE>;
-    //using Stream  = alpaka::queue::QueueCpuSync;
+    //using Acc = alpaka::AccCpuOmp2Threads<AccDim, ISAAC_IDX_TYPE>;
+    //using Stream  = alpaka::QueueCpuSync;
 
-    using DevAcc = alpaka::dev::Dev< Acc >;
-    using DevHost = alpaka::dev::DevCpu;
-    using PltfHost = alpaka::pltf::Pltf< DevHost >;
-    using PltfAcc = alpaka::pltf::Pltf< DevAcc >;
+    using DevAcc = alpaka::Dev< Acc >;
+    using DevHost = alpaka::DevCpu;
+    using PltfHost = alpaka::Pltf< DevHost >;
+    using PltfAcc = alpaka::Pltf< DevAcc >;
 
     DevAcc devAcc(
-        alpaka::pltf::getDevByIdx< PltfAcc >(
-            rank % alpaka::pltf::getDevCount< PltfAcc >( )
+        alpaka::getDevByIdx< PltfAcc >(
+            rank % alpaka::getDevCount< PltfAcc >( )
         )
     );
-    DevHost devHost( alpaka::pltf::getDevByIdx< PltfHost >( 0u ) );
+    DevHost devHost( alpaka::getDevByIdx< PltfHost >( 0u ) );
     Stream stream( devAcc );
 
-    const alpaka::vec::Vec< SimDim, ISAAC_IDX_TYPE > global_size(
+    const alpaka::Vec< SimDim, ISAAC_IDX_TYPE > global_size(
         d[0] * VOLUME_X,
         d[1] * VOLUME_Y,
         d[2] * VOLUME_Z
     );
-    const alpaka::vec::Vec< SimDim, ISAAC_IDX_TYPE > local_size(
+    const alpaka::Vec< SimDim, ISAAC_IDX_TYPE > local_size(
         ISAAC_IDX_TYPE( VOLUME_X ),
         ISAAC_IDX_TYPE( VOLUME_Y ),
         ISAAC_IDX_TYPE( VOLUME_Z )
     );
-    const alpaka::vec::Vec< DatDim, ISAAC_IDX_TYPE > data_size(
+    const alpaka::Vec< DatDim, ISAAC_IDX_TYPE > data_size(
         ISAAC_IDX_TYPE( VOLUME_X ) * ISAAC_IDX_TYPE( VOLUME_Y )
         * ISAAC_IDX_TYPE( VOLUME_Z )
     );
-    const alpaka::vec::Vec< SimDim, ISAAC_IDX_TYPE > position(
+    const alpaka::Vec< SimDim, ISAAC_IDX_TYPE > position(
         p[0] * VOLUME_X,
         p[1] * VOLUME_Y,
         p[2] * VOLUME_Z
     );
-    const alpaka::vec::Vec< alpaka::dim::DimInt< 1 >, ISAAC_IDX_TYPE > particle_count(
+    const alpaka::Vec< alpaka::DimInt< 1 >, ISAAC_IDX_TYPE > particle_count(
         ISAAC_IDX_TYPE( PARTICLE_COUNT )
     );
 
@@ -454,9 +454,9 @@ int main(
     // Init memory
 #if ISAAC_ALPAKA == 1
 
-    alpaka::mem::buf::Buf< DevHost, float3_t, DatDim, ISAAC_IDX_TYPE >
+    alpaka::Buf< DevHost, float3_t, DatDim, ISAAC_IDX_TYPE >
         hostBuffer1(
-        alpaka::mem::buf::alloc<
+        alpaka::allocBuf<
             float3_t,
             ISAAC_IDX_TYPE
         >(
@@ -464,9 +464,9 @@ int main(
             data_size
         )
     );
-    alpaka::mem::buf::Buf< DevAcc, float3_t, DatDim, ISAAC_IDX_TYPE >
+    alpaka::Buf< DevAcc, float3_t, DatDim, ISAAC_IDX_TYPE >
         deviceBuffer1(
-        alpaka::mem::buf::alloc<
+        alpaka::allocBuf<
             float3_t,
             ISAAC_IDX_TYPE
         >(
@@ -474,11 +474,11 @@ int main(
             data_size
         )
     );
-    alpaka::mem::buf::Buf<
+    alpaka::Buf<
         DevHost, float, DatDim,
         ISAAC_IDX_TYPE
     > hostBuffer2(
-        alpaka::mem::buf::alloc<
+        alpaka::allocBuf<
             float,
             ISAAC_IDX_TYPE
         >(
@@ -486,11 +486,11 @@ int main(
             data_size
         )
     );
-    alpaka::mem::buf::Buf<
+    alpaka::Buf<
         DevAcc, float, DatDim,
         ISAAC_IDX_TYPE
     > deviceBuffer2(
-        alpaka::mem::buf::alloc<
+        alpaka::allocBuf<
             float,
             ISAAC_IDX_TYPE
         >(
@@ -499,9 +499,9 @@ int main(
         )
     );
 
-    alpaka::mem::buf::Buf< DevHost, float3_t, DatDim, ISAAC_IDX_TYPE >
+    alpaka::Buf< DevHost, float3_t, DatDim, ISAAC_IDX_TYPE >
         hostBuffer3(
-        alpaka::mem::buf::alloc<
+        alpaka::allocBuf<
             float3_t,
             ISAAC_IDX_TYPE
         >(
@@ -509,9 +509,9 @@ int main(
             particle_count
         )
     );
-    alpaka::mem::buf::Buf< DevAcc, float3_t, DatDim, ISAAC_IDX_TYPE >
+    alpaka::Buf< DevAcc, float3_t, DatDim, ISAAC_IDX_TYPE >
         deviceBuffer3(
-        alpaka::mem::buf::alloc<
+        alpaka::allocBuf<
             float3_t,
             ISAAC_IDX_TYPE
         >(
@@ -551,7 +551,7 @@ int main(
         devAcc,
         devHost,
         stream,
-        reinterpret_cast<isaac_float3 *> ( alpaka::mem::view::getPtrNative( deviceBuffer1 ) )
+        reinterpret_cast<isaac_float3 *> ( alpaka::getPtrNative( deviceBuffer1 ) )
     );
     TestSource2<
         DevAcc,
@@ -561,7 +561,7 @@ int main(
         devAcc,
         devHost,
         stream,
-        reinterpret_cast<isaac_float *> ( alpaka::mem::view::getPtrNative( deviceBuffer2 ) )
+        reinterpret_cast<isaac_float *> ( alpaka::getPtrNative( deviceBuffer2 ) )
     );
 
     ParticleSource1<
@@ -572,7 +572,7 @@ int main(
         devAcc,
         devHost,
         stream,
-        reinterpret_cast<isaac_float3 *> ( alpaka::mem::view::getPtrNative( deviceBuffer3 ) ),
+        reinterpret_cast<isaac_float3 *> ( alpaka::getPtrNative( deviceBuffer3 ) ),
         PARTICLE_COUNT
     );
 
@@ -685,7 +685,7 @@ int main(
         SimDim, //Dimension of the Simulation. In this case: 3D
         ParticleList, SourceList, //The boost::fusion list of Source Types
 #if ISAAC_ALPAKA == 1
-        alpaka::vec::Vec<
+        alpaka::Vec<
             SimDim,
             ISAAC_IDX_TYPE
         >, //Type of the 3D vectors used later
