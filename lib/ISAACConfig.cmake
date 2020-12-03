@@ -107,14 +107,25 @@ set(ISAAC_DEPENDENCY_HINTS "missing dependencies:")
 ###############################################################################
 # JANSSON LIB
 ###############################################################################
-# set(JANSSON_DIR JANSSON_DIR_NOT-FOUND CACHE PATH "The location of the jansson library")
 find_package (Jansson CONFIG QUIET)
-if (NOT Jansson_FOUND)
-    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   libJansson")
+if (Jansson_FOUND)
+    set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
+    set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
+else()
+    find_package (jansson CONFIG QUIET)
+    if (TARGET jansson::jansson)
+        # required since 2.12
+        # interfacing cmake tagets with the old cmake variables we use in ISAAC
+        # since ISSAC has CMake no target we can not use target_link_library
+        get_target_property(JANSSON_LIBRARIES jansson::jansson LOCATION)
+        set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
+        get_target_property(JANSSON_INCLUDE_DIRS jansson::jansson INTERFACE_INCLUDE_DIRECTORIES)
+        set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
+    else()
+        # jansson not found
+        set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   jansson")
+    endif()
 endif()
-set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
-set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
-
 
 ###############################################################################
 # PTHREADS
