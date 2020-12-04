@@ -22,7 +22,7 @@
 #define BOOST_RESULT_OF_USE_TR1
 #endif
 
-
+#include <iostream>
 #include <random>
 #include <string>
 #include <string.h>
