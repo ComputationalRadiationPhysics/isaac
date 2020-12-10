@@ -36,12 +36,11 @@ void update_particles(
 {
     for( ISAAC_IDX_TYPE i = 0; i < particle_count[0]; i++ )
     {
-#if ISAAC_ALPAKA == 1
-        alpaka::getPtrNative( hostBuffer3 )[i][0] =
+        alpaka::getPtrNative( hostBuffer3 )[i].x =
             float( ( int( i * 29.6f ) ) % 64 ) / 64.0f;
-        alpaka::getPtrNative( hostBuffer3 )[i][1] =
+        alpaka::getPtrNative( hostBuffer3 )[i].y =
             float( ( int( i * 23.1f ) ) % 64 ) / 64.0f;
-        alpaka::getPtrNative( hostBuffer3 )[i][2] = float(
+        alpaka::getPtrNative( hostBuffer3 )[i].z = float(
             ( int( ( i * 7.9f + pos * ( i % 20 + 1 ) ) * 1000 ) ) % 64000
         ) / 1000.0f / 64.0f;
     }
@@ -56,20 +55,6 @@ void update_particles(
         hostBuffer3,
         particle_count
     );
-#else
-        hostBuffer3[i][0] = float( ( int( i * 29.6f ) ) % 64 ) / 64.0f;
-        hostBuffer3[i][1] = float( ( int( i * 23.1f ) ) % 64 ) / 64.0f;
-        hostBuffer3[i][2] = float(
-            ( int( ( i * 7.9f + pos * ( i % 20 + 1 ) ) * 1000 ) ) % 64000
-        ) / 1000.0f / 64.0f;
-    }
-    cudaMemcpy(
-        deviceBuffer3,
-        hostBuffer3,
-        sizeof( float3_t ) * particle_count[0],
-        cudaMemcpyHostToDevice
-    );
-#endif
 }
 
 
@@ -136,12 +121,12 @@ void update_data(
                 }
                 size_t pos =
                     x + y * local_size[0] + z * local_size[0] * local_size[1];
-#if ISAAC_ALPAKA == 1
-                alpaka::getPtrNative( hostBuffer1 )[pos][0] =
+
+                alpaka::getPtrNative( hostBuffer1 )[pos].x =
                     intensity;
-                alpaka::getPtrNative( hostBuffer1 )[pos][1] =
+                alpaka::getPtrNative( hostBuffer1 )[pos].y =
                     intensity;
-                alpaka::getPtrNative( hostBuffer1 )[pos][2] =
+                alpaka::getPtrNative( hostBuffer1 )[pos].z =
                     intensity;
                 alpaka::getPtrNative( hostBuffer2 )[pos] =
                     ( 2.0f - l ) * ( 2.0f - l ) / 4.0f;
@@ -166,28 +151,6 @@ void update_data(
         hostBuffer2,
         data_size
     );
-#else
-                hostBuffer1[pos][0] = intensity;
-                hostBuffer1[pos][1] = intensity;
-                hostBuffer1[pos][2] = intensity;
-                hostBuffer2[pos] = ( 2.0f - l ) * ( 2.0f - l ) / 4.0f;
-            }
-        }
-    }
-    cudaMemcpy(
-        deviceBuffer1,
-        hostBuffer1,
-        sizeof( float3_t ) * prod,
-        cudaMemcpyHostToDevice
-    );
-    cudaMemcpy(
-        deviceBuffer2,
-        hostBuffer2,
-        sizeof( float ) * prod,
-        cudaMemcpyHostToDevice
-    );
-
-#endif
 }
 
 
@@ -462,12 +425,9 @@ void read_vtk_to_memory(
             {
                 size_t pos = t_x + t_y * local_size[0]
                              + t_z * local_size[0] * local_size[1];
-#if ISAAC_ALPAKA == 1
+
                 alpaka::getPtrNative( hostBuffer2 )[pos] =
                     ( float ) value;
-#else
-                hostBuffer2[pos] = ( float ) value;
-#endif
             }
             x++;
             if( size_t( x ) >= global_size[0] )
@@ -483,25 +443,16 @@ void read_vtk_to_memory(
         }
     }
 
-#if ISAAC_ALPAKA == 1
-            const alpaka::Vec <alpaka::DimInt< 1 >, ISAAC_IDX_TYPE>
-                data_size(
-                ISAAC_IDX_TYPE( local_size[0] )
-                * ISAAC_IDX_TYPE( local_size[1] )
-                * ISAAC_IDX_TYPE( local_size[2] )
-            );
-            alpaka::memcpy(
-                stream,
-                deviceBuffer2,
-                hostBuffer2,
-                data_size
-            );
-#else
-            cudaMemcpy(
-                deviceBuffer2,
-                hostBuffer2,
-                sizeof( float ) * prod,
-                cudaMemcpyHostToDevice
-            );
-#endif
+    const alpaka::Vec <alpaka::DimInt< 1 >, ISAAC_IDX_TYPE>
+        data_size(
+        ISAAC_IDX_TYPE( local_size[0] )
+        * ISAAC_IDX_TYPE( local_size[1] )
+        * ISAAC_IDX_TYPE( local_size[2] )
+    );
+    alpaka::memcpy(
+        stream,
+        deviceBuffer2,
+        hostBuffer2,
+        data_size
+    );
 }

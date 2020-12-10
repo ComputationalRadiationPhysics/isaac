@@ -53,21 +53,12 @@
 #include <map>
 
 
-#if ISAAC_ALPAKA == 1
 
 
 #include <alpaka/alpaka.hpp>
 #include <boost/type_traits.hpp>
 #include <boost/mpl/not.hpp>
 
-
-#else
-
-
-#include <boost/mpl/int.hpp>
-
-
-#endif
 
 
 #include "isaac/isaac_kernel.hpp"
@@ -83,12 +74,10 @@ namespace isaac
 {
 
     template<
-#if ISAAC_ALPAKA == 1
-    typename THost,
-    typename TAcc,
-    typename TStream,
-    typename TAccDim,
-#endif
+        typename THost,
+        typename TAcc,
+        typename TStream,
+        typename TAccDim,
         typename TSimDim,
         typename TParticleList,
         typename TSourceList,
@@ -108,11 +97,9 @@ namespace isaac
         }
 
 
-#if ISAAC_ALPAKA == 1
         using TDevAcc = alpaka::Dev< TAcc >;
         using TFraDim = alpaka::DimInt< 1 >;
         using TTexDim = alpaka::DimInt< 1 >;
-#endif
 
         struct source_2_json_iterator
         {
@@ -264,23 +251,17 @@ namespace isaac
             template<
                 typename TSource,
                 typename TArray,
-                typename TLocalSize
-#if ISAAC_ALPAKA == 1
-            ,
-            typename TVector,
-            typename TDevAcc__
-#endif
+                typename TLocalSize,
+                typename TVector,
+                typename TDevAcc__
             >
             ISAAC_HOST_INLINE void operator()(
                 const int I,
                 const TSource & source,
                 TArray & pointer_array,
-                const TLocalSize & local_size
-#if ISAAC_ALPAKA == 1
-            ,
-            TVector & alpaka_vector,
-            const TDevAcc__ & acc
-#endif
+                const TLocalSize & local_size,
+                TVector & alpaka_vector,
+                const TDevAcc__ & acc
             ) const
             {
                 if( TSource::persistent )
@@ -289,7 +270,6 @@ namespace isaac
                 }
                 else
                 {
-#if ISAAC_ALPAKA == 1
                     alpaka_vector.push_back(
                         alpaka::Buf<
                             TDevAcc,
@@ -321,15 +301,6 @@ namespace isaac
                     );
                     pointer_array.pointer[I] =
                         alpaka::getPtrNative( alpaka_vector.back( ) );
-#else
-                    ISAAC_CUDA_CHECK ( cudaMalloc(
-                        ( void ** ) &( pointer_array.pointer[I] ),
-                        sizeof( isaac_float_dim < TSource::feature_dim > )
-                        * ( local_size[0] + 2 * ISAAC_GUARD_SIZE )
-                        * ( local_size[1] + 2 * ISAAC_GUARD_SIZE )
-                        * ( local_size[2] + 2 * ISAAC_GUARD_SIZE )
-                    ) );
-#endif
                 }
             }
         };
@@ -385,11 +356,8 @@ namespace isaac
                 typename TArray,
                 typename TLocalSize,
                 typename TWeight,
-                typename TPointer
-#if ISAAC_ALPAKA == 1
-            ,
-            typename TStream__
-#endif
+                typename TPointer,
+                typename TStream__
             >
             ISAAC_HOST_INLINE void operator()(
                 const int I,
@@ -397,11 +365,8 @@ namespace isaac
                 TArray & pointer_array,
                 const TLocalSize & local_size,
                 const TWeight & weight,
-                const TPointer & pointer
-#if ISAAC_ALPAKA == 1
-            ,
-            TStream__ & stream
-#endif
+                const TPointer & pointer,
+                TStream__ & stream
             ) const
             {
                 bool enabled = weight.value[I] != isaac_float( 0 );
@@ -428,7 +393,6 @@ namespace isaac
                         isaac_int( local_size[1] ),
                         isaac_int( local_size[2] )
                     };
-#if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                     if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
@@ -482,22 +446,6 @@ namespace isaac
                         instance
                     );
                     alpaka::wait( stream );
-#else
-                    dim3 block(
-                        block_size.x,
-                        block_size.y
-                    );
-                    dim3 grid(
-                        grid_size.x,
-                        grid_size.y
-                    );
-                    updateBufferKernel <<< grid, block >>> (
-                        source,
-                        pointer_array.pointer[I],
-                        local_size_array
-                    );
-                    ISAAC_CUDA_CHECK ( cudaDeviceSynchronize( ) );
-#endif
                 }
             }
         };
@@ -509,12 +457,9 @@ namespace isaac
                 typename TArray,
                 typename TMinmax,
                 typename TLocalMinmax,
-                typename TLocalSize
-#if ISAAC_ALPAKA == 1
-            ,
-            typename TStream__,
-            typename THost__
-#endif
+                typename TLocalSize,
+                typename TStream__,
+                typename THost__
             >
             ISAAC_HOST_INLINE void operator()(
                 const int I,
@@ -522,12 +467,9 @@ namespace isaac
                 TArray & pointer_array,
                 TMinmax & minmax,
                 TLocalMinmax & local_minmax,
-                TLocalSize & local_size
-#if ISAAC_ALPAKA == 1
-            ,
-            TStream__ & stream,
-            const THost__ & host
-#endif
+                TLocalSize & local_size,
+                TStream__ & stream,
+                const THost__ & host
             ) const
             {
                 isaac_size2 grid_size = {
@@ -548,7 +490,6 @@ namespace isaac
                 ];
                 if( local_size[0] != 0 && local_size[1] != 0 )
                 {
-#if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                     if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
@@ -626,30 +567,6 @@ namespace isaac
                             )
                         )
                     );
-#else
-                    dim3 block(
-                        block_size.x,
-                        block_size.y
-                    );
-                    dim3 grid(
-                        grid_size.x,
-                        grid_size.y
-                    );
-                    minMaxKernel <<< grid, block >>> (
-                        source,
-                        I,
-                        local_minmax,
-                        local_size_array,
-                        pointer_array.pointer[I]
-                    );
-                    ISAAC_CUDA_CHECK ( cudaMemcpy(
-                        local_minmax_array_h,
-                        local_minmax,
-                        sizeof( minmax_struct ) * local_size_array.x
-                        * local_size_array.y,
-                        cudaMemcpyDeviceToHost
-                    ) );
-#endif
                 }
                 minmax.min[I] = FLT_MAX;
                 minmax.max[I] = -FLT_MAX;
@@ -679,24 +596,18 @@ namespace isaac
                 typename TParticleSource,
                 typename TMinmax,
                 typename TLocalMinmax,
-                typename TLocalSize
-#if ISAAC_ALPAKA == 1
-            ,
-            typename TStream__,
-            typename THost__
-#endif
+                typename TLocalSize,
+                typename TStream__,
+                typename THost__
             >
             ISAAC_HOST_INLINE void operator()(
                 const int I,
                 const TParticleSource & particle_source,
                 TMinmax & minmax,
                 TLocalMinmax & local_minmax,
-                TLocalSize & local_size
-#if ISAAC_ALPAKA == 1
-            ,
-            TStream__ & stream,
-            const THost__ & host
-#endif
+                TLocalSize & local_size,
+                TStream__ & stream,
+                const THost__ & host
             ) const
             {
                 // iterate over all cells and the particle lists
@@ -719,7 +630,6 @@ namespace isaac
                 ];
                 if( local_size[0] != 0 && local_size[1] != 0 )
                 {
-#if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                     if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
@@ -796,29 +706,6 @@ namespace isaac
                             )
                         )
                     );
-#else
-                    dim3 block(
-                        block_size.x,
-                        block_size.y
-                    );
-                    dim3 grid(
-                        grid_size.x,
-                        grid_size.y
-                    );
-                    minMaxPartikelKernel <<< grid, block >>> (
-                        particle_source,
-                        I + TOffset,
-                        local_minmax,
-                        local_size_array
-                    );
-                    ISAAC_CUDA_CHECK ( cudaMemcpy(
-                        local_minmax_array_h,
-                        local_minmax,
-                        sizeof( minmax_struct ) * local_size_array.x
-                        * local_size_array.y,
-                        cudaMemcpyDeviceToHost
-                    ) );
-#endif
                 }
                 minmax.min[I + TOffset] = FLT_MAX;
                 minmax.max[I + TOffset] = -FLT_MAX;
@@ -841,11 +728,9 @@ namespace isaac
 
 
         IsaacVisualization(
-#if ISAAC_ALPAKA == 1
-        THost host,
-        TDevAcc acc,
-        TStream stream,
-#endif
+            THost host,
+            TDevAcc acc,
+            TStream stream,
             const std::string name,
             const isaac_int master,
             const std::string server_url,
@@ -860,11 +745,9 @@ namespace isaac
             TScale scale
 
         ) :
-#if ISAAC_ALPAKA == 1
-        host( host ),
-        acc( acc ),
-        stream( stream ),
-#endif
+            host( host ),
+            acc( acc ),
+            stream( stream ),
             global_size( global_size ),
             local_size( local_size ),
             local_particle_size( local_particle_size ),
@@ -894,124 +777,79 @@ namespace isaac
             particle_sources( particle_sources ),
             sources( sources ),
             scale( scale ),
-            icet_bounding_box( true )
-#if ISAAC_ALPAKA == 1
-        ,
-        framebuffer(
-            alpaka::allocBuf<
-                uint32_t,
-                ISAAC_IDX_TYPE
-            >(
-                acc,
-                framebuffer_prod
-            )
-        ),
-        framebufferAO(
-            alpaka::allocBuf<
-                isaac_float,
-                ISAAC_IDX_TYPE
-            >(
-                acc,
-                framebuffer_prod
-            )
-        ),
-        framebufferDepth(
-            alpaka::allocBuf<
-                isaac_float3,
-                ISAAC_IDX_TYPE
-            >(
-                acc,
-                framebuffer_prod
-            )
-        ),
-        framebufferNormal(
-            alpaka::allocBuf<
-                isaac_float3,
-                ISAAC_IDX_TYPE
-            >(
-                acc,
-                framebuffer_prod
-            )
-        ),
-        functor_chain_d(
-            alpaka::allocBuf<
+            icet_bounding_box( true ),
+            framebuffer(
+                alpaka::allocBuf<
+                    uint32_t,
+                    ISAAC_IDX_TYPE
+                >(
+                    acc,
+                    framebuffer_prod
+                )
+            ),
+            framebufferAO(
+                alpaka::allocBuf<
+                    isaac_float,
+                    ISAAC_IDX_TYPE
+                >(
+                    acc,
+                    framebuffer_prod
+                )
+            ),
+            framebufferDepth(
+                alpaka::allocBuf<
+                    isaac_float3,
+                    ISAAC_IDX_TYPE
+                >(
+                    acc,
+                    framebuffer_prod
+                )
+            ),
+            framebufferNormal(
+                alpaka::allocBuf<
+                    isaac_float3,
+                    ISAAC_IDX_TYPE
+                >(
+                    acc,
+                    framebuffer_prod
+                )
+            ),
+            functor_chain_d(
+                alpaka::allocBuf<
+                    isaac_functor_chain_pointer_N,
+                    ISAAC_IDX_TYPE
+                >(
+                    acc,
+                    ISAAC_IDX_TYPE( ISAAC_FUNCTOR_COMPLEX * 4 ) ) )
+            ,
+
+            functor_chain_choose_d ( alpaka::allocBuf<
                 isaac_functor_chain_pointer_N,
                 ISAAC_IDX_TYPE
             >(
                 acc,
-                ISAAC_IDX_TYPE( ISAAC_FUNCTOR_COMPLEX * 4 ) ) )
-    ,
+                ISAAC_IDX_TYPE ( ( boost
+                ::mpl::size< TSourceList >::type::value
+                + boost::mpl::size< TParticleList >::type::value ) ) ) )
+            ,
 
-    functor_chain_choose_d ( alpaka::allocBuf<
-        isaac_functor_chain_pointer_N,
-        ISAAC_IDX_TYPE
-    >(
-        acc,
-        ISAAC_IDX_TYPE ( ( boost
-        ::mpl::size< TSourceList >::type::value
+            local_minmax_array_d ( alpaka::allocBuf<
+                minmax_struct,
+                ISAAC_IDX_TYPE
+            >(
+                acc,
+                ISAAC_IDX_TYPE ( local_size[0]
+                * local_size[1] ) ) )
+            ,
 
-    + boost::mpl::size< TParticleList >::type::value ) ) ) )
-    ,
-
-    local_minmax_array_d ( alpaka::allocBuf<
-        minmax_struct,
-        ISAAC_IDX_TYPE
-    >(
-        acc,
-        ISAAC_IDX_TYPE ( local_size[0]
-
-    * local_size[1] ) ) )
-    ,
-
-    local_particle_minmax_array_d ( alpaka::allocBuf<
-        minmax_struct,
-        ISAAC_IDX_TYPE
-    >(
-        acc,
-        ISAAC_IDX_TYPE ( local_particle_size[0]
-
-    * local_particle_size[1] ) ) )
-    {
-#else
+            local_particle_minmax_array_d ( alpaka::allocBuf<
+                minmax_struct,
+                ISAAC_IDX_TYPE
+            >(
+                acc,
+                ISAAC_IDX_TYPE ( local_particle_size[0]
+                * local_particle_size[1] ) ) )
         {
-            ISAAC_CUDA_CHECK ( cudaMalloc(
-                ( uint32_t * * ) & framebuffer,
-                sizeof( uint32_t ) * framebuffer_prod
-            ) );
-            ISAAC_CUDA_CHECK ( cudaMalloc(
-                ( isaac_float * * ) & framebufferAO,
-                sizeof( isaac_float ) * framebuffer_prod
-            ) );
-            ISAAC_CUDA_CHECK ( cudaMalloc(
-                ( isaac_float3 * * ) & framebufferDepth,
-                sizeof( isaac_float3 ) * framebuffer_prod
-            ) );
-            ISAAC_CUDA_CHECK ( cudaMalloc(
-                ( isaac_float3 * * ) & framebufferNormal,
-                sizeof( isaac_float3 ) * framebuffer_prod
-            ) );
-            ISAAC_CUDA_CHECK ( cudaMalloc(
-                ( isaac_functor_chain_pointer_N ** ) &functor_chain_d,
-                sizeof( isaac_functor_chain_pointer_N ) * ISAAC_FUNCTOR_COMPLEX
-                * 4
-            ) );
-            ISAAC_CUDA_CHECK ( cudaMalloc(
-                ( isaac_functor_chain_pointer_N ** ) &functor_chain_choose_d,
-                sizeof( isaac_functor_chain_pointer_N ) * (
-                    boost::mpl::size< TSourceList >::type::value
-                    + boost::mpl::size< TParticleList >::type::value
-                )
-            ) );
-            ISAAC_CUDA_CHECK ( cudaMalloc(
-                ( minmax_struct ** ) &local_minmax_array_d,
-                sizeof( minmax_struct ) * local_size[0] * local_size[1]
-            ) );
-            ISAAC_CUDA_CHECK ( cudaMalloc(
-                ( minmax_struct ** ) &local_particle_minmax_array_d,
-                sizeof( minmax_struct ) * local_particle_size[0]
-                * local_particle_size[1]
-            ) );
-#endif
 #if ISAAC_VALGRIND_TWEAKS == 1
             //Jansson has some optimizations for 2 and 4 byte aligned
             //memory. However valgrind complains then sometimes about reads
@@ -1089,7 +927,6 @@ namespace isaac
             updateModelview( );
 
             //Create functor chain pointer lookup table
-#if ISAAC_ALPAKA == 1
             const alpaka::Vec<
                 TAccDim,
                 ISAAC_IDX_TYPE
@@ -1137,12 +974,6 @@ namespace isaac
                 instance
             );
             alpaka::wait( stream );
-#else
-            dim3 grid( 1 );
-            dim3 block( 1 );
-            fillFunctorChainPointerKernel <<< grid, block >>> ( functor_chain_d );
-            ISAAC_CUDA_CHECK ( cudaDeviceSynchronize( ) );
-#endif
             //Init functions:
             for( int i = 0; i < (
                 boost::mpl::size< TSourceList >::type::value
@@ -1158,12 +989,9 @@ namespace isaac
                 sources,
                 allocate_pointer_array_iterator( ),
                 pointer_array,
-                local_size
-#if ISAAC_ALPAKA == 1
-            ,
-            pointer_array_alpaka,
-            acc
-#endif
+                local_size,
+                pointer_array_alpaka,
+                acc
             );
 
             //Transfer func memory:
@@ -1173,7 +1001,6 @@ namespace isaac
             ); i++ )
             {
                 source_weight.value[i] = ISAAC_DEFAULT_WEIGHT;
-#if ISAAC_ALPAKA == 1
                 transfer_d_buf.push_back(
                     alpaka::Buf<
                         TDevAcc,
@@ -1216,14 +1043,6 @@ namespace isaac
                     alpaka::getPtrNative( transfer_d_buf[i] );
                 transfer_h.pointer[i] =
                     alpaka::getPtrNative( transfer_h_buf[i] );
-#else
-                ISAAC_CUDA_CHECK ( cudaMalloc(
-                    ( isaac_float4 * * ) & ( transfer_d.pointer[i] ),
-                    sizeof( isaac_float4 ) * TTransfer_size
-                ) );
-                transfer_h.pointer[i] = ( isaac_float4 * )
-                malloc( sizeof( isaac_float4 ) * TTransfer_size );
-#endif
                 //Init volume transfer func with a alpha ramp from 0 -> 1
                 if( i < boost::mpl::size< TSourceList >::type::value )
                 {
@@ -1549,7 +1368,6 @@ namespace isaac
                 ); 
             }
 
-#if ISAAC_ALPAKA == 1
             //allocate ssao kernel (16x16 matrix)
             alpaka::Buf<
                 THost, 
@@ -1583,13 +1401,7 @@ namespace isaac
                 )
             );
             isaac_float3* ssao_noise_h = reinterpret_cast<isaac_float3*> ( alpaka::getPtrNative ( ssao_noise_h_buf ) );
-    
-#else
 
-            isaac_float3 ssao_kernel_h[64];
-            isaac_float3 ssao_noise_h[16];
-    
-#endif
             
             std::uniform_real_distribution<float> randomFloats(0.0, 1.0);
             std::default_random_engine generator;
@@ -1621,7 +1433,6 @@ namespace isaac
             }
 
             //move ssao kernel to device
-#if ISAAC_ALPAKA == 1
             //copy ssao kernel to constant memory
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const 
                 ssao_kernel_d_extent(ISAAC_IDX_TYPE(64));
@@ -1657,13 +1468,6 @@ namespace isaac
                 ssao_noise_h_buf, 
                 ISAAC_IDX_TYPE(16)
             );
-    
-#else
-
-            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol ( ssao_kernel_d, ssao_kernel_h, 64 * sizeof ( isaac_float3 ) ) );
-            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol ( ssao_noise_d, ssao_noise_h, 16 * sizeof ( isaac_float3 ) ) );
-
-#endif
 
         }
 
@@ -2051,7 +1855,6 @@ namespace isaac
                 boost::mpl::size< TSourceList >::type::value,
                 dest
             );
-#if ISAAC_ALPAKA == 1
             alpaka::ViewPlainPtr <THost, isaac_float4, TFraDim, ISAAC_IDX_TYPE>
                 parameter_buffer(
                 isaac_parameter_h,
@@ -2163,40 +1966,6 @@ namespace isaac
                     )
                 )
             );
-#else
-            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol(
-                isaac_parameter_d,
-                isaac_parameter_h,
-                sizeof( isaac_parameter_h )
-            ) );
-            dim3 grid( 1 );
-            dim3 block( 1 );
-            updateFunctorChainPointerKernel<
-                (
-                    boost::mpl::size< TSourceList >::type::value
-                    + boost::mpl::size< TParticleList >::type::value
-                )
-            > <<< grid, block >>> (
-                functor_chain_choose_d,
-                functor_chain_d,
-                dest
-            );
-            ISAAC_CUDA_CHECK ( cudaDeviceSynchronize( ) );
-            isaac_functor_chain_pointer_N * constant_ptr;
-            ISAAC_CUDA_CHECK ( cudaGetSymbolAddress(
-                ( void ** ) &constant_ptr,
-                isaac_function_chain_d
-            ) );
-            ISAAC_CUDA_CHECK ( cudaMemcpy(
-                constant_ptr,
-                functor_chain_choose_d,
-                (
-                    boost::mpl::size< TSourceList >::type::value
-                    + boost::mpl::size< TParticleList >::type::value
-                ) * sizeof( isaac_functor_chain_pointer_N ),
-                cudaMemcpyDeviceToDevice
-            ) );
-#endif
         }
 
 
@@ -2232,21 +2001,12 @@ namespace isaac
                     }
                     before = next;
                 }
-#if ISAAC_ALPAKA == 1
                 alpaka::memcpy(
                     stream,
                     transfer_d_buf[i],
                     transfer_h_buf[i],
                     TTransfer_size
                 );
-#else
-                ISAAC_CUDA_CHECK ( cudaMemcpy(
-                    transfer_d.pointer[i],
-                    transfer_h.pointer[i],
-                    sizeof( isaac_float4 ) * TTransfer_size,
-                    cudaMemcpyHostToDevice
-                ) );
-#endif
             }
         }
 
@@ -2304,11 +2064,8 @@ namespace isaac
                     pointer_array,
                     local_size,
                     source_weight,
-                    pointer
-#if ISAAC_ALPAKA == 1
-                ,
-                stream
-#endif
+                    pointer,
+                    stream
                 );
                 isaac_for_each_params(
                     particle_sources,
@@ -3163,24 +2920,18 @@ namespace isaac
                     pointer_array,
                     minmax_array,
                     local_minmax_array_d,
-                    local_size
-#if ISAAC_ALPAKA == 1
-                ,
-                stream,
-                host
-#endif
+                    local_size,
+                    stream,
+                    host
                 );
                 isaac_for_each_params(
                     particle_sources,
                     calc_particle_minmax_iterator< boost::mpl::size< TSourceList >::type::value >( ),
                     minmax_array,
                     local_particle_minmax_array_d,
-                    local_particle_size
-#if ISAAC_ALPAKA == 1
-                ,
-                stream,
-                host
-#endif
+                    local_particle_size,
+                    stream,
+                    host
                 );
 
                 if( rank == master )
@@ -3442,25 +3193,6 @@ namespace isaac
             {
                 icetDestroyContext( icetContext[pass] );
             }
-#if ISAAC_ALPAKA == 0
-            for( int i = 0; i < (
-                boost::mpl::size< TSourceList >::type::value
-                + boost::mpl::size< TParticleList >::type::value
-            ); i++ )
-            {
-                if( pointer_array.pointer[i] )
-                {
-                    ISAAC_CUDA_CHECK ( cudaFree( pointer_array.pointer[i] ) );
-                }
-                ISAAC_CUDA_CHECK ( cudaFree( transfer_d.pointer[i] ) );
-                free( transfer_h.pointer[i] );
-            }
-            ISAAC_CUDA_CHECK ( cudaFree( framebuffer ) );
-            ISAAC_CUDA_CHECK ( cudaFree( functor_chain_d ) );
-            ISAAC_CUDA_CHECK ( cudaFree( functor_chain_choose_d ) );
-            ISAAC_CUDA_CHECK ( cudaFree( local_minmax_array_d ) );
-            ISAAC_CUDA_CHECK ( cudaFree( local_particle_minmax_array_d ) );
-#endif
             delete communicator;
             json_decref( json_init_root );
         }
@@ -3496,7 +3228,6 @@ namespace isaac
         )
         {
             //allocate memory for inverse mvp, mv and p matrix and simulation size properties
-#if ISAAC_ALPAKA == 1
 
             //inverse mvp
             alpaka::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
@@ -3551,13 +3282,6 @@ namespace isaac
             );
             isaac_size_struct < TSimDim::value > *size_h =
                 reinterpret_cast<isaac_size_struct< TSimDim::value > *> ( alpaka::getPtrNative( size_h_buf ) );
-
-#else
-            isaac_float inverse_h[16];
-            isaac_float modelview_h[16];
-            isaac_float projection_h[16];
-            isaac_size_struct < TSimDim::value > size_h[1];
-#endif
 
             //calculate inverse mvp matrix for render kernel
             IceTDouble inverse[16];
@@ -3692,7 +3416,6 @@ namespace isaac
             };
 
             //copy matrices and simulation size properties to constant memory
-#if ISAAC_ALPAKA == 1
 
             //inverse matrix
             alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
@@ -3752,38 +3475,6 @@ namespace isaac
                 ISAAC_IDX_TYPE( 1 )
             );
 
-#else
-
-            //copy inverse matrix to constant memory
-            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol(
-                isaac_inverse_d,
-                inverse_h,
-                16 * sizeof( float )
-            ) );
-
-            //copy modelview matrix to constant memory
-            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol(
-                isaac_modelview_d,
-                modelview_h,
-                16 * sizeof( float )
-            ) );
-
-            //copy projection matrix to constant memory
-            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol(
-                isaac_projection_d,
-                projection_h,
-                16 * sizeof( float )
-            ) );
-
-            //copy simulation size values to constant memory
-            ISAAC_CUDA_CHECK ( cudaMemcpyToSymbol(
-                isaac_size_d,
-                size_h,
-                sizeof( isaac_size_struct< TSimDim::value > )
-            ) );
-
-#endif
-
             //get pixel pointer from image as unsigned byte
             IceTUByte * pixels = icetImageGetColorub( result );
 
@@ -3806,7 +3497,6 @@ namespace isaac
             };
 
             //call render kernel
-#if ISAAC_ALPAKA == 1
             IsaacRenderKernelCaller<
                 TSimDim,
                 TParticleList,
@@ -3996,124 +3686,6 @@ namespace isaac
                     ISAAC_IDX_TYPE
                 >( myself->framebuffer_prod )
             );
-#else
-            IsaacRenderKernelCaller<
-                TSimDim,
-                TParticleList,
-                TSourceList,
-                transfer_d_struct<
-                    (
-                        boost::mpl::size< TSourceList >::type::value
-                        + boost::mpl::size< TParticleList >::type::value
-                    )
-                >,
-                source_weight_struct<
-                    (
-                        boost::mpl::size< TSourceList >::type::value
-                        + boost::mpl::size< TParticleList >::type::value
-                    )
-                >,
-                pointer_array_struct<
-                    (
-                        boost::mpl::size< TSourceList >::type::value
-                        + boost::mpl::size< TParticleList >::type::value
-                    )
-                >,
-                mpl::vector< >,
-                uint32_t *,
-                isaac_float3*,
-                isaac_float3*,
-                TTransfer_size,
-                isaac_float3,
-                (
-                    boost::mpl::size< TSourceList >::type::value
-                    + boost::mpl::size< TParticleList >::type::value
-                )
-            >
-            ::call(
-                myself->framebuffer,
-                myself->framebufferDepth,
-                myself->framebufferNormal,
-                myself->framebuffer_size,
-                framebuffer_start,
-                myself->particle_sources,
-                myself->sources,
-                myself->step,
-                bg_color,
-                myself->transfer_d,
-                myself->source_weight,
-                myself->pointer_array,
-                readback_viewport,
-                myself->interpolation,
-                myself->iso_surface,
-                isaac_scale,
-                myself->clipping,
-                myself->ambientOcclusion
-            );
-
-            //wait until render kernel has finished
-            ISAAC_CUDA_CHECK ( cudaDeviceSynchronize() );
-
-            //process depth/color information for depth simulation
-            if(myself->ambientOcclusion.isEnabled && myself->ambientOcclusion.weight > 0.0f) {
-                //call render kernel
-                IsaacSSAOKernelCaller
-                <
-                isaac_float*,
-                isaac_float3*,
-                isaac_float3*
-                >
-                ::call (
-                    myself->framebufferAO,
-                    myself->framebufferDepth,
-                    myself->framebufferNormal,
-                    myself->framebuffer_size,
-                    framebuffer_start,
-                    readback_viewport,
-                    myself->ambientOcclusion
-                );
-
-                //wait until render kernel has finished
-                ISAAC_CUDA_CHECK ( cudaDeviceSynchronize() );
-
-                //call render kernel
-                IsaacSSAOFilterKernelCaller
-                <
-                uint32_t*,
-                isaac_float*,
-                isaac_float3*
-                >
-                ::call (
-                    myself->framebuffer,
-                    myself->framebufferAO,
-                    myself->framebufferDepth,
-                    myself->framebuffer_size,
-                    framebuffer_start,
-                    readback_viewport,
-                    myself->ambientOcclusion
-                );
-
-                //wait until render kernel has finished
-                ISAAC_CUDA_CHECK ( cudaDeviceSynchronize() );
-            }
-
-            //stop and restart time for delta calculation
-            ISAAC_STOP_TIME_MEASUREMENT ( myself->kernel_time,
-                +=,
-                kernel,
-                myself->getTicksUs( ) )
-            ISAAC_START_TIME_MEASUREMENT ( copy,
-                myself->getTicksUs( ) )
-
-            //copy filled framebuffer to IceT result buffer
-            ISAAC_CUDA_CHECK ( cudaMemcpy(
-                ( uint32_t * )( pixels ),
-                myself->framebuffer,
-                sizeof( uint32_t ) * myself->framebuffer_prod,
-                cudaMemcpyDeviceToHost
-            ) );
-
-#endif
 
             //stop timer and calculate copy time
             ISAAC_STOP_TIME_MEASUREMENT ( myself->copy_time,
@@ -4703,17 +4275,14 @@ namespace isaac
         }
 
 
-#if ISAAC_ALPAKA == 1
         THost host;
         TDevAcc acc;
         TStream stream;
-#endif
         std::string name;
         std::string server_url;
         isaac_uint server_port;
         isaac_size2 framebuffer_size;
         isaac_size2 compbuffer_size;
-#if ISAAC_ALPAKA == 1
         alpaka::Vec<
             TFraDim,
             ISAAC_IDX_TYPE
@@ -4775,17 +4344,7 @@ namespace isaac
             TFraDim,
             ISAAC_IDX_TYPE
         > local_particle_minmax_array_d;
-#else
-        ISAAC_IDX_TYPE framebuffer_prod;
-        isaac_uint* framebuffer;                                //color values storage
-        isaac_float* framebufferAO;                             //ao/depth indicator storage
-        isaac_float3* framebufferDepth;                         //depth value storage
-        isaac_float3* framebufferNormal;                        //normal values storage
-        isaac_functor_chain_pointer_N * functor_chain_d;
-        isaac_functor_chain_pointer_N * functor_chain_choose_d;
-        minmax_struct * local_minmax_array_d;
-        minmax_struct * local_particle_minmax_array_d;
-#endif
+
         TDomainSize global_size;
         TDomainSize local_size;
         TDomainSize local_particle_size;
@@ -4837,7 +4396,7 @@ namespace isaac
         IsaacVisualizationMetaEnum thr_metaTargets;
         pthread_t visualizationThread;
         ao_struct ambientOcclusion;                         //state of ambient occlusion on client site
-#if ISAAC_ALPAKA == 1
+
         std::vector <alpaka::Buf<
             TDevAcc,
             isaac_float4,
@@ -4856,7 +4415,7 @@ namespace isaac
             TFraDim,
             ISAAC_IDX_TYPE
         >> pointer_array_alpaka;
-#endif
+
         transfer_d_struct<
             (
                 boost::mpl::size< TSourceList >::type::value
@@ -4904,7 +4463,6 @@ namespace isaac
         IceTImage image[TController::pass_count];
     };
 
-#if ISAAC_ALPAKA == 1
     template<
         typename THost,
         typename TAcc,
@@ -4944,34 +4502,5 @@ namespace isaac
         TController,
         TCompositor
     >::myself = NULL;
-#else
-    template<
-        typename TSimDim,
-        typename TParticleList,
-        typename TSourceList,
-        typename TDomainSize, ISAAC_IDX_TYPE TTransfer_size,
-        typename TScale,
-        typename TController,
-        typename TCompositor
-    > IsaacVisualization<
-        TSimDim,
-        TParticleList,
-        TSourceList,
-        TDomainSize,
-        TTransfer_size,
-        TScale,
-        TController,
-        TCompositor
-    > * IsaacVisualization<
-        TSimDim,
-        TParticleList,
-        TSourceList,
-        TDomainSize,
-        TTransfer_size,
-        TScale,
-        TController,
-        TCompositor
-    >::myself = NULL;
-#endif
 
 } //namespace isaac;

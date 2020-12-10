@@ -192,7 +192,6 @@ namespace isaac
     };
 
 
-#if ISAAC_ALPAKA == 1
 
     struct fillFunctorChainPointerKernel
     {
@@ -201,16 +200,8 @@ namespace isaac
         >
         ALPAKA_FN_ACC void operator()(
             TAcc__ const & acc,
-#else
-
-
-            __global__ void fillFunctorChainPointerKernel(
-#endif
             isaac_functor_chain_pointer_N * const functor_chain_d
-        )
-#if ISAAC_ALPAKA == 1
-        const
-#endif
+        ) const
         {
             isaac_int bytecode[ISAAC_MAX_FUNCTORS];
             for( int i = 0; i < ISAAC_MAX_FUNCTORS; i++ )
@@ -258,12 +249,8 @@ namespace isaac
                 }
             }
         }
-
-
-#if ISAAC_ALPAKA == 1
     };
 
-#endif
 
     template<
         isaac_int TInterpolation,
@@ -434,7 +421,6 @@ namespace isaac
         }
         isaac_float result = isaac_float( 0 );
 
-#if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
         if( TSource::feature_dim == 1 )
         {
             result =
@@ -467,7 +453,6 @@ namespace isaac
                     NR::value
                 );
         }
-#endif
         return result;
     }
 
@@ -697,7 +682,6 @@ namespace isaac
                         isaac_float result = isaac_float( 0 );
 
                         // apply functorchain
-#if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
                         if( TSource::feature_dim == 1 )
                         {
                             result =
@@ -730,7 +714,6 @@ namespace isaac
                                     sourceNumber
                                 );
                         }
-#endif
 
                         // apply transferfunction
                         isaac_int lookup_value = isaac_int(
@@ -1146,7 +1129,6 @@ namespace isaac
         isaac_int TIsoSurface,
         typename TScale
     >
-#if ISAAC_ALPAKA == 1
     struct isaacRenderKernel
     {
         template<
@@ -1154,9 +1136,6 @@ namespace isaac
         >
         ALPAKA_FN_ACC void operator()(
             TAcc__ const & acc,
-#else
-            __global__ void isaacRenderKernel(
-#endif
             uint32_t * const pixels,                //ptr to output pixels
             isaac_float3 * const gDepth,            //depth buffer
             isaac_float3 * const gNormal,           //normal buffer
@@ -1172,16 +1151,12 @@ namespace isaac
             const TScale scale,                     //isaac set scaling
             const clipping_struct input_clipping,   //clipping planes
             const ao_struct ambientOcclusion        //ambient occlusion params
-        )
-#if ISAAC_ALPAKA == 1
-        const
-#endif
+        ) const
         {
             isaac_uint2 pixel[ISAAC_VECTOR_ELEM];
             bool finish[ISAAC_VECTOR_ELEM];
 
             //get pixel values from thread ids
-#if ISAAC_ALPAKA == 1
             auto alpThreadIdx = alpaka::getIdx<
                 alpaka::Grid,
                 alpaka::Threads
@@ -1191,13 +1166,6 @@ namespace isaac
                 pixel[e].x = isaac_uint( alpThreadIdx[2] )
                              * isaac_uint( ISAAC_VECTOR_ELEM ) + e;
                 pixel[e].y = isaac_uint( alpThreadIdx[1] );
-#else
-                ISAAC_ELEM_ITERATE ( e )
-                {
-                    pixel[e].x = isaac_uint( threadIdx.x + blockIdx.x * blockDim.x )
-                                 * isaac_uint( ISAAC_VECTOR_ELEM ) + e;
-                    pixel[e].y = isaac_uint( threadIdx.y + blockIdx.y * blockDim.y );
-#endif
                 //apply framebuffer offset to pixel
                 //stop if pixel position is out of bounds
                 finish[e] = false;
@@ -2123,9 +2091,7 @@ namespace isaac
                 }
             }
         }
-#if ISAAC_ALPAKA == 1
     };
-#endif
 
     /**
      * @brief Calculate SSAO factor
@@ -2135,36 +2101,24 @@ namespace isaac
      *          Normal Buffer (dim 3)
      * 
      */
-#if ISAAC_ALPAKA == 1
     struct isaacSSAOKernel {
         template <typename TAcc__>
         ALPAKA_FN_ACC void operator() (
             TAcc__ const &acc,
-#else
-    __global__ void isaacSSAOKernel (
-#endif
             isaac_float * const gAOBuffer,       //ao buffer
             isaac_float3 * const gDepth,         //depth buffer (will be used as y=blending of particles and volume, z=depth of pixels)
             isaac_float3 * const gNormal,        //normal buffer
             const isaac_size2 framebuffer_size,  //size of framebuffer
             const isaac_uint2 framebuffer_start, //framebuffer offset
             ao_struct ao_properties              //properties for ambient occlusion
-            )
-#if ISAAC_ALPAKA == 1
-        const
-#endif
+            ) const
         {
 
             isaac_uint2 pixel;
             //get pixel values from thread ids
-#if ISAAC_ALPAKA == 1
-                    auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
-                    pixel.x = isaac_uint ( alpThreadIdx[2] );
-                    pixel.y = isaac_uint ( alpThreadIdx[1] );
-#else
-                    pixel.x = isaac_uint ( threadIdx.x + blockIdx.x * blockDim.x );
-                    pixel.y = isaac_uint ( threadIdx.y + blockIdx.y * blockDim.y );
-#endif
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
+            pixel.x = isaac_uint ( alpThreadIdx[2] );
+            pixel.y = isaac_uint ( alpThreadIdx[1] );
 
             pixel = pixel + framebuffer_start;    
 
@@ -2297,9 +2251,7 @@ namespace isaac
             //save the depth value in our ao buffer
             gAOBuffer[pixel.x + pixel.y * framebuffer_size.x] = depth;
         }
-#if ISAAC_ALPAKA == 1
     };
-#endif
 
     /**
      * @brief Filter SSAO artifacts and return the color with depth simulation
@@ -2308,36 +2260,24 @@ namespace isaac
      * Requires AO Values Buffer  (dim 1)
      * 
      */
-#if ISAAC_ALPAKA == 1
     struct isaacSSAOFilterKernel {
         template <typename TAcc__>
         ALPAKA_FN_ACC void operator() (
             TAcc__ const &acc,
-#else
-    __global__ void isaacSSAOFilterKernel (
-#endif
             uint32_t * const gColor,             //ptr to output pixels
             isaac_float * const gAOBuffer,       //ambient occlusion values from ssao kernel
             isaac_float3 * const gDepthBuffer,   //depth and blending values
             const isaac_size2 framebuffer_size,  //size of framebuffer
             const isaac_uint2 framebuffer_start, //framebuffer offset
             ao_struct ao_properties              //properties for ambient occlusion
-            )
-#if ISAAC_ALPAKA == 1
-        const
-#endif
+            ) const
         {
 
             isaac_uint2 pixel;
             //get pixel values from thread ids
-#if ISAAC_ALPAKA == 1
-                    auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
-                    pixel.x = isaac_uint ( alpThreadIdx[2] );
-                    pixel.y = isaac_uint ( alpThreadIdx[1] );
-#else
-                    pixel.x = isaac_uint ( threadIdx.x + blockIdx.x * blockDim.x );
-                    pixel.y = isaac_uint ( threadIdx.y + blockIdx.y * blockDim.y );
-#endif
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
+            pixel.x = isaac_uint ( alpThreadIdx[2] );
+            pixel.y = isaac_uint ( alpThreadIdx[1] );
 
             //get real pixel coordinate by offset
             pixel = pixel + framebuffer_start;
@@ -2381,9 +2321,7 @@ namespace isaac
             ISAAC_SET_COLOR(gColor[pixel.x + pixel.y * framebuffer_size.x], final_color);
             
         }
-#if ISAAC_ALPAKA == 1
     };
-#endif
 
 
     template<
@@ -2399,20 +2337,16 @@ namespace isaac
         typename TFramebufferNormal,
         ISAAC_IDX_TYPE TTransfer_size,
         typename TScale,
-#if ISAAC_ALPAKA == 1
         typename TAccDim,
         typename TAcc,
         typename TStream,
         typename TFunctionChain,
-#endif
         int N
     >
     struct IsaacRenderKernelCaller
     {
         inline static void call(
-#if ISAAC_ALPAKA == 1
             TStream stream,
-#endif
             TFramebuffer framebuffer,
             TFramebufferDepth depthBuffer,
             TFramebufferNormal normalBuffer,
@@ -2453,17 +2387,13 @@ namespace isaac
                     TFramebufferNormal,
                     TTransfer_size,
                     TScale,
-#if ISAAC_ALPAKA == 1
                     TAccDim,
                     TAcc,
                     TStream,
                     TFunctionChain,
-#endif
 N - 1
                 >::call(
-#if ISAAC_ALPAKA == 1
                     stream,
-#endif
                     framebuffer,
                     depthBuffer,
                     normalBuffer,
@@ -2502,17 +2432,13 @@ N - 1
                     TFramebufferNormal,
                     TTransfer_size,
                     TScale,
-#if ISAAC_ALPAKA == 1
                     TAccDim,
                     TAcc,
                     TStream,
                     TFunctionChain,
-#endif
 N - 1
                 >::call(
-#if ISAAC_ALPAKA == 1
                     stream,
-#endif
                     framebuffer,
                     depthBuffer,
                     normalBuffer,
@@ -2548,14 +2474,11 @@ N - 1
         typename TFramebufferDepth,
         typename TFramebufferNormal,
         ISAAC_IDX_TYPE TTransfer_size,
-        typename TScale
-#if ISAAC_ALPAKA == 1
-        ,
+        typename TScale,
         typename TAccDim,
         typename TAcc,
         typename TStream,
         typename TFunctionChain
-#endif
     >
     struct IsaacRenderKernelCaller<
         TSimDim,
@@ -2570,19 +2493,15 @@ N - 1
         TFramebufferNormal,
         TTransfer_size,
         TScale,
-#if ISAAC_ALPAKA == 1
         TAccDim,
         TAcc,
         TStream,
         TFunctionChain,
-#endif
         0 //<-- spezialisation
     >
     {
         inline static void call(
-#if ISAAC_ALPAKA == 1
             TStream stream,
-#endif
             TFramebuffer framebuffer,
             TFramebufferDepth depthBuffer,
             TFramebufferNormal normalBuffer,
@@ -2616,7 +2535,6 @@ N - 1
                     ( readback_viewport[3] + block_size.y - 1 ) / block_size.y
                 )
             };
-#if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
             if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
@@ -2694,48 +2612,6 @@ N - 1
                 ); \
                 alpaka::enqueue(stream, instance); \
             }
-#else
-            dim3 block(
-                block_size.x,
-                block_size.y
-            );
-            dim3 grid(
-                grid_size.x,
-                grid_size.y
-            );
-#define ISAAC_KERNEL_START \
-                isaacRenderKernel \
-                < \
-                    TSimDim, \
-                    TParticleList, \
-                    TSourceList, \
-                    TTransferArray, \
-                    TSourceWeight, \
-                    TPointerArray, \
-                    TFilter, \
-                    TTransfer_size,
-#define ISAAC_KERNEL_END \
-                > \
-                <<<grid, block>>> \
-                ( \
-                    framebuffer, \
-                    depthBuffer, \
-                    normalBuffer, \
-                    framebuffer_size, \
-                    framebuffer_start, \
-                    particle_sources, \
-                    sources, \
-                    step, \
-                    background_color, \
-                    transferArray, \
-                    sourceWeight, \
-                    pointerArray, \
-                    scale, \
-                    clipping, \
-                    ambientOcclusion \
-                );
-
-#endif
             if( interpolation )
             {
                 if( iso_surface )
@@ -2763,18 +2639,14 @@ N - 1
         typename TAOBuffer,
         typename TDepthBuffer,
         typename TNormalBuffer
-#if ISAAC_ALPAKA == 1
         ,typename TAccDim
         ,typename TAcc
         ,typename TStream
-#endif
         >
     struct IsaacSSAOKernelCaller {
         
         inline static void call (
-#if ISAAC_ALPAKA == 1
             TStream stream,
-#endif
             TAOBuffer aoBuffer,
             TDepthBuffer depthBuffer,
             TNormalBuffer normalBuffer,
@@ -2792,7 +2664,6 @@ N - 1
                 ISAAC_IDX_TYPE ( ( readback_viewport[2]+block_size.x-1 ) /block_size.x + ISAAC_VECTOR_ELEM - 1 ) /ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ),
                 ISAAC_IDX_TYPE ( ( readback_viewport[3]+block_size.y-1 ) /block_size.y )
             };
-#if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
             if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
@@ -2825,19 +2696,6 @@ N - 1
                 );
                 alpaka::enqueue(stream, instance);
             }
-#else
-            dim3 block ( block_size.x, block_size.y );
-            dim3 grid ( grid_size.x, grid_size.y );
-            isaacSSAOKernel<<<grid, block>>>
-            (
-                aoBuffer,
-                depthBuffer,
-                normalBuffer,
-                framebuffer_size,
-                framebuffer_start,
-                ao_properties
-            );
-#endif
         }
     };
 
@@ -2846,18 +2704,14 @@ N - 1
         typename TFramebuffer,
         typename TFramebufferAO,
         typename TFramebufferDepth
-#if ISAAC_ALPAKA == 1
         ,typename TAccDim
         ,typename TAcc
         ,typename TStream
-#endif
         >
     struct IsaacSSAOFilterKernelCaller {
         
         inline static void call (
-#if ISAAC_ALPAKA == 1
             TStream stream,
-#endif
             TFramebuffer framebuffer,
             TFramebufferAO aobuffer,
             TFramebufferDepth depthbuffer,
@@ -2875,7 +2729,6 @@ N - 1
                 ISAAC_IDX_TYPE ( ( readback_viewport[2]+block_size.x-1 ) /block_size.x + ISAAC_VECTOR_ELEM - 1 ) /ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ),
                 ISAAC_IDX_TYPE ( ( readback_viewport[3]+block_size.y-1 ) /block_size.y )
             };
-#if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
             if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
@@ -2908,19 +2761,6 @@ N - 1
                 );
                 alpaka::enqueue(stream, instance);
             }
-#else
-            dim3 block ( block_size.x, block_size.y );
-            dim3 grid ( grid_size.x, grid_size.y );
-            isaacSSAOFilterKernel<<<grid, block>>>
-            (
-                framebuffer,
-                aobuffer,
-                depthbuffer,
-                framebuffer_size,
-                framebuffer_start,
-                ao_properties
-            );
-#endif
         }
     };
 
@@ -2930,7 +2770,6 @@ N - 1
         int count,
         typename TDest
     >
-#if ISAAC_ALPAKA == 1
     struct updateFunctorChainPointerKernel
     {
         template<
@@ -2938,34 +2777,23 @@ N - 1
         >
         ALPAKA_FN_ACC void operator()(
             TAcc__ const & acc,
-#else
-            __global__ void updateFunctorChainPointerKernel(
-#endif
             isaac_functor_chain_pointer_N * const functor_chain_choose_d,
             isaac_functor_chain_pointer_N const * const functor_chain_d,
             TDest dest
-        )
-#if ISAAC_ALPAKA == 1
-        const
-#endif
+        ) const
         {
             for( int i = 0; i < count; i++ )
             {
                 functor_chain_choose_d[i] = functor_chain_d[dest.nr[i]];
             }
         }
-
-
-#if ISAAC_ALPAKA == 1
     };
 
-#endif
 
 
     template<
         typename TSource
     >
-#if ISAAC_ALPAKA == 1
     struct updateBufferKernel
     {
         template<
@@ -2973,18 +2801,11 @@ N - 1
         >
         ALPAKA_FN_ACC void operator()(
             TAcc__ const & acc,
-#else
-            __global__ void updateBufferKernel(
-#endif
             const TSource source,
             void * const pointer,
             const isaac_int3 local_size
-        )
-#if ISAAC_ALPAKA == 1
-        const
-#endif
+        ) const
         {
-#if ISAAC_ALPAKA == 1
             auto alpThreadIdx = alpaka::getIdx<
                 alpaka::Grid,
                 alpaka::Threads
@@ -2994,13 +2815,6 @@ N - 1
                 isaac_int( alpThreadIdx[2] ),
                 0
             };
-#else
-            isaac_int3 dest = {
-                isaac_int( threadIdx.x + blockIdx.x * blockDim.x ),
-                isaac_int( threadIdx.y + blockIdx.y * blockDim.y ),
-                0
-            };
-#endif
             isaac_int3 coord = dest;
             coord.x -= ISAAC_GUARD_SIZE;
             coord.y -= ISAAC_GUARD_SIZE;
@@ -3074,12 +2888,7 @@ N - 1
                 }
             }
         }
-
-
-#if ISAAC_ALPAKA == 1
     };
-
-#endif
 
 
     template<
@@ -3094,7 +2903,6 @@ N - 1
     template<
         typename TSource
     >
-#if ISAAC_ALPAKA == 1
     struct minMaxKernel
     {
         template<
@@ -3102,20 +2910,13 @@ N - 1
         >
         ALPAKA_FN_ACC void operator()(
             TAcc__ const & acc,
-#else
-            __global__ void minMaxKernel(
-#endif
             const TSource source,
             const int nr,
             minmax_struct * const result,
             const isaac_int3 local_size,
             void const * const pointer
-        )
-#if ISAAC_ALPAKA == 1
-        const
-#endif
+        ) const
         {
-#if ISAAC_ALPAKA == 1
             auto alpThreadIdx = alpaka::getIdx<
                 alpaka::Grid,
                 alpaka::Threads
@@ -3125,13 +2926,7 @@ N - 1
                 isaac_int( alpThreadIdx[2] ),
                 0
             };
-#else
-            isaac_int3 coord = {
-                isaac_int( threadIdx.x + blockIdx.x * blockDim.x ),
-                isaac_int( threadIdx.y + blockIdx.y * blockDim.y ),
-                0
-            };
-#endif
+
             if( ISAAC_FOR_EACH_DIM_TWICE ( 2,
                     coord,
                     >= local_size,
@@ -3160,7 +2955,6 @@ N - 1
                                )];
                 };
                 isaac_float value = isaac_float( 0 );
-#if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
                 if( TSource::feature_dim == 1 )
                 {
                     value =
@@ -3193,7 +2987,6 @@ N - 1
                             nr
                         );
                 }
-#endif
                 if( value > max )
                 {
                     max = value;
@@ -3207,17 +3000,13 @@ N - 1
             result[coord.x + coord.y * local_size.x].max = max;
         }
 
-
-#if ISAAC_ALPAKA == 1
     };
 
-#endif
 
 
     template<
         typename TParticleSource
     >
-#if ISAAC_ALPAKA == 1
     struct minMaxPartikelKernel
     {
         template<
@@ -3225,19 +3014,12 @@ N - 1
         >
         ALPAKA_FN_ACC void operator()(
             TAcc__ const & acc,
-#else
-            __global__ void minMaxPartikelKernel(
-#endif
             const TParticleSource particle_source,
             const int nr,
             minmax_struct * const result,
             const isaac_int3 local_size
-        )
-#if ISAAC_ALPAKA == 1
-        const
-#endif
+        ) const
         {
-#if ISAAC_ALPAKA == 1
             auto alpThreadIdx = alpaka::getIdx<
                 alpaka::Grid,
                 alpaka::Threads
@@ -3247,13 +3029,6 @@ N - 1
                 isaac_uint( alpThreadIdx[2] ),
                 0
             };
-#else
-            isaac_uint3 coord = {
-                isaac_uint( threadIdx.x + blockIdx.x * blockDim.x ),
-                isaac_uint( threadIdx.y + blockIdx.y * blockDim.y ),
-                0
-            };
-#endif
             if( ISAAC_FOR_EACH_DIM_TWICE ( 2,
                     coord,
                     >= local_size,
@@ -3271,7 +3046,6 @@ N - 1
                     data = particle_iterator.getAttribute( );
 
                     isaac_float value = isaac_float( 0 );
-#if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
                     if( TParticleSource::feature_dim == 1 )
                     {
                         value =
@@ -3304,7 +3078,6 @@ N - 1
                                 nr
                             );
                     }
-#endif
                     if( value > max )
                     {
                         max = value;
@@ -3320,11 +3093,7 @@ N - 1
             result[coord.x + coord.y * local_size.x].max = max;
         }
 
-
-#if ISAAC_ALPAKA == 1
     };
-
-#endif
 
 } //namespace isaac;
 
