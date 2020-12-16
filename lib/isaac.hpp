@@ -78,12 +78,9 @@ namespace isaac
         typename TAcc,
         typename TStream,
         typename TAccDim,
-        typename TSimDim,
         typename TParticleList,
         typename TSourceList,
-        typename TDomainSize,
         ISAAC_IDX_TYPE TTransfer_size,
-        typename TScale,
         typename TController,
         typename TCompositor
     >
@@ -472,32 +469,19 @@ namespace isaac
                 const THost__ & host
             ) const
             {
-                isaac_size2 grid_size = {
-                    ISAAC_IDX_TYPE( ( local_size[0] + 15 ) / 16 ),
-                    ISAAC_IDX_TYPE( ( local_size[1] + 15 ) / 16 ),
-                };
-                isaac_size2 block_size = {
-                    ISAAC_IDX_TYPE( 16 ),
-                    ISAAC_IDX_TYPE( 16 ),
-                };
-                isaac_int3 local_size_array = {
-                    isaac_int( local_size[0] ),
-                    isaac_int( local_size[1] ),
-                    isaac_int( local_size[2] )
-                };
-                minmax_struct
-                    local_minmax_array_h[local_size_array.x * local_size_array.y
-                ];
-                if( local_size[0] != 0 && local_size[1] != 0 )
+                isaac_size2 grid_size = ( local_size + ISAAC_IDX_TYPE( 15 ) ) / ISAAC_IDX_TYPE( 16 );
+                isaac_size2 block_size( 16 );
+
+                minmax_struct local_minmax_array_h[local_size.x * local_size.y];
+
+                if( local_size.x != 0 && local_size.y != 0 )
                 {
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                     if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
                     {
-                        grid_size.x = ISAAC_IDX_TYPE( local_size[0] );
-                        grid_size.y = ISAAC_IDX_TYPE( local_size[0] );
-                        block_size.x = ISAAC_IDX_TYPE( 1 );
-                        block_size.y = ISAAC_IDX_TYPE( 1 );
+                        grid_size = local_size;
+                        block_size = isaac_size2( 1 );
                     }
                     const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
                         ISAAC_IDX_TYPE( 1 ),
@@ -532,7 +516,7 @@ namespace isaac
                             source,
                             I,
                             alpaka::getPtrNative( local_minmax ),
-                            local_size_array,
+                            local_size,
                             pointer_array.pointer[I]
                         )
                     );
@@ -541,18 +525,13 @@ namespace isaac
                         instance
                     );
                     alpaka::wait( stream );
-                    alpaka::ViewPlainPtr <THost, minmax_struct, TFraDim, ISAAC_IDX_TYPE>
-                        minmax_buffer(
+                    alpaka::ViewPlainPtr <THost, minmax_struct, TFraDim, ISAAC_IDX_TYPE> minmax_buffer(
                         local_minmax_array_h,
                         host,
                         alpaka::Vec<
                             TFraDim,
                             ISAAC_IDX_TYPE
-                        >(
-                            ISAAC_IDX_TYPE(
-                                local_size_array.x * local_size_array.y
-                            )
-                        )
+                        >( local_size.x * local_size.y )
                     );
                     alpaka::memcpy(
                         stream,
@@ -561,18 +540,12 @@ namespace isaac
                         alpaka::Vec<
                             TFraDim,
                             ISAAC_IDX_TYPE
-                        >(
-                            ISAAC_IDX_TYPE(
-                                local_size_array.x * local_size_array.y
-                            )
-                        )
+                        >( local_size.x * local_size.y )
                     );
                 }
                 minmax.min[I] = FLT_MAX;
                 minmax.max[I] = -FLT_MAX;
-                for( int i = 0;
-                    i < local_size_array.x * local_size_array.y;
-                    i++ )
+                for( ISAAC_IDX_TYPE i = 0; i < local_size.x * local_size.y; i++ )
                 {
                     if( local_minmax_array_h[i].min < minmax.min[I] )
                     {
@@ -612,32 +585,19 @@ namespace isaac
             {
                 // iterate over all cells and the particle lists
 
-                isaac_size2 grid_size = {
-                    ISAAC_IDX_TYPE( ( local_size[0] + 15 ) / 16 ),
-                    ISAAC_IDX_TYPE( ( local_size[1] + 15 ) / 16 ),
-                };
-                isaac_size2 block_size = {
-                    ISAAC_IDX_TYPE( 16 ),
-                    ISAAC_IDX_TYPE( 16 ),
-                };
-                isaac_int3 local_size_array = {
-                    isaac_int( local_size[0] ),
-                    isaac_int( local_size[1] ),
-                    isaac_int( local_size[2] )
-                };
-                minmax_struct
-                    local_minmax_array_h[local_size_array.x * local_size_array.y
-                ];
-                if( local_size[0] != 0 && local_size[1] != 0 )
+                isaac_size2 grid_size = ( local_size + ISAAC_IDX_TYPE( 15 ) ) / ISAAC_IDX_TYPE( 16 );
+                isaac_size2 block_size( 16 );
+
+                minmax_struct local_minmax_array_h[local_size.x * local_size.y];
+                
+                if( local_size.x != 0 && local_size.y != 0 )
                 {
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                     if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
                     {
-                        grid_size.x = ISAAC_IDX_TYPE( local_size[0] );
-                        grid_size.y = ISAAC_IDX_TYPE( local_size[0] );
-                        block_size.x = ISAAC_IDX_TYPE( 1 );
-                        block_size.y = ISAAC_IDX_TYPE( 1 );
+                        grid_size = local_size;
+                        block_size = isaac_size2( 1 );
                     }
                     const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
                         ISAAC_IDX_TYPE( 1 ),
@@ -672,7 +632,7 @@ namespace isaac
                             particle_source,
                             I + TOffset,
                             alpaka::getPtrNative( local_minmax ),
-                            local_size_array
+                            local_size
                         )
                     );
                     alpaka::enqueue(
@@ -680,18 +640,13 @@ namespace isaac
                         instance
                     );
                     alpaka::wait( stream );
-                    alpaka::ViewPlainPtr <THost, minmax_struct, TFraDim, ISAAC_IDX_TYPE>
-                        minmax_buffer(
+                    alpaka::ViewPlainPtr <THost, minmax_struct, TFraDim, ISAAC_IDX_TYPE> minmax_buffer(
                         local_minmax_array_h,
                         host,
                         alpaka::Vec<
                             TFraDim,
                             ISAAC_IDX_TYPE
-                        >(
-                            ISAAC_IDX_TYPE(
-                                local_size_array.x * local_size_array.y
-                            )
-                        )
+                        >( local_size.x * local_size.y )
                     );
                     alpaka::memcpy(
                         stream,
@@ -700,19 +655,13 @@ namespace isaac
                         alpaka::Vec<
                             TFraDim,
                             ISAAC_IDX_TYPE
-                        >(
-                            ISAAC_IDX_TYPE(
-                                local_size_array.x * local_size_array.y
-                            )
-                        )
+                        >( local_size.x * local_size.y )
                     );
                 }
                 minmax.min[I + TOffset] = FLT_MAX;
                 minmax.max[I + TOffset] = -FLT_MAX;
                 // find the min and max
-                for( int i = 0;
-                    i < local_size_array.x * local_size_array.y;
-                    i++ )
+                for( ISAAC_IDX_TYPE i = 0; i < local_size.x * local_size.y; i++ )
                 {
                     if( local_minmax_array_h[i].min < minmax.min[I + TOffset] )
                     {
@@ -736,13 +685,13 @@ namespace isaac
             const std::string server_url,
             const isaac_uint server_port,
             const isaac_size2 framebuffer_size,
-            const TDomainSize global_size,
-            const TDomainSize local_size,
-            const TDomainSize local_particle_size,
-            const TDomainSize position,
+            const isaac_size3 global_size,
+            const isaac_size3 local_size,
+            const isaac_size3 local_particle_size,
+            const isaac_size3 position,
             TParticleList & particle_sources,
             TSourceList & sources,
-            TScale scale
+            isaac_float3 scale
 
         ) :
             host( host ),
@@ -862,25 +811,9 @@ namespace isaac
             );
 #endif
             json_object_seed( 0 );
-            for( int i = 0; i < 3; i++ )
-            {
-                global_size_scaled.push_back(
-                    isaac_int(
-                        ( isaac_float ) global_size[i]
-                        * ( isaac_float ) scale[i]
-                    )
-                );
-                local_size_scaled.push_back(
-                    isaac_int(
-                        ( isaac_float ) local_size[i] * ( isaac_float ) scale[i]
-                    )
-                );
-                position_scaled.push_back(
-                    isaac_int(
-                        ( isaac_float ) position[i] * ( isaac_float ) scale[i]
-                    )
-                );
-            }
+            global_size_scaled = isaac_float3( global_size ) * scale;
+            local_size_scaled = isaac_float3( local_size ) * scale;
+            position_scaled = isaac_float3( position ) * scale;
 
             background_color[0] = 0;
             background_color[1] = 0;
@@ -912,17 +845,18 @@ namespace isaac
                 this->communicator = NULL;
             }
             recreateJSON( );
+            for(int i = 0; i < TController::pass_count; ++i)
+            {
+                projections.push_back(isaac_dmat4(1));
+            }
             controller.updateProjection(
-                projection,
+                projections,
                 framebuffer_size,
                 NULL,
                 true
             );
-            look_at[0] = 0.0f;
-            look_at[1] = 0.0f;
-            look_at[2] = 0.0f;
-            ISAAC_SET_IDENTITY ( 3,
-                rotation )
+            look_at = isaac_double3(0);
+            rotation = isaac_dmat3(1);
             distance = -4.5f;
             updateModelview( );
 
@@ -1131,28 +1065,8 @@ namespace isaac
             }
             updateTransfer( );
 
-            max_size = ISAAC_MAX(
-                uint32_t( global_size[0] ),
-                uint32_t( global_size[1] )
-            );
-            if( TSimDim::value > 2 )
-            {
-                max_size = ISAAC_MAX(
-                    uint32_t( global_size[2] ),
-                    uint32_t( max_size )
-                );
-            }
-            max_size_scaled = ISAAC_MAX(
-                uint32_t( global_size_scaled[0] ),
-                uint32_t( global_size_scaled[1] )
-            );
-            if( TSimDim::value > 2 )
-            {
-                max_size_scaled = ISAAC_MAX(
-                    uint32_t( global_size_scaled[2] ),
-                    uint32_t( max_size_scaled )
-                );
-            }
+            max_size = glm::max( global_size.x , glm::max( global_size.y, global_size.z ) );
+            max_size_scaled = glm::max( global_size_scaled.x , glm::max( global_size_scaled.y, global_size_scaled.z ) );
 
             //ICET:
             IceTCommunicator icetComm;
@@ -1255,16 +1169,20 @@ namespace isaac
                     "projection",
                     matrix = json_array( )
                 );
-                ISAAC_JSON_ADD_MATRIX ( matrix,
-                    projection,
-                    16 * TController::pass_count )
+                for(isaac_int p = 0; p < TController::pass_count; ++p)
+                {
+                    for (isaac_int i = 0; i < 16; ++i)
+                    {
+                        json_array_append_new( matrix, json_real( glm::value_ptr( projections[p] )[i] ) );
+                    }
+                }
                 json_object_set_new(
                     json_root,
                     "position",
                     matrix = json_array( )
                 );
                 ISAAC_JSON_ADD_MATRIX ( matrix,
-                    look_at,
+                    glm::value_ptr( look_at ),
                     3 )
                 json_object_set_new(
                     json_root,
@@ -1272,7 +1190,7 @@ namespace isaac
                     matrix = json_array( )
                 );
                 ISAAC_JSON_ADD_MATRIX ( matrix,
-                    rotation,
+                    glm::value_ptr( rotation ),
                     9 )
                 json_object_set_new(
                     json_root,
@@ -1317,29 +1235,23 @@ namespace isaac
                 json_object_set_new(
                     json_root,
                     "dimension",
-                    json_integer( TSimDim::value )
+                    json_integer( 3 )
                 );
                 json_object_set_new(
                     json_root,
                     "width",
-                    json_integer( global_size_scaled[0] )
+                    json_integer( global_size_scaled.x )
                 );
-                if( TSimDim::value > 1 )
-                {
-                    json_object_set_new(
-                        json_root,
-                        "height",
-                        json_integer( global_size_scaled[1] )
-                    );
-                }
-                if( TSimDim::value > 2 )
-                {
-                    json_object_set_new(
-                        json_root,
-                        "depth",
-                        json_integer( global_size_scaled[2] )
-                    );
-                }
+                json_object_set_new(
+                    json_root,
+                    "height",
+                    json_integer( global_size_scaled.y )
+                );
+                json_object_set_new(
+                    json_root,
+                    "depth",
+                    json_integer( global_size_scaled.z )
+                );
                 json_t * json_version_array = json_array( );
                 json_array_append_new(
                     json_version_array,
@@ -1403,7 +1315,7 @@ namespace isaac
             isaac_float3* ssao_noise_h = reinterpret_cast<isaac_float3*> ( alpaka::getPtrNative ( ssao_noise_h_buf ) );
 
             
-            std::uniform_real_distribution<float> randomFloats(0.0, 1.0);
+            std::uniform_real_distribution<isaac_float> randomFloats(0.0, 1.0);
             std::default_random_engine generator;
 
             //set ssao_kernel values
@@ -1575,42 +1487,18 @@ namespace isaac
                 icetSetContext( icetContext[pass] );
                 if( icet_bounding_box )
                 {
-                    isaac_float f_l_width = ( isaac_float ) local_size_scaled[0]
-                                            / ( isaac_float ) max_size_scaled
-                                            * 2.0f;
-                    isaac_float f_l_height =
-                        ( isaac_float ) local_size_scaled[1]
-                        / ( isaac_float ) max_size_scaled * 2.0f;
-                    isaac_float f_l_depth = 0.0f;
-                    if( TSimDim::value > 2 )
-                    {
-                        f_l_depth = ( isaac_float ) local_size_scaled[2]
-                                    / ( isaac_float ) max_size_scaled * 2.0f;
-                    }
-                    isaac_float f_x = ( isaac_float ) position_scaled[0]
-                                      / ( isaac_float ) max_size_scaled * 2.0f
-                                      - ( isaac_float ) global_size_scaled[0]
-                                        / ( isaac_float ) max_size_scaled;
-                    isaac_float f_y = ( isaac_float ) position_scaled[1]
-                                      / ( isaac_float ) max_size_scaled * 2.0f
-                                      - ( isaac_float ) global_size_scaled[1]
-                                        / ( isaac_float ) max_size_scaled;
-                    isaac_float f_z = 0.0f;
-                    if( TSimDim::value > 2 )
-                    {
-                        f_z = ( isaac_float ) position_scaled[2]
-                              / ( isaac_float ) max_size_scaled
-                              * isaac_float( 2 )
-                              - ( isaac_float ) global_size_scaled[2]
-                                / ( isaac_float ) max_size_scaled;
-                    }
+                    isaac_float3 bb_dimension = isaac_float3( local_size_scaled ) / isaac_float( max_size_scaled ) * isaac_float( 2 );
+
+                    isaac_float3 bb_min = isaac_float3( position_scaled ) / isaac_float( max_size_scaled ) * isaac_float( 2 )
+                                    - isaac_float3( global_size_scaled ) / isaac_float( max_size_scaled );
+
                     icetBoundingBoxf(
-                        f_x,
-                        f_x + f_l_width,
-                        f_y,
-                        f_y + f_l_height,
-                        f_z,
-                        f_z + f_l_depth
+                        bb_min.x,
+                        bb_min.x + bb_dimension.x,
+                        bb_min.y,
+                        bb_min.y + bb_dimension.y,
+                        bb_min.z,
+                        bb_min.z + bb_dimension.z
                     );
                 }
                 else
@@ -1627,33 +1515,23 @@ namespace isaac
         }
 
 
-        void updatePosition( const TDomainSize position )
+        void updatePosition( const isaac_size3 position )
         {
             ISAAC_WAIT_VISUALIZATION
             this->position = position;
-            for( int i = 0; i < 3; i++ )
-            {
-                position_scaled[i] = isaac_int(
-                    ( isaac_float ) position[i] * ( isaac_float ) scale[i]
-                );
-            }
+            this->position_scaled = isaac_float3( position ) * scale;
         }
 
 
-        void updateLocalSize( const TDomainSize local_size )
+        void updateLocalSize( const isaac_size3 local_size )
         {
             ISAAC_WAIT_VISUALIZATION
             this->local_size = local_size;
-            for( int i = 0; i < 3; i++ )
-            {
-                local_size_scaled[i] = isaac_int(
-                    ( isaac_float ) local_size[i] * ( isaac_float ) scale[i]
-                );
-            }
+            this->local_size_scaled = isaac_float3( local_size ) * scale;
         }
 
 
-        void updateLocalParticleSize( const TDomainSize local_particle_size )
+        void updateLocalParticleSize( const isaac_size3 local_particle_size )
         {
             ISAAC_WAIT_VISUALIZATION
             this->local_particle_size = local_particle_size;
@@ -1746,7 +1624,7 @@ namespace isaac
                             size_t p_pos = 0;
                             bool p_again = true;
                             int p_elem = 0;
-                            isaac_float * parameter_array = ( float * ) &(
+                            isaac_float * parameter_array = ( isaac_float * ) &(
                                 isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]
                             );
                             while( p_again && (
@@ -2239,7 +2117,7 @@ namespace isaac
                             index,
                             value
                         )
-                        rotation[index] = json_number_value( value );
+                        glm::value_ptr( rotation )[index] = json_number_value( value );
                         json_object_del(
                             last,
                             "rotation absolute"
@@ -2254,29 +2132,15 @@ namespace isaac
                     {
                         add_modelview = true;
                         send_rotation = true;
-                        IceTDouble relative[9];
-                        IceTDouble new_rotation[9];
+                        isaac_dmat3 relative;
                         json_array_foreach(
                             js,
                             index,
                             value
                         )
-                        relative[index] = json_number_value( value );
-                        for( isaac_int x = 0; x < 3; x++ )
-                        {
-                            for( isaac_int y = 0; y < 3; y++ )
-                            {
-                                new_rotation[y + x * 3] =
-                                    relative[y + 0 * 3] * rotation[0 + x * 3]
-                                    + relative[y + 1 * 3] * rotation[1 + x * 3]
-                                    + relative[y + 2 * 3] * rotation[2 + x * 3];
-                            }
-                        }
-                        memcpy(
-                            rotation,
-                            new_rotation,
-                            9 * sizeof( IceTDouble )
-                        );
+                        glm::value_ptr( relative )[index] = json_number_value( value );
+                        rotation = relative * rotation;
+
                         json_object_del(
                             last,
                             "rotation relative"
@@ -2289,70 +2153,38 @@ namespace isaac
                         )
                     ) == 4 )
                     {
-                        IceTDouble relative[9];
-                        IceTDouble x = json_number_value(
+                        isaac_double3 rot_vec;
+                        rot_vec.x = json_number_value(
                             json_array_get(
                                 js,
                                 0
                             )
                         );
-                        IceTDouble y = json_number_value(
+                        rot_vec.y = json_number_value(
                             json_array_get(
                                 js,
                                 1
                             )
                         );
-                        IceTDouble z = json_number_value(
+                        rot_vec.z = json_number_value(
                             json_array_get(
                                 js,
                                 2
                             )
                         );
-                        IceTDouble rad = json_number_value(
+                        isaac_double deg = json_number_value(
                             json_array_get(
                                 js,
                                 3
                             )
                         );
-                        IceTDouble s = sin( rad * M_PI / 180.0 );
-                        IceTDouble c = cos( rad * M_PI / 180.0 );
-                        IceTDouble l = sqrt( x * x + y * y + z * z );
-                        if( l != 0.0 )
-                        {
-                            add_modelview = true;
-                            send_rotation = true;
-                            x /= l;
-                            y /= l;
-                            z /= l;
-                            relative[0] = c + x * x * ( 1 - c );
-                            relative[3] = x * y * ( 1 - c ) - z * s;
-                            relative[6] = x * z * ( 1 - c ) + y * s;
-                            relative[1] = y * x * ( 1 - c ) + z * s;
-                            relative[4] = c + y * y * ( 1 - c );
-                            relative[7] = y * z * ( 1 - c ) - x * s;
-                            relative[2] = z * x * ( 1 - c ) - y * s;
-                            relative[5] = z * y * ( 1 - c ) + x * s;
-                            relative[8] = c + z * z * ( 1 - c );
-                            IceTDouble new_rotation[9];
-                            for( isaac_int x = 0; x < 3; x++ )
-                            {
-                                for( isaac_int y = 0; y < 3; y++ )
-                                {
-                                    new_rotation[y + x * 3] =
-                                        relative[y + 0 * 3]
-                                        * rotation[0 + x * 3]
-                                        + relative[y + 1 * 3]
-                                          * rotation[1 + x * 3]
-                                        + relative[y + 2 * 3]
-                                          * rotation[2 + x * 3];
-                                }
-                            }
-                            memcpy(
-                                rotation,
-                                new_rotation,
-                                9 * sizeof( IceTDouble )
-                            );
-                        }
+
+                        isaac_dmat3 relative = glm::rotate( isaac_dmat4( 1 ), glm::radians( deg ), rot_vec );
+                        rotation = relative * rotation;
+
+                        add_modelview = true;
+                        send_rotation = true;
+
                         json_object_del(
                             last,
                             "rotation axis"
@@ -2387,24 +2219,15 @@ namespace isaac
                     {
                         add_modelview = true;
                         send_look_at = true;
-                        IceTDouble add[3];
+                        isaac_double3 translation;
                         json_array_foreach(
                             js,
                             index,
                             value
                         )
-                        add[index] = json_number_value( value );
-                        IceTDouble add_p[3] = {
-                            rotation[0] * add[0] + rotation[1] * add[1]
-                            + rotation[2] * add[2],
-                            rotation[3] * add[0] + rotation[4] * add[1]
-                            + rotation[5] * add[2],
-                            rotation[6] * add[0] + rotation[7] * add[1]
-                            + rotation[8] * add[2]
-                        };
-                        look_at[0] += add_p[0];
-                        look_at[1] += add_p[1];
-                        look_at[2] += add_p[2];
+                        translation[index] = json_number_value( value );
+
+                        look_at += glm::transpose( rotation ) * translation;
                         json_object_del(
                             last,
                             "position relative"
@@ -2438,7 +2261,7 @@ namespace isaac
                     }
                     //Giving the Controller the chance to grep for controller specific messages:
                     if( controller.updateProjection(
-                        projection,
+                        projections,
                         framebuffer_size,
                         last
                     ) )
@@ -2451,9 +2274,13 @@ namespace isaac
                             "projection",
                             matrix = json_array( )
                         );
-                        ISAAC_JSON_ADD_MATRIX ( matrix,
-                            projection,
-                            16 * TController::pass_count )
+                        for(isaac_int p = 0; p < TController::pass_count; ++p)
+                        {
+                            for (isaac_int i = 0; i < 16; ++i)
+                            {
+                                json_array_append_new( matrix, json_real( glm::value_ptr( projections[p] )[i] ) );
+                            }
+                        }
                     }
                     mergeJSON(
                         message,
@@ -2472,7 +2299,7 @@ namespace isaac
                         matrix = json_array( )
                     );
                     ISAAC_JSON_ADD_MATRIX ( matrix,
-                        modelview,
+                        glm::value_ptr( modelview ),
                         16 )
                 }
                 char * buffer = json_dumps(
@@ -2569,7 +2396,7 @@ namespace isaac
                     index,
                     value
                 )
-                projection[index] = json_number_value( value );
+                glm::value_ptr( projections[index / 16] )[index % 16] = json_number_value( value );
             }
             if( rank != master && json_array_size(
                 js = json_object_get(
@@ -2584,7 +2411,7 @@ namespace isaac
                     index,
                     value
                 )
-                modelview[index] = json_number_value( value );
+                glm::value_ptr( modelview )[index] = json_number_value( value );
             }
             if( json_array_size(
                 js = json_object_get(
@@ -3004,37 +2831,12 @@ namespace isaac
                     ISAAC_START_TIME_MEASUREMENT ( sorting,
                         getTicksUs( ) )
                     //Every rank calculates it's distance to the camera
-                    IceTDouble point[4] = {
-                        (
-                            IceTDouble( position_scaled[0] ) + (
-                                                                   IceTDouble( local_size_scaled[0] )
-                                                                   - IceTDouble( global_size_scaled[0] )
-                                                               ) / 2.0
-                        ) / IceTDouble( max_size_scaled / 2 ),
-                        (
-                            IceTDouble( position_scaled[1] ) + (
-                                                                   IceTDouble( local_size_scaled[1] )
-                                                                   - IceTDouble( global_size_scaled[1] )
-                                                               ) / 2.0
-                        ) / IceTDouble( max_size_scaled / 2 ),
-                        (
-                            IceTDouble( position_scaled[2] ) + (
-                                                                   IceTDouble( local_size_scaled[2] )
-                                                                   - IceTDouble( global_size_scaled[2] )
-                                                               ) / 2.0
-                        ) / IceTDouble( max_size_scaled / 2 ),
-                        1.0
-                    };
-                    IceTDouble result[4];
-                    mulMatrixVector(
-                        result,
-                        modelview,
-                        point
-                    );
-                    float point_distance = sqrt(
-                        result[0] * result[0] + result[1] * result[1]
-                        + result[2] * result[2]
-                    );
+                    isaac_double4 point = isaac_double4( ( isaac_double3( position_scaled ) 
+                                        + ( isaac_double3( local_size_scaled ) - isaac_double3( global_size_scaled ) ) / isaac_double(2.0) )
+                                        / isaac_double( max_size_scaled / 2 ), 0 );
+                    point.w = 1.0;
+
+                    float point_distance = glm::length(modelview * point);
                     //Allgather of the distances
                     float receive_buffer[numProc];
                     MPI_Allgather(
@@ -3083,8 +2885,8 @@ namespace isaac
                     ISAAC_START_TIME_MEASUREMENT ( merge,
                         getTicksUs( ) )
                     image[pass] = icetDrawFrame(
-                        &( projection[pass * 16] ),
-                        modelview,
+                        glm::value_ptr( projections[pass] ),
+                        glm::value_ptr( modelview ),
                         background_color
                     );
                     ISAAC_STOP_TIME_MEASUREMENT ( merge_time,
@@ -3230,58 +3032,59 @@ namespace isaac
             //allocate memory for inverse mvp, mv and p matrix and simulation size properties
 
             //inverse mvp
-            alpaka::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
+            alpaka::Buf <THost, isaac_mat4, TFraDim, ISAAC_IDX_TYPE>
                 inverse_h_buf(
                 alpaka::allocBuf<
-                    isaac_float,
+                    isaac_mat4,
                     ISAAC_IDX_TYPE
                 >(
                     myself->host,
-                    ISAAC_IDX_TYPE( 16 )
+                    ISAAC_IDX_TYPE( 1 )
                 )
             );
-            isaac_float * inverse_h =
-                reinterpret_cast<float *> ( alpaka::getPtrNative( inverse_h_buf ) );
+            isaac_mat4& inverse_h =
+                *(reinterpret_cast<isaac_mat4 *> ( alpaka::getPtrNative( inverse_h_buf ) ) );
 
 
             //model-view matrix
-            alpaka::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
+            alpaka::Buf <THost, isaac_mat4, TFraDim, ISAAC_IDX_TYPE>
                 modelview_h_buf(
                 alpaka::allocBuf<
-                    isaac_float,
+                    isaac_mat4,
                     ISAAC_IDX_TYPE
                 >(
                     myself->host,
-                    ISAAC_IDX_TYPE( 16 )
+                    ISAAC_IDX_TYPE( 1 )
                 )
             );
-            isaac_float * modelview_h =
-                reinterpret_cast<float *> ( alpaka::getPtrNative( modelview_h_buf ) );
+            isaac_mat4& modelview_h =
+                *( reinterpret_cast<isaac_mat4 *> ( alpaka::getPtrNative( modelview_h_buf ) ) );
 
 
             //projection matrix
-            alpaka::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
+            alpaka::Buf <THost, isaac_mat4, TFraDim, ISAAC_IDX_TYPE>
                 projection_h_buf(
                 alpaka::allocBuf<
-                    isaac_float,
+                    isaac_mat4,
                     ISAAC_IDX_TYPE
                 >(
                     myself->host,
-                    ISAAC_IDX_TYPE( 16 )
+                    ISAAC_IDX_TYPE( 1 )
                 )
             );
-            isaac_float * projection_h =
-                reinterpret_cast<float *> ( alpaka::getPtrNative( modelview_h_buf ) );
+            isaac_mat4& projection_h =
+                *( reinterpret_cast<isaac_mat4 *> ( alpaka::getPtrNative( projection_h_buf ) ) );
 
 
             //sim size values
-            alpaka::Buf <THost, isaac_size_struct< TSimDim::value >, TFraDim, ISAAC_IDX_TYPE>
+            alpaka::Buf <THost, isaac_size_struct, TFraDim, ISAAC_IDX_TYPE>
                 size_h_buf(
-                alpaka::allocBuf < isaac_size_struct < TSimDim::value > ,
-                ISAAC_IDX_TYPE > ( myself->host, ISAAC_IDX_TYPE( 1 ) )
+                alpaka::allocBuf <isaac_size_struct ,
+                ISAAC_IDX_TYPE> ( myself->host, ISAAC_IDX_TYPE( 1 ) )
             );
-            isaac_size_struct < TSimDim::value > *size_h =
-                reinterpret_cast<isaac_size_struct< TSimDim::value > *> ( alpaka::getPtrNative( size_h_buf ) );
+            isaac_size_struct & size_h =
+                *( reinterpret_cast<isaac_size_struct*> ( alpaka::getPtrNative( size_h_buf ) ) );
+
 
             //calculate inverse mvp matrix for render kernel
             IceTDouble inverse[16];
@@ -3290,183 +3093,93 @@ namespace isaac
                 projection_matrix,
                 modelview_matrix
             );
-            for( int i = 0; i < 16; i++ )
-            {
-                //set values for inverse, mv and p matrix
-                inverse_h[i] = static_cast<float> ( inverse[i] );
-                modelview_h[i] = static_cast<float>(modelview_matrix[i]);
-                projection_h[i] = static_cast<float>(projection_matrix[i]);
-            }
+            std::copy( inverse, inverse + 16, glm::value_ptr( inverse_h ) );
+            //copy the projection and viewmatrix to the host buffer location
+            std::copy( projection_matrix, projection_matrix + 16, glm::value_ptr( projection_h ) );
+            std::copy( modelview_matrix, modelview_matrix + 16, glm::value_ptr( modelview_h ) );
+
+            //isaac_mat4 inverse = glm::inverse( projection_h *  modelview_h );
+            //std::copy( glm::value_ptr( inverse ), glm::value_ptr( inverse ) + 16, glm::value_ptr( inverse_h ) );
+
 
             //set global simulation size
-            size_h[0].global_size
-                .value
-                .x = myself->global_size[0];
-            size_h[0].global_size
-                .value
-                .y = myself->global_size[1];
-            if( TSimDim::value > 2 )
-            {
-                size_h[0].global_size
-                    .value
-                    .z = myself->global_size[2];
-            }
-            size_h[0].position
-                .value
-                .x = myself->position[0];
-            size_h[0].position
-                .value
-                .y = myself->position[1];
-            if( TSimDim::value > 2 )
-            {
-                size_h[0].position
-                    .value
-                    .z = myself->position[2];
-            }
+            size_h.global_size = myself->global_size;
+
+            size_h.position = myself->position;
 
             //set subvolume size
-            size_h[0].local_size
-                .value
-                .x = myself->local_size[0];
-            size_h[0].local_size
-                .value
-                .y = myself->local_size[1];
-            if( TSimDim::value > 2 )
-            {
-                size_h[0].local_size
-                    .value
-                    .z = myself->local_size[2];
-            }
-            size_h[0].local_particle_size
-                .value
-                .x = myself->local_particle_size[0];
-            size_h[0].local_particle_size
-                .value
-                .y = myself->local_particle_size[1];
-            if( TSimDim::value > 2 )
-            {
-                size_h[0].local_particle_size
-                    .value
-                    .z = myself->local_particle_size[2];
-            }
+            size_h.local_size = myself->local_size;
+            size_h.local_particle_size = myself->local_particle_size;
             
             //get maximum size from biggest dimesnion MAX(x-dim, y-dim, z-dim)
-            size_h[0].max_global_size = static_cast<float> ( ISAAC_MAX(
-                ISAAC_MAX(
-                    uint32_t( myself->global_size[0] ),
-                    uint32_t( myself->global_size[1] )
-                ),
-                uint32_t( myself->global_size[2] )
-            ) );
+            size_h.max_global_size = myself->max_size;
 
             //set global size with cellcount scaled
-            size_h[0].global_size_scaled
-                .value
-                .x = myself->global_size_scaled[0];
-            size_h[0].global_size_scaled
-                .value
-                .y = myself->global_size_scaled[1];
-            if( TSimDim::value > 2 )
-            {
-                size_h[0].global_size_scaled
-                    .value
-                    .z = myself->global_size_scaled[2];
-            }
+            size_h.global_size_scaled = myself->global_size_scaled;
 
             //set position in subvolume (adjusted to cellcount scale)
-            size_h[0].position_scaled
-                .value
-                .x = myself->position_scaled[0];
-            size_h[0].position_scaled
-                .value
-                .y = myself->position_scaled[1];
-            if( TSimDim::value > 2 )
-            {
-                size_h[0].position_scaled
-                    .value
-                    .z = myself->position_scaled[2];
-            }
-            size_h[0].local_size_scaled
-                .value
-                .x = myself->local_size_scaled[0];
-            size_h[0].local_size_scaled
-                .value
-                .y = myself->local_size_scaled[1];
-            if( TSimDim::value > 2 )
-            {
-                size_h[0].local_size_scaled
-                    .value
-                    .z = myself->local_size_scaled[2];
-            }
+            size_h.position_scaled = myself->position_scaled;
+
+            size_h.local_size_scaled = myself->local_size_scaled;
 
             //get maximum size from biggest dimesnion after scaling MAX(x-dim, y-dim, z-dim)
-            size_h[0].max_global_size_scaled = static_cast<float> ( ISAAC_MAX(
-                ISAAC_MAX(
-                    uint32_t( myself->global_size_scaled[0] ),
-                    uint32_t( myself->global_size_scaled[1] )
-                ),
-                uint32_t( myself->global_size_scaled[2] )
-            ) );
+            size_h.max_global_size_scaled = myself->max_size_scaled;
 
             //set volume scale parameters
-            isaac_float3 isaac_scale = {
-                myself->scale[0],
-                myself->scale[1],
-                myself->scale[2]
-            };
+            isaac_float3 isaac_scale = myself->scale;
 
             //copy matrices and simulation size properties to constant memory
 
             //inverse matrix
             alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
-                inverse_d_extent( ISAAC_IDX_TYPE( 16 ) );
+                inverse_d_extent( ISAAC_IDX_TYPE( 1 ) );
             //get view
             auto inverse_d_view(
-                alpaka::createStaticDevMemView ( & isaac_inverse_d[0u],
+                alpaka::createStaticDevMemView ( & isaac_inverse_d,
                 myself -> acc, inverse_d_extent ) );
             //copy to constant memory
             alpaka::memcpy(
                 myself->stream,
                 inverse_d_view,
                 inverse_h_buf,
-                ISAAC_IDX_TYPE( 16 )
+                ISAAC_IDX_TYPE( 1 )
             );
 
             //modelview matrix
             alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
-                modelview_d_extent( ISAAC_IDX_TYPE( 16 ) );
+                modelview_d_extent( ISAAC_IDX_TYPE( 1 ) );
             //get view
             auto modelview_d_view(
-                alpaka::createStaticDevMemView ( & isaac_modelview_d[0u],
+                alpaka::createStaticDevMemView ( & isaac_modelview_d,
                 myself -> acc, modelview_d_extent ) );
             //copy to constant memory 
             alpaka::memcpy(
                 myself->stream,
                 modelview_d_view,
                 modelview_h_buf,
-                ISAAC_IDX_TYPE( 16 )
+                ISAAC_IDX_TYPE( 1 )
             );
 
 
             //projection matrix
             alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
-                projection_d_extent( ISAAC_IDX_TYPE( 16 ) );
+                projection_d_extent( ISAAC_IDX_TYPE( 1 ) );
             //get view
             auto projection_d_view(
-                alpaka::createStaticDevMemView ( & isaac_projection_d[0u],
+                alpaka::createStaticDevMemView ( & isaac_projection_d,
                 myself -> acc, projection_d_extent ) );
             //copy to constant memory
             alpaka::memcpy(
                 myself->stream,
                 projection_d_view,
                 projection_h_buf,
-                ISAAC_IDX_TYPE( 16 )
+                ISAAC_IDX_TYPE( 1 )
             );
 
             alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
                 size_d_extent( ISAAC_IDX_TYPE( 1 ) );
             auto size_d_view(
-                alpaka::createStaticDevMemView ( & isaac_size_d[0u],
+                alpaka::createStaticDevMemView ( & isaac_size_d,
                 myself -> acc, size_d_extent ) );
             alpaka::memcpy(
                 myself->stream,
@@ -3498,7 +3211,6 @@ namespace isaac
 
             //call render kernel
             IsaacRenderKernelCaller<
-                TSimDim,
                 TParticleList,
                 TSourceList,
                 transfer_d_struct<
@@ -3538,8 +3250,7 @@ namespace isaac
                     TFraDim, 
                     ISAAC_IDX_TYPE
                 >,
-                TTransfer_size, 
-                isaac_float3, 
+                TTransfer_size,
                 TAccDim, 
                 TAcc, 
                 TStream,
@@ -3720,9 +3431,13 @@ namespace isaac
                         "projection",
                         matrix = json_array( )
                     );
-                    ISAAC_JSON_ADD_MATRIX ( matrix,
-                        myself->projection,
-                        16 * TController::pass_count )
+                    for(isaac_int p = 0; p < TController::pass_count; ++p)
+                    {
+                        for (isaac_int i = 0; i < 16; ++i)
+                        {
+                            json_array_append_new( matrix, json_real( glm::value_ptr( myself->projections[p] )[i] ) );
+                        }
+                    }
                     json_object_set(
                         myself->json_init_root,
                         "projection",
@@ -3738,7 +3453,7 @@ namespace isaac
                         matrix = json_array( )
                     );
                     ISAAC_JSON_ADD_MATRIX ( matrix,
-                        myself->look_at,
+                        glm::value_ptr( myself->look_at ),
                         3 )
                     json_object_set(
                         myself->json_init_root,
@@ -3755,7 +3470,7 @@ namespace isaac
                         matrix = json_array( )
                     );
                     ISAAC_JSON_ADD_MATRIX ( matrix,
-                        myself->rotation,
+                        glm::value_ptr( myself->rotation ),
                         9 )
                     json_object_set(
                         myself->json_init_root,
@@ -4228,50 +3943,15 @@ namespace isaac
 
         void updateModelview( )
         {
-            IceTDouble look_at_m[16];
-            ISAAC_SET_IDENTITY ( 4,
-                look_at_m )
-            look_at_m[12] = look_at[0];
-            look_at_m[13] = look_at[1];
-            look_at_m[14] = look_at[2];
+            isaac_dmat4 translation_m = glm::translate( isaac_dmat4( 1 ), look_at);
 
-            IceTDouble rotation_m[16];
-            for( isaac_int x = 0; x < 4; x++ )
-            {
-                for( isaac_int y = 0; y < 4; y++ )
-                {
-                    if( x < 3 && y < 3 )
-                    {
-                        rotation_m[x + y * 4] = rotation[x + y * 3];
-                    }
-                    else if( x != 3 || y != 3 )
-                    {
-                        rotation_m[x + y * 4] = 0.0;
-                    }
-                    else
-                    {
-                        rotation_m[x + y * 4] = 1.0;
-                    }
-                }
-            }
+            isaac_dmat4 rotation_m = rotation;
+            rotation_m[3][3] = 1.0;
 
-            IceTDouble distance_m[16];
-            ISAAC_SET_IDENTITY ( 4,
-                distance_m )
-            distance_m[14] = distance;
-
-            IceTDouble temp[16];
-
-            mulMatrixMatrix(
-                temp,
-                rotation_m,
-                look_at_m
-            );
-            mulMatrixMatrix(
-                modelview,
-                distance_m,
-                temp
-            );
+            isaac_dmat4 distance_m = isaac_dmat4( 1 );
+            distance_m[3][2] = distance;
+            
+            modelview = distance_m * rotation_m * translation_m;
         }
 
 
@@ -4345,18 +4025,19 @@ namespace isaac
             ISAAC_IDX_TYPE
         > local_particle_minmax_array_d;
 
-        TDomainSize global_size;
-        TDomainSize local_size;
-        TDomainSize local_particle_size;
-        TDomainSize position;
-        std::vector <ISAAC_IDX_TYPE> global_size_scaled;
-        std::vector <ISAAC_IDX_TYPE> local_size_scaled;
-        std::vector <ISAAC_IDX_TYPE> position_scaled;
+        isaac_size3 global_size;
+        isaac_size3 local_size;
+        isaac_size3 local_particle_size;
+        isaac_size3 position;
+        isaac_size3 global_size_scaled;
+        isaac_size3 local_size_scaled;
+        isaac_size3 position_scaled;
         MPI_Comm mpi_world;
-        IceTDouble projection[16 * TController::pass_count];
-        IceTDouble look_at[3];
-        IceTDouble rotation[9];
-        IceTDouble distance;
+        std::vector<isaac_dmat4> projections;
+        isaac_dmat4 modelview;                           //modelview matrix
+        isaac_double3 look_at;
+        isaac_dmat3 rotation;
+        isaac_double distance;
 
         //true if properties should be sent by server
         bool send_look_at;
@@ -4381,7 +4062,6 @@ namespace isaac
         bool iso_surface;
         bool icet_bounding_box;
         isaac_float step;
-        IceTDouble modelview[16];                           //modelview matrix
         IsaacCommunicator * communicator;
         json_t * json_root;
         json_t * json_init_root;
@@ -4455,7 +4135,7 @@ namespace isaac
         ISAAC_IDX_TYPE max_size_scaled;
         IceTFloat background_color[4];
         static IsaacVisualization * myself;
-        TScale scale;
+        isaac_float3 scale;
         clipping_struct clipping;
         isaac_float3 clipping_saved_normals[ISAAC_MAX_CLIPPING];
         TController controller;
@@ -4468,11 +4148,9 @@ namespace isaac
         typename TAcc,
         typename TStream,
         typename TAccDim,
-        typename TSimDim,
         typename TParticleList,
         typename TSourceList,
-        typename TDomainSize, ISAAC_IDX_TYPE TTransfer_size,
-        typename TScale,
+        ISAAC_IDX_TYPE TTransfer_size,
         typename TController,
         typename TCompositor
     > IsaacVisualization<
@@ -4480,12 +4158,9 @@ namespace isaac
         TAcc,
         TStream,
         TAccDim,
-        TSimDim,
         TParticleList,
         TSourceList,
-        TDomainSize,
         TTransfer_size,
-        TScale,
         TController,
         TCompositor
     > * IsaacVisualization<
@@ -4493,12 +4168,9 @@ namespace isaac
         TAcc,
         TStream,
         TAccDim,
-        TSimDim,
         TParticleList,
         TSourceList,
-        TDomainSize,
         TTransfer_size,
-        TScale,
         TController,
         TCompositor
     >::myself = NULL;
