@@ -36,14 +36,11 @@ using namespace isaac;
 // Volume Source 1
 
 ISAAC_NO_HOST_DEVICE_WARNING
-#if ISAAC_ALPAKA == 1
-
 template<
     typename TDevAcc,
     typename THost,
     typename TStream
 >
-#endif
 class TestSource1
 {
 public:
@@ -53,11 +50,9 @@ public:
 
 
     ISAAC_NO_HOST_DEVICE_WARNING TestSource1(
-#if ISAAC_ALPAKA == 1
         TDevAcc acc,
         THost host,
         TStream stream,
-#endif
         isaac_float3 * ptr
     ) :
         ptr( ptr )
@@ -94,14 +89,11 @@ public:
 // Volume Source 2
 
 ISAAC_NO_HOST_DEVICE_WARNING
-#if ISAAC_ALPAKA == 1
-
 template<
     typename TDevAcc,
     typename THost,
     typename TStream
 >
-#endif
 class TestSource2
 {
 public:
@@ -111,11 +103,9 @@ public:
 
 
     ISAAC_NO_HOST_DEVICE_WARNING TestSource2(
-#if ISAAC_ALPAKA == 1
         TDevAcc acc,
         THost host,
         TStream stream,
-#endif
         isaac_float * ptr
     ) :
         ptr( ptr )
@@ -210,14 +200,11 @@ private:
 // Particle Source
 
 ISAAC_NO_HOST_DEVICE_WARNING
-#if ISAAC_ALPAKA == 1
-
 template<
     typename TDevAcc,
     typename THost,
     typename TStream
 >
-#endif
 class ParticleSource1
 {
 public:
@@ -225,11 +212,9 @@ public:
 
 
     ISAAC_NO_HOST_DEVICE_WARNING ParticleSource1(
-#if ISAAC_ALPAKA == 1
         TDevAcc acc,
         THost host,
         TStream stream,
-#endif
         isaac_float3 * ptr,
         size_t size
     ) :
@@ -369,24 +354,21 @@ int main(
         ISAAC_IDX_TYPE( 600 )
     };
 
-#if ISAAC_ALPAKA == 1
-
     // Alpaka specific initialization
     using AccDim = alpaka::DimInt< 3 >;
     using SimDim = alpaka::DimInt< 3 >;
     using DatDim = alpaka::DimInt< 1 >;
     
-    //using Acc = alpaka::AccGpuCudaRt<AccDim, ISAAC_IDX_TYPE>;
-    //using Stream  = alpaka::QueueCudaRtSync;
-
-    using Acc = alpaka::AccCpuOmp2Blocks<
-        AccDim,
+    using Acc = alpaka::AccGpuCudaRt<
+        AccDim, 
         ISAAC_IDX_TYPE
     >;
-    using Stream  = alpaka::QueueCpuSync;
 
-    //using Acc = alpaka::AccCpuOmp2Threads<AccDim, ISAAC_IDX_TYPE>;
-    //using Stream  = alpaka::QueueCpuSync;
+    //using Acc = alpaka::AccCpuOmp2Blocks<
+    //    AccDim,
+    //    ISAAC_IDX_TYPE
+    //>;
+    using Stream = alpaka::Queue<Acc, alpaka::Blocking>;
 
     using DevAcc = alpaka::Dev< Acc >;
     using DevHost = alpaka::DevCpu;
@@ -424,125 +406,63 @@ int main(
         ISAAC_IDX_TYPE( PARTICLE_COUNT )
     );
 
-#else //CUDA
-
-    // Cuda specific initialization
-    int devCount;
-    cudaGetDeviceCount( &devCount );
-    cudaSetDevice( rank % devCount );
-    typedef boost::mpl::int_< 3 > SimDim;
-    std::vector< ISAAC_IDX_TYPE > global_size;
-    global_size.push_back( d[0] * VOLUME_X );
-    global_size.push_back( d[1] * VOLUME_Y );
-    global_size.push_back( d[2] * VOLUME_Z );
-    std::vector< ISAAC_IDX_TYPE > local_size;
-    local_size.push_back( VOLUME_X );
-    local_size.push_back( VOLUME_Y );
-    local_size.push_back( VOLUME_Z );
-    std::vector< ISAAC_IDX_TYPE > position;
-    position.push_back( p[0] * VOLUME_X );
-    position.push_back( p[1] * VOLUME_Y );
-    position.push_back( p[2] * VOLUME_Z );
-    int stream = 0;
-    std::vector< ISAAC_IDX_TYPE > particle_count;
-    particle_count.push_back( ISAAC_IDX_TYPE( PARTICLE_COUNT ) );
-#endif
-
     //The whole size of the rendered sub volumes
     ISAAC_IDX_TYPE prod = local_size[0] * local_size[1] * local_size[2];
 
     // Init memory
-#if ISAAC_ALPAKA == 1
 
-    alpaka::Buf< DevHost, float3_t, DatDim, ISAAC_IDX_TYPE >
-        hostBuffer1(
+    auto hostBuffer1 = 
         alpaka::allocBuf<
-            float3_t,
+            isaac_float3,
             ISAAC_IDX_TYPE
         >(
             devHost,
             data_size
-        )
-    );
-    alpaka::Buf< DevAcc, float3_t, DatDim, ISAAC_IDX_TYPE >
-        deviceBuffer1(
+        );
+    auto deviceBuffer1 =
         alpaka::allocBuf<
-            float3_t,
+            isaac_float3,
             ISAAC_IDX_TYPE
         >(
             devAcc,
             data_size
-        )
-    );
-    alpaka::Buf<
-        DevHost, float, DatDim,
-        ISAAC_IDX_TYPE
-    > hostBuffer2(
+        );
+    auto hostBuffer2 = 
         alpaka::allocBuf<
-            float,
+            isaac_float,
             ISAAC_IDX_TYPE
         >(
             devHost,
             data_size
-        )
-    );
-    alpaka::Buf<
-        DevAcc, float, DatDim,
-        ISAAC_IDX_TYPE
-    > deviceBuffer2(
+        );
+    auto deviceBuffer2 =
         alpaka::allocBuf<
-            float,
+            isaac_float,
             ISAAC_IDX_TYPE
         >(
             devAcc,
             data_size
-        )
-    );
+        );
 
-    alpaka::Buf< DevHost, float3_t, DatDim, ISAAC_IDX_TYPE >
-        hostBuffer3(
+    auto hostBuffer3 =
         alpaka::allocBuf<
-            float3_t,
+            isaac_float3,
             ISAAC_IDX_TYPE
         >(
             devHost,
             particle_count
-        )
-    );
-    alpaka::Buf< DevAcc, float3_t, DatDim, ISAAC_IDX_TYPE >
-        deviceBuffer3(
+        );
+    auto deviceBuffer3 = 
         alpaka::allocBuf<
-            float3_t,
+            isaac_float3,
             ISAAC_IDX_TYPE
         >(
             devAcc,
             particle_count
-        )
-    );
-#else //CUDA
-    float3_t * hostBuffer1 = ( float3_t * ) malloc( sizeof( float3_t ) * prod );
-    float3_t * deviceBuffer1;
-    cudaMalloc(
-        ( float3_t ** ) &deviceBuffer1,
-        sizeof( float3_t ) * prod
-    );
-    float * hostBuffer2 = ( float * ) malloc( sizeof( float ) * prod );
-    float * deviceBuffer2;
-    cudaMalloc(
-        ( float ** ) &deviceBuffer2,
-        sizeof( float ) * prod
-    );
-    float3_t * hostBuffer3 =
-        ( float3_t * ) malloc( sizeof( float3_t ) * PARTICLE_COUNT );
-    float3_t * deviceBuffer3;
-    cudaMalloc(
-        ( float3_t ** ) &deviceBuffer3,
-        sizeof( float3_t ) * PARTICLE_COUNT
-    );
-#endif
+        );
 
     // Creating source list
-#if ISAAC_ALPAKA == 1
+
     TestSource1<
         DevAcc,
         DevHost,
@@ -551,7 +471,7 @@ int main(
         devAcc,
         devHost,
         stream,
-        reinterpret_cast<isaac_float3 *> ( alpaka::getPtrNative( deviceBuffer1 ) )
+        alpaka::getPtrNative( deviceBuffer1 )
     );
     TestSource2<
         DevAcc,
@@ -561,7 +481,7 @@ int main(
         devAcc,
         devHost,
         stream,
-        reinterpret_cast<isaac_float *> ( alpaka::getPtrNative( deviceBuffer2 ) )
+        alpaka::getPtrNative( deviceBuffer2 )
     );
 
     ParticleSource1<
@@ -572,7 +492,7 @@ int main(
         devAcc,
         devHost,
         stream,
-        reinterpret_cast<isaac_float3 *> ( alpaka::getPtrNative( deviceBuffer3 ) ),
+        alpaka::getPtrNative( deviceBuffer3 ),
         PARTICLE_COUNT
     );
 
@@ -596,25 +516,6 @@ int main(
             Stream
         >
     >;
-
-#else //CUDA
-    TestSource1
-        testSource1( reinterpret_cast<isaac_float3 *> ( deviceBuffer1 ) );
-    TestSource2
-        testSource2( reinterpret_cast<isaac_float *> ( deviceBuffer2 ) );
-
-    ParticleSource1 particleTestSource1(
-        reinterpret_cast<isaac_float3 *> ( deviceBuffer3 ),
-        PARTICLE_COUNT
-    );
-    using SourceList = boost::fusion::list<
-        TestSource1,
-        TestSource2
-    >;
-    using ParticleList = boost::fusion::list<
-        ParticleSource1
-    >;
-#endif
 
     ParticleList particle_sources( particleTestSource1 );
     SourceList sources(
@@ -676,22 +577,16 @@ int main(
 
     // Create isaac visualization object
     auto visualization = new IsaacVisualization<
-#if ISAAC_ALPAKA == 1
         DevHost, //Alpaka specific Host Dev Type
         Acc, //Alpaka specific Accelerator Dev Type
         Stream, //Alpaka specific Stream Type
         AccDim, //Alpaka specific Acceleration Dimension Type
-#endif
         SimDim, //Dimension of the Simulation. In this case: 3D
         ParticleList, SourceList, //The boost::fusion list of Source Types
-#if ISAAC_ALPAKA == 1
         alpaka::Vec<
             SimDim,
             ISAAC_IDX_TYPE
         >, //Type of the 3D vectors used later
-#else //CUDA
-        std::vector< ISAAC_IDX_TYPE >, //Type of the 3D vectors used later
-#endif
         1024, //Size of the transfer functions
         std::vector< float >, //user defined type of scaling
 
@@ -708,11 +603,9 @@ int main(
 #endif
 #endif
     >(
-#if ISAAC_ALPAKA == 1
         devHost, //Alpaka specific host dev instance
         devAcc, //Alpaka specific accelerator dev instance
         stream, //Alpaka specific stream instance
-#endif
         name, //Name of the visualization shown to the client
         0, //Master rank, which will opens the connection to the server
         server, //Address of the server
@@ -1046,15 +939,6 @@ int main(
 
     // Winter wrap up
     delete ( visualization );
-
-#if ISAAC_ALPAKA == 0
-    free( hostBuffer1 );
-    free( hostBuffer2 );
-    free( hostBuffer3 );
-    cudaFree( deviceBuffer1 );
-    cudaFree( deviceBuffer2 );
-    cudaFree( deviceBuffer3 );
-#endif
 
     MPI_Finalize( );
     return 0;

@@ -57,27 +57,16 @@
 #define ISAAC_Z_NEAR 0.002f
 #define ISAAC_Z_FAR 100.0f
 
-#if ISAAC_ALPAKA == 1
-    #ifdef __CUDACC__
-        #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_HOST_ACC __forceinline__
-    #else
-        #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_HOST_ACC inline
-    #endif
+#ifdef __CUDACC__
+    #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_HOST_ACC __forceinline__
 #else
-    #define ISAAC_HOST_DEVICE_INLINE __device__ __host__ __forceinline__
+    #define ISAAC_HOST_DEVICE_INLINE ALPAKA_FN_HOST_ACC inline
 #endif
 
-#if ISAAC_ALPAKA == 1
-    #define ISAAC_HOST_INLINE ALPAKA_FN_HOST inline
-#else
-    #define ISAAC_HOST_INLINE __host__ __forceinline__
-#endif
 
-#if ISAAC_ALPAKA == 1
-    #define ISAAC_DEVICE_INLINE ISAAC_HOST_DEVICE_INLINE
-#else
-    #define ISAAC_DEVICE_INLINE __device__ __forceinline__
-#endif
+#define ISAAC_HOST_INLINE ALPAKA_FN_HOST inline
+
+#define ISAAC_DEVICE_INLINE ISAAC_HOST_DEVICE_INLINE
 
 #ifdef __CUDACC__
     #define ISAAC_DEVICE __device__ __host__
@@ -103,11 +92,7 @@
         return; \
 }
 
-#if ISAAC_ALPAKA == 1
-    #define ISAAC_CONSTANT ALPAKA_STATIC_ACC_MEM_CONSTANT
-#else
-    #define ISAAC_CONSTANT __constant__
-#endif
+#define ISAAC_CONSTANT ALPAKA_STATIC_ACC_MEM_CONSTANT
 
 #ifdef __CUDACC__
     #define ISAAC_MAX max

@@ -9,8 +9,6 @@
 # It defines the following options
 #  ISAAC_THREADING
 #  ISAAC_SHOWBORDER
-#  ISAAC_CUDA
-#  ISAAC_ALPAKA
 #  ISAAC_JPEG
 #  ISAAC_AO_BUG_FIX
 
@@ -49,13 +47,6 @@ option(ISAAC_SHOWBORDER "Debug and presentation mode, in which the sub volume bo
 if (ISAAC_SHOWBORDER)
   set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_SHOWBORDER)
 endif ()
-
-option(ISAAC_CUDA "Using CUDA" ON)
-option(ISAAC_ALPAKA "Using ALPKA" OFF)
-
-if ( (NOT ISAAC_CUDA) AND (NOT ISAAC_ALPAKA) )
-    message( FATAL_ERROR "At least Alpaka or Cuda have to be activated!" )
-endif()
 
 option(ISAAC_AO_BUG_FIX "fix ambient occlusion bug" ON)
 
@@ -161,35 +152,16 @@ set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DBOOST_ALL_NO_LIB)
 
 set(ISAAC_PRIVATE_FOUND true)
 
-################################################################################
-# CUDA LIB
-################################################################################
-if (ISAAC_CUDA)
-    find_package( CUDA 7.0 QUIET)
-    if (!CUDA_FOUND)
-        set(ISAAC_PRIVATE_FOUND false)
-    else()
-        set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS})
-    endif()
-endif()
-
 
 ################################################################################
 # Alpaka LIB
 ################################################################################
-if (ISAAC_ALPAKA)
-    find_package(alpaka QUIET)
-    if (!alpaka_FOUND)
-        set(ISAAC_PRIVATE_FOUND false)
-        set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Cuda or Alpaka")
-    else()
-        set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${alpaka_INCLUDE_DIRS})
-        set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${alpaka_LIBRARIES})
-        set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} ${alpaka_DEFINITIONS})
-        set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} ${ALPAKA_DEV_COMPILE_OPTIONS})
-        set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_ALPAKA")
-    endif()
+find_package(alpaka QUIET)
+if (NOT alpaka_FOUND)
+    set(ISAAC_PRIVATE_FOUND false)
+    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Alpaka")
 endif()
+set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} "alpaka::alpaka")
 
 
 ################################################################################
