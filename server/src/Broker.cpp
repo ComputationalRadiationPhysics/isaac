@@ -538,6 +538,7 @@ errorCode Broker::run()
 							"{\"type\": \"feedback\", \"request\": \"transfer\"} "
 							"{\"type\": \"feedback\", \"request\": \"functions\"} "
 							"{\"type\": \"feedback\", \"request\": \"weight\"} "
+							"{\"type\": \"feedback\", \"request\": \"iso mask\"} "
 							"{\"type\": \"feedback\", \"request\": \"clipping\"} "
 							"{\"type\": \"feedback\", \"request\": \"redraw\"} "
 							"{\"type\": \"feedback\", \"request\": \"controller\"}";

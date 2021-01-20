@@ -31,47 +31,63 @@ using isaac_float = float;
 using isaac_double = double;
 using isaac_int = int32_t;
 using isaac_uint = uint32_t;
+using isaac_byte = uint8_t;
 
 #ifndef ISAAC_IDX_TYPE
     #define ISAAC_IDX_TYPE size_t
 #endif
 
-using isaac_float4 = glm::vec<4, isaac_float, glm::defaultp>;
-using isaac_float3 = glm::vec<3, isaac_float, glm::defaultp>;
-using isaac_float2 = glm::vec<2, isaac_float, glm::defaultp>;
 
-using isaac_double4 = glm::vec<4, isaac_double, glm::defaultp>;
-using isaac_double3 = glm::vec<3, isaac_double, glm::defaultp>;
-using isaac_double2 = glm::vec<2, isaac_double, glm::defaultp>;
+template <int T_n, typename T_Type>
+using isaac_vec_dim = glm::vec<T_n, T_Type, glm::defaultp>;
 
-using isaac_uint4 = glm::vec<4, isaac_uint, glm::defaultp>;
-using isaac_uint3 = glm::vec<3, isaac_uint, glm::defaultp>;
-using isaac_uint2 = glm::vec<2, isaac_uint, glm::defaultp>;
+template <int T_n, typename T_Type>
+using isaac_mat_dim = glm::mat<T_n, T_n, T_Type, glm::defaultp>;
 
-using isaac_int4 = glm::vec<4, isaac_int, glm::defaultp>;
-using isaac_int3 = glm::vec<3, isaac_int, glm::defaultp>;
-using isaac_int2 = glm::vec<2, isaac_int, glm::defaultp>;
+template <int T_n>
+using isaac_float_dim = isaac_vec_dim<T_n, isaac_float>;
+template <int T_n>
+using isaac_double_dim = isaac_vec_dim<T_n, isaac_double>;
+template <int T_n>
+using isaac_int_dim = isaac_vec_dim<T_n, isaac_int>;
+template <int T_n>
+using isaac_uint_dim = isaac_vec_dim<T_n, isaac_uint>;
+template <int T_n>
+using isaac_size_dim = isaac_vec_dim<T_n, ISAAC_IDX_TYPE>;
 
-using isaac_size4 = glm::vec<4, ISAAC_IDX_TYPE, glm::defaultp>;
-using isaac_size3 = glm::vec<3, ISAAC_IDX_TYPE, glm::defaultp>;
-using isaac_size2 = glm::vec<2, ISAAC_IDX_TYPE, glm::defaultp>;
+using isaac_float4 = isaac_vec_dim<4, isaac_float>;
+using isaac_float3 = isaac_vec_dim<3, isaac_float>;
+using isaac_float2 = isaac_vec_dim<2, isaac_float>;
 
-using isaac_mat4 = glm::mat<4, 4, isaac_float, glm::defaultp>;
-using isaac_mat3 = glm::mat<3, 3, isaac_float, glm::defaultp>;
-using isaac_mat2 = glm::mat<2, 2, isaac_float, glm::defaultp>;
+using isaac_double4 = isaac_vec_dim<4, isaac_double>;
+using isaac_double3 = isaac_vec_dim<3, isaac_double>;
+using isaac_double2 = isaac_vec_dim<2, isaac_double>;
 
-using isaac_dmat4 = glm::mat<4, 4, isaac_double, glm::defaultp>;
-using isaac_dmat3 = glm::mat<3, 3, isaac_double, glm::defaultp>;
-using isaac_dmat2 = glm::mat<2, 2, isaac_double, glm::defaultp>;
+using isaac_uint4 = isaac_vec_dim<4, isaac_uint>;
+using isaac_uint3 = isaac_vec_dim<3, isaac_uint>;
+using isaac_uint2 = isaac_vec_dim<2, isaac_uint>;
 
-template <int T>
-using isaac_float_dim = glm::vec<T, isaac_float, glm::defaultp>;
-template <int T>
-using isaac_double_dim = glm::vec<T, isaac_double, glm::defaultp>;
-template <int T>
-using isaac_int_dim = glm::vec<T, isaac_int, glm::defaultp>;
-template <int T>
-using isaac_size_dim = glm::vec<T, ISAAC_IDX_TYPE, glm::defaultp>;
+using isaac_byte4 = isaac_vec_dim<4, isaac_byte>;
+using isaac_byte3 = isaac_vec_dim<3, isaac_byte>;
+using isaac_byte2 = isaac_vec_dim<2, isaac_byte>;
+
+using isaac_int4 = isaac_vec_dim<4, isaac_int>;
+using isaac_int3 = isaac_vec_dim<3, isaac_int>;
+using isaac_int2 = isaac_vec_dim<2, isaac_int>;
+
+using isaac_size4 = isaac_vec_dim<4, ISAAC_IDX_TYPE>;
+using isaac_size3 = isaac_vec_dim<3, ISAAC_IDX_TYPE>;
+using isaac_size2 = isaac_vec_dim<2, ISAAC_IDX_TYPE>;
+
+using isaac_mat4 = isaac_mat_dim<4, isaac_float>;
+using isaac_mat3 = isaac_mat_dim<3, isaac_float>;
+using isaac_mat2 = isaac_mat_dim<2, isaac_float>;
+
+using isaac_dmat4 = isaac_mat_dim<4, isaac_double>;
+using isaac_dmat3 = isaac_mat_dim<3, isaac_double>;
+using isaac_dmat2 = isaac_mat_dim<2, isaac_double>;
+
+
 
 
 /**
@@ -79,68 +95,83 @@ using isaac_size_dim = glm::vec<T, ISAAC_IDX_TYPE, glm::defaultp>;
  * 
  * @tparam simdim 
  */
-struct isaac_size_struct
+struct SimulationSizeStruct
 {
-    isaac_size3 global_size;         //size of volume
-    ISAAC_IDX_TYPE max_global_size;                //each dimension has a size and this value contains the value of the greatest dimension
-    isaac_size3 position;            //local position of subvolume
-    isaac_size3 local_size;          //size of local volume grid
-    isaac_size3 local_particle_size; //size of local particle grid 
-    isaac_size3 global_size_scaled;  //scaled version of global size with cells = scale * cells
-    ISAAC_IDX_TYPE max_global_size_scaled;         //same as global_size_scaled
-    isaac_size3 position_scaled;     //scaled position of local subvolume
-    isaac_size3 local_size_scaled;   //same as global_size_scaled
+    isaac_size3 globalSize;             //size of volume
+    ISAAC_IDX_TYPE maxGlobalSize;       //each dimension has a size and this value contains the value of the greatest dimension
+    isaac_size3 position;               //local position of subvolume
+    isaac_size3 localSize;              //size of local volume grid
+    isaac_size3 localParticleSize;      //size of local particle grid 
+    isaac_size3 globalSizeScaled;       //scaled version of global size with cells = scale * cells
+    ISAAC_IDX_TYPE maxGlobalSizeScaled; //same as globalSizeScaled
+    isaac_size3 positionScaled;         //scaled position of local subvolume
+    isaac_size3 localSizeScaled;        //same as globalSizeScaled
 };
 
-
-template< int N >
-struct transfer_d_struct
+struct GBuffer
 {
-    isaac_float4* pointer[ N ];
+    isaac_size2 size;
+    isaac_uint2 startOffset;
+    uint32_t* color;
+    isaac_float* depth;
+    isaac_float3* normal;
+    isaac_float* aoStrength;
 };
 
-template< int N >
-struct transfer_h_struct
+template< int T_n >
+struct TransferDeviceStruct
 {
-    isaac_float4* pointer[ N ];
-    std::map< isaac_uint, isaac_float4 > description[ N ];
+    isaac_float4* pointer[ T_n ];
 };
 
-struct functions_struct
+template< int T_n >
+struct TransferHostStruct
+{
+    isaac_float4* pointer[ T_n ];
+    std::map< isaac_uint, isaac_float4 > description[ T_n ];
+};
+
+struct FunctionsStruct
 {
     std::string source;
     isaac_int bytecode[ISAAC_MAX_FUNCTORS];
-    isaac_int error_code;
+    isaac_int errorCode;
 };
 
-template< int N >
-struct source_weight_struct
+template< int T_n >
+struct IsoThresholdStruct
 {
-    isaac_float value[ N ];
+    isaac_float value[ T_n ];
 };
 
-template< int N >
-struct pointer_array_struct
+template< int T_n >
+struct SourceWeightStruct
 {
-    void* pointer[ N ];
+    isaac_float value[ T_n ];
 };
 
-struct minmax_struct
+template< int T_n >
+struct PointerArrayStruct
+{
+    void* pointer[ T_n ];
+};
+
+struct MinMax
 {
     isaac_float min;
     isaac_float max;
 };
 
-template< int N>
-struct minmax_array_struct
+template< int T_n>
+struct MinMaxArray
 {
-    isaac_float min[ N ];
-    isaac_float max[ N ];
+    isaac_float min[ T_n ];
+    isaac_float max[ T_n ];
 };
 
-struct clipping_struct
+struct ClippingStruct
 {
-    ISAAC_HOST_DEVICE_INLINE clipping_struct() :
+    ISAAC_HOST_DEVICE_INLINE ClippingStruct() :
         count(0)
     {}
     isaac_uint count;
@@ -155,8 +186,8 @@ struct clipping_struct
  * @brief Container for ambient occlusion parameters
  * 
  */
-struct ao_struct {
-    ISAAC_HOST_DEVICE_INLINE ao_struct() {}
+struct AOParams {
+    ISAAC_HOST_DEVICE_INLINE AOParams() {}
 
     //weight value (0.0-1.0) for mixing color with depth component (darken) 
     //1.0 = 100% depth component 0.0 = 0% depth component  

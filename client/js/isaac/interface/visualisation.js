@@ -21,6 +21,7 @@ const default_image_src = "data:image/gif;base64,R0lGODlhXAFpAIQQAAABAAELEwEVJSA
 
 var functions = new Array();
 var weight = new Array();
+var isoThreshold = new Array();
 
 
 var transfer_array = [];
@@ -360,6 +361,18 @@ function createWeightFeedback(w, range_name, value_name) {
 	};
 }
 
+function createThresholdFeedback(t, range_name, value_name) {
+	return function () {
+		var myself = document.getElementById(range_name);
+		isoThreshold[t] = myself.value / 100;
+		var value = document.getElementById(value_name);
+		if (isoThreshold[t] == 0)
+			value.innerHTML = ' <b><font color="red">Off</font></b> ';
+		else
+			value.innerHTML = ' <b><font color="green">' + isoThreshold[t].toFixed(2) + '</font></b> ';
+	};
+}
+
 function createOptimizedFunction(i, minmax, with_add) {
 	return function () {
 		var mul = 1 / (minmax["max"] - minmax["min"]);
@@ -482,7 +495,6 @@ function onClientMessage(response) {
 			sources = response["sources"];
 			document.getElementById("interpolation_checkbox").checked = response["interpolation"];
 			document.getElementById("step").value = response["step"];
-			document.getElementById("iso_surface_checkbox").checked = response["iso surface"];
 			
 			aoSetValues(response);
 
@@ -525,8 +537,6 @@ function onClientMessage(response) {
 				document.getElementById("interpolation_checkbox").checked = response["interpolation"];
 			if (response.hasOwnProperty("step"))
 				document.getElementById("step").checked = response["step"];
-			if (response.hasOwnProperty("iso surface"))
-				document.getElementById("iso_surface_checkbox").checked = response["iso surface"];
 
 			aoSetValues(response);
 
@@ -541,6 +551,8 @@ function onClientMessage(response) {
 		processMinMax(response);
 
 		processWeight(response);
+
+		processIsoThreshold(response);
 
 		processTransferArray(response);
 
@@ -729,6 +741,41 @@ function processWeight(response) {
 			sendFeedback("weight", weight);
 		};
 		weight_div.appendChild(weight_button);
+	}
+}
+
+function processIsoThreshold(response) {
+	if (response.hasOwnProperty("iso threshold")) {
+		var iso_div = document.getElementById("iso_div");
+		while (iso_div.firstChild) {
+			iso_div.removeChild(iso_div.firstChild);
+		}
+		isoThreshold = response["iso threshold"];
+		for (var t in isoThreshold) {
+			var title = document.createElement("SPAN");
+			title.innerHTML = sources[t].name + ": ";
+			iso_div.appendChild(title);
+			var threshold = document.createElement("INPUT");
+			threshold.type = "range";
+			threshold.min = 0;
+			threshold.max = 100;
+			threshold.value = isoThreshold[t] * 100;
+			threshold.onchange = function () {
+				sendFeedback("iso threshold", isoThreshold);
+			};
+			var range_name = "t_" + t + "_range";
+			var value_name = "t_" + t + "_value";
+			threshold.id = range_name
+			threshold.oninput = createThresholdFeedback(t, range_name, value_name);
+			iso_div.appendChild(threshold);
+			var value = document.createElement("SPAN");
+			if (isoThreshold[t] == 0)
+				value.innerHTML = ' <b><font color="red">Off</font></b> ';
+			else
+				value.innerHTML = ' <b><font color="green">' + isoThreshold[t].toFixed(2) + '</font></b> ';
+			value.id = value_name;
+			iso_div.appendChild(value);
+		}
 	}
 }
 
@@ -1001,11 +1048,6 @@ function step_button_click() {
 	sendFeedback("step", status);
 };
 
-function iso_surface_checkbox_click() {
-	var status = document.getElementById("iso_surface_checkbox").checked;
-	sendFeedback("iso surface", status);
-};
-
 document.getElementById("zoom_in").onclick = function () {
 	zoom(+0.1);
 }
@@ -1137,6 +1179,17 @@ function aoSetValues(response) {
 	}
 }
 
+/**
+ * called when renderMode is changed
+ */
+function renderModeUpdate() {
+	let modeID = document.getElementById("render_mode_list").selectedIndex;
+
+	let render_mode_object = {
+		"mode": modeID
+	};
+	sendFeedback("render_mode", render_mode_object);
+}
 
 /**
  * called when wheight value is set or isEnabled is changed

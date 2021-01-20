@@ -18,14 +18,14 @@ ISAAC is a template libary, which compiles supports for your fields (called "sou
 
 For every source an own class needs to be defined. This class has to implement this following things:
 <ul>
-<li><KBD>static const ISAAC_IDX_TYPE feature_dim</KBD>: containing the feature dimension of the source. For a vector field this would be e.g. most probably 3, for a scalar field 1.</li>
+<li><KBD>static const ISAAC_IDX_TYPE featureDim</KBD>: containing the feature dimension of the source. For a vector field this would be e.g. most probably 3, for a scalar field 1.</li>
 <li><KBD>static const bool has_guard</KBD> determines, whether the source has a guard for access of data outside the later defined local dimensions.</li>
 <li><KBD>static const bool persistent</KBD> determines, whether ths source is persistent or needs to be copied after calling the update function.</li>
 <li>Speaking of it. Every source class needs an update function <KBD>ISAAC_HOST_INLINE void update(bool enabled)</KBD>. The definition has to look exactly like this. This function is called right before the rendering and before update is called for the next source the data will be copied for non persistent sources. <KBD>enabled</KBD> tells you, whether the source will be drawn at all. It is up to you to not update arrays in that case. Non persistent sources will be not accessed at all in that case.</li>
 <li><KBD>ISAAC_HOST_INLINE static std::string getName()</KBD> has to return the name of the source</li>.
 <li>An overload of the <KBD>[]</KBD> operator, which looks like this:
 \code{.cpp}
-ISAAC_NO_HOST_DEVICE_WARNING ISAAC_HOST_DEVICE_INLINE isaac_float_dim< feature_dim > operator[] (const isaac_int3 nIndex) const
+ISAAC_NO_HOST_DEVICE_WARNING ISAAC_HOST_DEVICE_INLINE isaac_float_dim< featureDim > operator[] (const isaac_int3 nIndex) const
 {
     ...
 }
