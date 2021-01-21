@@ -1,6 +1,6 @@
 # Changelog
 
-## [v1.5.2] - 2021-01-20
+## [v1.5.2] - 2021-01-22
 
 alpaka 0.6.0 is required if you enabled alpaka support.
 
