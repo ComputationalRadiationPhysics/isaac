@@ -22,7 +22,7 @@
 #define BOOST_RESULT_OF_USE_TR1
 #endif
 
-
+#include <iostream>
 #include <random>
 #include <string>
 #include <string.h>
@@ -109,9 +109,9 @@ namespace isaac
 
 
 #if ISAAC_ALPAKA == 1
-        using TDevAcc = alpaka::dev::Dev< TAcc >;
-        using TFraDim = alpaka::dim::DimInt< 1 >;
-        using TTexDim = alpaka::dim::DimInt< 1 >;
+        using TDevAcc = alpaka::Dev< TAcc >;
+        using TFraDim = alpaka::DimInt< 1 >;
+        using TTexDim = alpaka::DimInt< 1 >;
 #endif
 
         struct source_2_json_iterator
@@ -291,18 +291,18 @@ namespace isaac
                 {
 #if ISAAC_ALPAKA == 1
                     alpaka_vector.push_back(
-                        alpaka::mem::buf::Buf<
+                        alpaka::Buf<
                             TDevAcc,
                             isaac_float,
                             TFraDim,
                             ISAAC_IDX_TYPE
                         >(
-                            alpaka::mem::buf::alloc<
+                            alpaka::allocBuf<
                                 isaac_float,
                                 ISAAC_IDX_TYPE
                             >(
                                 acc,
-                                alpaka::vec::Vec<
+                                alpaka::Vec<
                                     TFraDim,
                                     ISAAC_IDX_TYPE
                                 >(
@@ -320,7 +320,7 @@ namespace isaac
                         )
                     );
                     pointer_array.pointer[I] =
-                        alpaka::mem::view::getPtrNative( alpaka_vector.back( ) );
+                        alpaka::getPtrNative( alpaka_vector.back( ) );
 #else
                     ISAAC_CUDA_CHECK ( cudaMalloc(
                         ( void ** ) &( pointer_array.pointer[I] ),
@@ -430,7 +430,7 @@ namespace isaac
                     };
 #if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
-                    if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
+                    if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
                     {
                         grid_size.x = ISAAC_IDX_TYPE(
@@ -442,23 +442,23 @@ namespace isaac
                         block_size.x = ISAAC_IDX_TYPE( 1 );
                         block_size.y = ISAAC_IDX_TYPE( 1 );
                     }
-                    const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
+                    const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
                         ISAAC_IDX_TYPE( 1 ),
                         ISAAC_IDX_TYPE( 1 ),
                         ISAAC_IDX_TYPE( 1 )
                     );
-                    const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> blocks(
+                    const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> blocks(
                         ISAAC_IDX_TYPE( 1 ),
                         block_size.x,
                         block_size.y
                     );
-                    const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> grid(
+                    const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> grid(
                         ISAAC_IDX_TYPE( 1 ),
                         grid_size.x,
                         grid_size.y
                     );
                     auto const workdiv(
-                        alpaka::workdiv::WorkDivMembers<
+                        alpaka::WorkDivMembers<
                             TAccDim,
                             ISAAC_IDX_TYPE
                         >(
@@ -469,7 +469,7 @@ namespace isaac
                     );
                     updateBufferKernel< TSource > kernel;
                     auto const instance(
-                        alpaka::kernel::createTaskKernel< TAcc >(
+                        alpaka::createTaskKernel< TAcc >(
                             workdiv,
                             kernel,
                             source,
@@ -477,11 +477,11 @@ namespace isaac
                             local_size_array
                         )
                     );
-                    alpaka::queue::enqueue(
+                    alpaka::enqueue(
                         stream,
                         instance
                     );
-                    alpaka::wait::wait( stream );
+                    alpaka::wait( stream );
 #else
                     dim3 block(
                         block_size.x,
@@ -550,7 +550,7 @@ namespace isaac
                 {
 #if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
-                    if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
+                    if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
                     {
                         grid_size.x = ISAAC_IDX_TYPE( local_size[0] );
@@ -558,23 +558,23 @@ namespace isaac
                         block_size.x = ISAAC_IDX_TYPE( 1 );
                         block_size.y = ISAAC_IDX_TYPE( 1 );
                     }
-                    const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
+                    const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
                         ISAAC_IDX_TYPE( 1 ),
                         ISAAC_IDX_TYPE( 1 ),
                         ISAAC_IDX_TYPE( 1 )
                     );
-                    const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> blocks(
+                    const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> blocks(
                         ISAAC_IDX_TYPE( 1 ),
                         block_size.x,
                         block_size.y
                     );
-                    const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> grid(
+                    const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> grid(
                         ISAAC_IDX_TYPE( 1 ),
                         grid_size.x,
                         grid_size.y
                     );
                     auto const workdiv(
-                        alpaka::workdiv::WorkDivMembers<
+                        alpaka::WorkDivMembers<
                             TAccDim,
                             ISAAC_IDX_TYPE
                         >(
@@ -585,26 +585,26 @@ namespace isaac
                     );
                     minMaxKernel< TSource > kernel;
                     auto const instance(
-                        alpaka::kernel::createTaskKernel< TAcc >(
+                        alpaka::createTaskKernel< TAcc >(
                             workdiv,
                             kernel,
                             source,
                             I,
-                            alpaka::mem::view::getPtrNative( local_minmax ),
+                            alpaka::getPtrNative( local_minmax ),
                             local_size_array,
                             pointer_array.pointer[I]
                         )
                     );
-                    alpaka::queue::enqueue(
+                    alpaka::enqueue(
                         stream,
                         instance
                     );
-                    alpaka::wait::wait( stream );
-                    alpaka::mem::view::ViewPlainPtr <THost, minmax_struct, TFraDim, ISAAC_IDX_TYPE>
+                    alpaka::wait( stream );
+                    alpaka::ViewPlainPtr <THost, minmax_struct, TFraDim, ISAAC_IDX_TYPE>
                         minmax_buffer(
                         local_minmax_array_h,
                         host,
-                        alpaka::vec::Vec<
+                        alpaka::Vec<
                             TFraDim,
                             ISAAC_IDX_TYPE
                         >(
@@ -613,11 +613,11 @@ namespace isaac
                             )
                         )
                     );
-                    alpaka::mem::view::copy(
+                    alpaka::memcpy(
                         stream,
                         minmax_buffer,
                         local_minmax,
-                        alpaka::vec::Vec<
+                        alpaka::Vec<
                             TFraDim,
                             ISAAC_IDX_TYPE
                         >(
@@ -721,7 +721,7 @@ namespace isaac
                 {
 #if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
-                    if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
+                    if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
                     {
                         grid_size.x = ISAAC_IDX_TYPE( local_size[0] );
@@ -729,23 +729,23 @@ namespace isaac
                         block_size.x = ISAAC_IDX_TYPE( 1 );
                         block_size.y = ISAAC_IDX_TYPE( 1 );
                     }
-                    const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
+                    const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
                         ISAAC_IDX_TYPE( 1 ),
                         ISAAC_IDX_TYPE( 1 ),
                         ISAAC_IDX_TYPE( 1 )
                     );
-                    const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> blocks(
+                    const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> blocks(
                         ISAAC_IDX_TYPE( 1 ),
                         block_size.x,
                         block_size.y
                     );
-                    const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> grid(
+                    const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> grid(
                         ISAAC_IDX_TYPE( 1 ),
                         grid_size.x,
                         grid_size.y
                     );
                     auto const workdiv(
-                        alpaka::workdiv::WorkDivMembers<
+                        alpaka::WorkDivMembers<
                             TAccDim,
                             ISAAC_IDX_TYPE
                         >(
@@ -756,25 +756,25 @@ namespace isaac
                     );
                     minMaxPartikelKernel< TParticleSource > kernel;
                     auto const instance(
-                        alpaka::kernel::createTaskKernel< TAcc >(
+                        alpaka::createTaskKernel< TAcc >(
                             workdiv,
                             kernel,
                             particle_source,
                             I + TOffset,
-                            alpaka::mem::view::getPtrNative( local_minmax ),
+                            alpaka::getPtrNative( local_minmax ),
                             local_size_array
                         )
                     );
-                    alpaka::queue::enqueue(
+                    alpaka::enqueue(
                         stream,
                         instance
                     );
-                    alpaka::wait::wait( stream );
-                    alpaka::mem::view::ViewPlainPtr <THost, minmax_struct, TFraDim, ISAAC_IDX_TYPE>
+                    alpaka::wait( stream );
+                    alpaka::ViewPlainPtr <THost, minmax_struct, TFraDim, ISAAC_IDX_TYPE>
                         minmax_buffer(
                         local_minmax_array_h,
                         host,
-                        alpaka::vec::Vec<
+                        alpaka::Vec<
                             TFraDim,
                             ISAAC_IDX_TYPE
                         >(
@@ -783,11 +783,11 @@ namespace isaac
                             )
                         )
                     );
-                    alpaka::mem::view::copy(
+                    alpaka::memcpy(
                         stream,
                         minmax_buffer,
                         local_minmax,
-                        alpaka::vec::Vec<
+                        alpaka::Vec<
                             TFraDim,
                             ISAAC_IDX_TYPE
                         >(
@@ -898,7 +898,7 @@ namespace isaac
 #if ISAAC_ALPAKA == 1
         ,
         framebuffer(
-            alpaka::mem::buf::alloc<
+            alpaka::allocBuf<
                 uint32_t,
                 ISAAC_IDX_TYPE
             >(
@@ -907,7 +907,7 @@ namespace isaac
             )
         ),
         framebufferAO(
-            alpaka::mem::buf::alloc<
+            alpaka::allocBuf<
                 isaac_float,
                 ISAAC_IDX_TYPE
             >(
@@ -916,7 +916,7 @@ namespace isaac
             )
         ),
         framebufferDepth(
-            alpaka::mem::buf::alloc<
+            alpaka::allocBuf<
                 isaac_float3,
                 ISAAC_IDX_TYPE
             >(
@@ -925,7 +925,7 @@ namespace isaac
             )
         ),
         framebufferNormal(
-            alpaka::mem::buf::alloc<
+            alpaka::allocBuf<
                 isaac_float3,
                 ISAAC_IDX_TYPE
             >(
@@ -934,7 +934,7 @@ namespace isaac
             )
         ),
         functor_chain_d(
-            alpaka::mem::buf::alloc<
+            alpaka::allocBuf<
                 isaac_functor_chain_pointer_N,
                 ISAAC_IDX_TYPE
             >(
@@ -942,7 +942,7 @@ namespace isaac
                 ISAAC_IDX_TYPE( ISAAC_FUNCTOR_COMPLEX * 4 ) ) )
     ,
 
-    functor_chain_choose_d ( alpaka::mem::buf::alloc<
+    functor_chain_choose_d ( alpaka::allocBuf<
         isaac_functor_chain_pointer_N,
         ISAAC_IDX_TYPE
     >(
@@ -953,7 +953,7 @@ namespace isaac
     + boost::mpl::size< TParticleList >::type::value ) ) ) )
     ,
 
-    local_minmax_array_d ( alpaka::mem::buf::alloc<
+    local_minmax_array_d ( alpaka::allocBuf<
         minmax_struct,
         ISAAC_IDX_TYPE
     >(
@@ -963,7 +963,7 @@ namespace isaac
     * local_size[1] ) ) )
     ,
 
-    local_particle_minmax_array_d ( alpaka::mem::buf::alloc<
+    local_particle_minmax_array_d ( alpaka::allocBuf<
         minmax_struct,
         ISAAC_IDX_TYPE
     >(
@@ -1090,7 +1090,7 @@ namespace isaac
 
             //Create functor chain pointer lookup table
 #if ISAAC_ALPAKA == 1
-            const alpaka::vec::Vec<
+            const alpaka::Vec<
                 TAccDim,
                 ISAAC_IDX_TYPE
             > threads(
@@ -1098,7 +1098,7 @@ namespace isaac
                 ISAAC_IDX_TYPE( 1 ),
                 ISAAC_IDX_TYPE( 1 )
             );
-            const alpaka::vec::Vec<
+            const alpaka::Vec<
                 TAccDim,
                 ISAAC_IDX_TYPE
             > blocks(
@@ -1106,7 +1106,7 @@ namespace isaac
                 ISAAC_IDX_TYPE( 1 ),
                 ISAAC_IDX_TYPE( 1 )
             );
-            const alpaka::vec::Vec<
+            const alpaka::Vec<
                 TAccDim,
                 ISAAC_IDX_TYPE
             > grid(
@@ -1115,7 +1115,7 @@ namespace isaac
                 ISAAC_IDX_TYPE( 1 )
             );
             auto const workdiv(
-                alpaka::workdiv::WorkDivMembers<
+                alpaka::WorkDivMembers<
                     TAccDim,
                     ISAAC_IDX_TYPE
                 >(
@@ -1126,17 +1126,17 @@ namespace isaac
             );
             fillFunctorChainPointerKernel kernel;
             auto const instance(
-                alpaka::kernel::createTaskKernel< TAcc >(
+                alpaka::createTaskKernel< TAcc >(
                     workdiv,
                     kernel,
-                    alpaka::mem::view::getPtrNative( functor_chain_d )
+                    alpaka::getPtrNative( functor_chain_d )
                 )
             );
-            alpaka::queue::enqueue(
+            alpaka::enqueue(
                 stream,
                 instance
             );
-            alpaka::wait::wait( stream );
+            alpaka::wait( stream );
 #else
             dim3 grid( 1 );
             dim3 block( 1 );
@@ -1175,18 +1175,18 @@ namespace isaac
                 source_weight.value[i] = ISAAC_DEFAULT_WEIGHT;
 #if ISAAC_ALPAKA == 1
                 transfer_d_buf.push_back(
-                    alpaka::mem::buf::Buf<
+                    alpaka::Buf<
                         TDevAcc,
                         isaac_float4,
                         TTexDim,
                         ISAAC_IDX_TYPE
                     >(
-                        alpaka::mem::buf::alloc<
+                        alpaka::allocBuf<
                             isaac_float4,
                             ISAAC_IDX_TYPE
                         >(
                             acc,
-                            alpaka::vec::Vec<
+                            alpaka::Vec<
                                 TTexDim,
                                 ISAAC_IDX_TYPE
                             >( TTransfer_size )
@@ -1194,18 +1194,18 @@ namespace isaac
                     )
                 );
                 transfer_h_buf.push_back(
-                    alpaka::mem::buf::Buf<
+                    alpaka::Buf<
                         THost,
                         isaac_float4,
                         TTexDim,
                         ISAAC_IDX_TYPE
                     >(
-                        alpaka::mem::buf::alloc<
+                        alpaka::allocBuf<
                             isaac_float4,
                             ISAAC_IDX_TYPE
                         >(
                             host,
-                            alpaka::vec::Vec<
+                            alpaka::Vec<
                                 TTexDim,
                                 ISAAC_IDX_TYPE
                             >( TTransfer_size )
@@ -1213,9 +1213,9 @@ namespace isaac
                     )
                 );
                 transfer_d.pointer[i] =
-                    alpaka::mem::view::getPtrNative( transfer_d_buf[i] );
+                    alpaka::getPtrNative( transfer_d_buf[i] );
                 transfer_h.pointer[i] =
-                    alpaka::mem::view::getPtrNative( transfer_h_buf[i] );
+                    alpaka::getPtrNative( transfer_h_buf[i] );
 #else
                 ISAAC_CUDA_CHECK ( cudaMalloc(
                     ( isaac_float4 * * ) & ( transfer_d.pointer[i] ),
@@ -1551,13 +1551,13 @@ namespace isaac
 
 #if ISAAC_ALPAKA == 1
             //allocate ssao kernel (16x16 matrix)
-            alpaka::mem::buf::Buf<
+            alpaka::Buf<
                 THost, 
                 isaac_float3, 
                 TFraDim, 
                 ISAAC_IDX_TYPE
             > ssao_kernel_h_buf (
-                alpaka::mem::buf::alloc<
+                alpaka::allocBuf<
                     isaac_float3, 
                     ISAAC_IDX_TYPE
                 > (
@@ -1565,16 +1565,16 @@ namespace isaac
                     ISAAC_IDX_TYPE(64)
                 )
             );
-            isaac_float3* ssao_kernel_h = reinterpret_cast<isaac_float3*> ( alpaka::mem::view::getPtrNative ( ssao_kernel_h_buf ) );
+            isaac_float3* ssao_kernel_h = reinterpret_cast<isaac_float3*> ( alpaka::getPtrNative ( ssao_kernel_h_buf ) );
 
             //allocate ssao noise kernel (4x4 matrix)
-            alpaka::mem::buf::Buf<
+            alpaka::Buf<
                 THost, 
                 isaac_float3, 
                 TFraDim, 
                 ISAAC_IDX_TYPE
             > ssao_noise_h_buf (
-                alpaka::mem::buf::alloc<
+                alpaka::allocBuf<
                     isaac_float3, 
                     ISAAC_IDX_TYPE
                 > (
@@ -1582,7 +1582,7 @@ namespace isaac
                     ISAAC_IDX_TYPE(16)
                 )
             );
-            isaac_float3* ssao_noise_h = reinterpret_cast<isaac_float3*> ( alpaka::mem::view::getPtrNative ( ssao_noise_h_buf ) );
+            isaac_float3* ssao_noise_h = reinterpret_cast<isaac_float3*> ( alpaka::getPtrNative ( ssao_noise_h_buf ) );
     
 #else
 
@@ -1623,17 +1623,17 @@ namespace isaac
             //move ssao kernel to device
 #if ISAAC_ALPAKA == 1
             //copy ssao kernel to constant memory
-            alpaka::vec::Vec<alpaka::dim::DimInt<1u>, ISAAC_IDX_TYPE> const 
+            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const 
                 ssao_kernel_d_extent(ISAAC_IDX_TYPE(64));
 
             auto ssao_kernel_d_view (
-                alpaka::mem::view::createStaticDevMemView(
+                alpaka::createStaticDevMemView(
                     &ssao_kernel_d[0u], 
                     acc, 
                     ssao_kernel_d_extent
                 )
             );
-            alpaka::mem::view::copy(
+            alpaka::memcpy(
                 stream, 
                 ssao_kernel_d_view, 
                 ssao_kernel_h_buf, 
@@ -1641,17 +1641,17 @@ namespace isaac
             );
 
             //copy ssao noise kernel to constant memory
-            alpaka::vec::Vec<alpaka::dim::DimInt<1u>, ISAAC_IDX_TYPE> const 
+            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const 
                 ssao_noise_d_extent(ISAAC_IDX_TYPE(16));
 
             auto ssao_noise_d_view ( 
-                alpaka::mem::view::createStaticDevMemView(
+                alpaka::createStaticDevMemView(
                     &ssao_noise_d[0u], 
                     acc, 
                     ssao_noise_d_extent
                 )
             );
-            alpaka::mem::view::copy ( 
+            alpaka::memcpy ( 
                 stream, 
                 ssao_noise_d_view, 
                 ssao_noise_h_buf, 
@@ -2052,11 +2052,11 @@ namespace isaac
                 dest
             );
 #if ISAAC_ALPAKA == 1
-            alpaka::mem::view::ViewPlainPtr <THost, isaac_float4, TFraDim, ISAAC_IDX_TYPE>
+            alpaka::ViewPlainPtr <THost, isaac_float4, TFraDim, ISAAC_IDX_TYPE>
                 parameter_buffer(
                 isaac_parameter_h,
                 host,
-                alpaka::vec::Vec<
+                alpaka::Vec<
                     TFraDim,
                     ISAAC_IDX_TYPE
                 >(
@@ -2069,18 +2069,18 @@ namespace isaac
                 )
             );
 
-            alpaka::vec::Vec <alpaka::dim::DimInt< 1u >, ISAAC_IDX_TYPE> const
+            alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
                 parameter_d_extent( ISAAC_IDX_TYPE( 16 ) );
             auto parameter_d_view(
-                alpaka::mem::view::createStaticDevMemView ( & isaac_parameter_d[0u],
+                alpaka::createStaticDevMemView ( & isaac_parameter_d[0u],
                 acc,
                 parameter_d_extent
             ) );
-            alpaka::mem::view::copy(
+            alpaka::memcpy(
                 stream,
                 parameter_d_view,
                 parameter_buffer,
-                alpaka::vec::Vec<
+                alpaka::Vec<
                     TFraDim,
                     ISAAC_IDX_TYPE
                 >(
@@ -2093,23 +2093,23 @@ namespace isaac
                 )
             );
 
-            const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
+            const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
                 ISAAC_IDX_TYPE( 1 ),
                 ISAAC_IDX_TYPE( 1 ),
                 ISAAC_IDX_TYPE( 1 )
             );
-            const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> blocks(
+            const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> blocks(
                 ISAAC_IDX_TYPE( 1 ),
                 ISAAC_IDX_TYPE( 1 ),
                 ISAAC_IDX_TYPE( 1 )
             );
-            const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> grid(
+            const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> grid(
                 ISAAC_IDX_TYPE( 1 ),
                 ISAAC_IDX_TYPE( 1 ),
                 ISAAC_IDX_TYPE( 1 )
             );
             auto const workdiv(
-                alpaka::workdiv::WorkDivMembers<
+                alpaka::WorkDivMembers<
                     TAccDim,
                     ISAAC_IDX_TYPE
                 >(
@@ -2131,28 +2131,28 @@ namespace isaac
                 >
             > kernel;
             auto const instance(
-                alpaka::kernel::createTaskKernel< TAcc >(
+                alpaka::createTaskKernel< TAcc >(
                     workdiv,
                     kernel,
-                    alpaka::mem::view::getPtrNative( functor_chain_choose_d ),
-                    alpaka::mem::view::getPtrNative( functor_chain_d ),
+                    alpaka::getPtrNative( functor_chain_choose_d ),
+                    alpaka::getPtrNative( functor_chain_d ),
                     dest
                 )
             );
-            alpaka::queue::enqueue(
+            alpaka::enqueue(
                 stream,
                 instance
             );
-            alpaka::wait::wait( stream );
+            alpaka::wait( stream );
 
-            alpaka::vec::Vec <alpaka::dim::DimInt< 1u >, ISAAC_IDX_TYPE> const
+            alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
                 function_chain_d_extent( ISAAC_IDX_TYPE( ISAAC_MAX_SOURCES ) );
             auto function_chain_d_view(
-                alpaka::mem::view::createStaticDevMemView ( & isaac_function_chain_d[0u],
+                alpaka::createStaticDevMemView ( & isaac_function_chain_d[0u],
                 acc,
                 function_chain_d_extent
             ) );
-            alpaka::mem::view::copy(
+            alpaka::memcpy(
                 stream,
                 function_chain_d_view,
                 functor_chain_choose_d,
@@ -2233,7 +2233,7 @@ namespace isaac
                     before = next;
                 }
 #if ISAAC_ALPAKA == 1
-                alpaka::mem::view::copy(
+                alpaka::memcpy(
                     stream,
                     transfer_d_buf[i],
                     transfer_h_buf[i],
@@ -3499,9 +3499,9 @@ namespace isaac
 #if ISAAC_ALPAKA == 1
 
             //inverse mvp
-            alpaka::mem::buf::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
+            alpaka::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
                 inverse_h_buf(
-                alpaka::mem::buf::alloc<
+                alpaka::allocBuf<
                     isaac_float,
                     ISAAC_IDX_TYPE
                 >(
@@ -3510,13 +3510,13 @@ namespace isaac
                 )
             );
             isaac_float * inverse_h =
-                reinterpret_cast<float *> ( alpaka::mem::view::getPtrNative( inverse_h_buf ) );
+                reinterpret_cast<float *> ( alpaka::getPtrNative( inverse_h_buf ) );
 
 
             //model-view matrix
-            alpaka::mem::buf::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
+            alpaka::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
                 modelview_h_buf(
-                alpaka::mem::buf::alloc<
+                alpaka::allocBuf<
                     isaac_float,
                     ISAAC_IDX_TYPE
                 >(
@@ -3525,13 +3525,13 @@ namespace isaac
                 )
             );
             isaac_float * modelview_h =
-                reinterpret_cast<float *> ( alpaka::mem::view::getPtrNative( modelview_h_buf ) );
+                reinterpret_cast<float *> ( alpaka::getPtrNative( modelview_h_buf ) );
 
 
             //projection matrix
-            alpaka::mem::buf::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
+            alpaka::Buf <THost, isaac_float, TFraDim, ISAAC_IDX_TYPE>
                 projection_h_buf(
-                alpaka::mem::buf::alloc<
+                alpaka::allocBuf<
                     isaac_float,
                     ISAAC_IDX_TYPE
                 >(
@@ -3540,17 +3540,17 @@ namespace isaac
                 )
             );
             isaac_float * projection_h =
-                reinterpret_cast<float *> ( alpaka::mem::view::getPtrNative( modelview_h_buf ) );
+                reinterpret_cast<float *> ( alpaka::getPtrNative( modelview_h_buf ) );
 
 
             //sim size values
-            alpaka::mem::buf::Buf <THost, isaac_size_struct< TSimDim::value >, TFraDim, ISAAC_IDX_TYPE>
+            alpaka::Buf <THost, isaac_size_struct< TSimDim::value >, TFraDim, ISAAC_IDX_TYPE>
                 size_h_buf(
-                alpaka::mem::buf::alloc < isaac_size_struct < TSimDim::value > ,
+                alpaka::allocBuf < isaac_size_struct < TSimDim::value > ,
                 ISAAC_IDX_TYPE > ( myself->host, ISAAC_IDX_TYPE( 1 ) )
             );
             isaac_size_struct < TSimDim::value > *size_h =
-                reinterpret_cast<isaac_size_struct< TSimDim::value > *> ( alpaka::mem::view::getPtrNative( size_h_buf ) );
+                reinterpret_cast<isaac_size_struct< TSimDim::value > *> ( alpaka::getPtrNative( size_h_buf ) );
 
 #else
             isaac_float inverse_h[16];
@@ -3695,14 +3695,14 @@ namespace isaac
 #if ISAAC_ALPAKA == 1
 
             //inverse matrix
-            alpaka::vec::Vec <alpaka::dim::DimInt< 1u >, ISAAC_IDX_TYPE> const
+            alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
                 inverse_d_extent( ISAAC_IDX_TYPE( 16 ) );
             //get view
             auto inverse_d_view(
-                alpaka::mem::view::createStaticDevMemView ( & isaac_inverse_d[0u],
+                alpaka::createStaticDevMemView ( & isaac_inverse_d[0u],
                 myself -> acc, inverse_d_extent ) );
             //copy to constant memory
-            alpaka::mem::view::copy(
+            alpaka::memcpy(
                 myself->stream,
                 inverse_d_view,
                 inverse_h_buf,
@@ -3710,14 +3710,14 @@ namespace isaac
             );
 
             //modelview matrix
-            alpaka::vec::Vec <alpaka::dim::DimInt< 1u >, ISAAC_IDX_TYPE> const
+            alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
                 modelview_d_extent( ISAAC_IDX_TYPE( 16 ) );
             //get view
             auto modelview_d_view(
-                alpaka::mem::view::createStaticDevMemView ( & isaac_modelview_d[0u],
+                alpaka::createStaticDevMemView ( & isaac_modelview_d[0u],
                 myself -> acc, modelview_d_extent ) );
             //copy to constant memory 
-            alpaka::mem::view::copy(
+            alpaka::memcpy(
                 myself->stream,
                 modelview_d_view,
                 modelview_h_buf,
@@ -3726,26 +3726,26 @@ namespace isaac
 
 
             //projection matrix
-            alpaka::vec::Vec <alpaka::dim::DimInt< 1u >, ISAAC_IDX_TYPE> const
+            alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
                 projection_d_extent( ISAAC_IDX_TYPE( 16 ) );
             //get view
             auto projection_d_view(
-                alpaka::mem::view::createStaticDevMemView ( & isaac_projection_d[0u],
+                alpaka::createStaticDevMemView ( & isaac_projection_d[0u],
                 myself -> acc, projection_d_extent ) );
             //copy to constant memory
-            alpaka::mem::view::copy(
+            alpaka::memcpy(
                 myself->stream,
                 projection_d_view,
                 projection_h_buf,
                 ISAAC_IDX_TYPE( 16 )
             );
 
-            alpaka::vec::Vec <alpaka::dim::DimInt< 1u >, ISAAC_IDX_TYPE> const
+            alpaka::Vec <alpaka::DimInt< 1u >, ISAAC_IDX_TYPE> const
                 size_d_extent( ISAAC_IDX_TYPE( 1 ) );
             auto size_d_view(
-                alpaka::mem::view::createStaticDevMemView ( & isaac_size_d[0u],
+                alpaka::createStaticDevMemView ( & isaac_size_d[0u],
                 myself -> acc, size_d_extent ) );
-            alpaka::mem::view::copy(
+            alpaka::memcpy(
                 myself->stream,
                 size_d_view,
                 size_h_buf,
@@ -3830,19 +3830,19 @@ namespace isaac
                     )
                 >,
                 mpl::vector< >,
-                alpaka::mem::buf::Buf< 
+                alpaka::Buf< 
                     TDevAcc, 
                     uint32_t, 
                     TFraDim, 
                     ISAAC_IDX_TYPE
                 >, 
-                alpaka::mem::buf::Buf<
+                alpaka::Buf<
                     TDevAcc, 
                     isaac_float3, 
                     TFraDim, 
                     ISAAC_IDX_TYPE
                 >,
-                alpaka::mem::buf::Buf<
+                alpaka::Buf<
                     TDevAcc, 
                     isaac_float3, 
                     TFraDim, 
@@ -3853,7 +3853,7 @@ namespace isaac
                 TAccDim, 
                 TAcc, 
                 TStream,
-                alpaka::mem::buf::Buf< 
+                alpaka::Buf< 
                     TDevAcc, 
                     isaac_functor_chain_pointer_N, 
                     TFraDim,
@@ -3887,24 +3887,24 @@ namespace isaac
             );
 
             //wait until render kernel has finished
-            alpaka::wait::wait( myself->stream );
+            alpaka::wait( myself->stream );
 
             //process color and depth values for depth simulation
             if(myself->ambientOcclusion.isEnabled && myself->ambientOcclusion.weight > 0.0f) {
                 IsaacSSAOKernelCaller<
-                    alpaka::mem::buf::Buf<
+                    alpaka::Buf<
                         TDevAcc, 
                         isaac_float, 
                         TFraDim, 
                         ISAAC_IDX_TYPE
                     >,
-                    alpaka::mem::buf::Buf<
+                    alpaka::Buf<
                         TDevAcc, 
                         isaac_float3, 
                         TFraDim, 
                         ISAAC_IDX_TYPE
                     >,
-                    alpaka::mem::buf::Buf<
+                    alpaka::Buf<
                         TDevAcc, 
                         isaac_float3, 
                         TFraDim, 
@@ -3926,23 +3926,23 @@ namespace isaac
                 );
 
                 //wait until render kernel has finished
-                alpaka::wait::wait ( myself->stream );
+                alpaka::wait ( myself->stream );
 
                 IsaacSSAOFilterKernelCaller
                 <
-                    alpaka::mem::buf::Buf<
+                    alpaka::Buf<
                         TDevAcc, 
                         uint32_t, 
                         TFraDim, 
                         ISAAC_IDX_TYPE
                     >,
-                    alpaka::mem::buf::Buf<
+                    alpaka::Buf<
                         TDevAcc, 
                         isaac_float, 
                         TFraDim, 
                         ISAAC_IDX_TYPE
                     >,
-                    alpaka::mem::buf::Buf<
+                    alpaka::Buf<
                         TDevAcc, 
                         isaac_float3, 
                         TFraDim, 
@@ -3964,7 +3964,7 @@ namespace isaac
                 );
 
                 //wait until render kernel has finished
-                alpaka::wait::wait ( myself->stream );
+                alpaka::wait ( myself->stream );
             }
 
             //stop and restart time for delta calculation
@@ -3976,22 +3976,22 @@ namespace isaac
                 myself->getTicksUs( ) )
 
             //get memory view from IceT pixels on host
-            alpaka::mem::view::ViewPlainPtr <THost, uint32_t, TFraDim, ISAAC_IDX_TYPE>
+            alpaka::ViewPlainPtr <THost, uint32_t, TFraDim, ISAAC_IDX_TYPE>
                 result_buffer(
                 ( uint32_t * )( pixels ),
                 myself->host,
-                alpaka::vec::Vec<
+                alpaka::Vec<
                     TFraDim,
                     ISAAC_IDX_TYPE
                 >( myself->framebuffer_prod )
             );
 
             //copy device framebuffer to result IceT pixel buffer
-            alpaka::mem::view::copy(
+            alpaka::memcpy(
                 myself->stream,
                 result_buffer,
                 myself->framebuffer,
-                alpaka::vec::Vec<
+                alpaka::Vec<
                     TFraDim,
                     ISAAC_IDX_TYPE
                 >( myself->framebuffer_prod )
@@ -4714,13 +4714,13 @@ namespace isaac
         isaac_size2 framebuffer_size;
         isaac_size2 compbuffer_size;
 #if ISAAC_ALPAKA == 1
-        alpaka::vec::Vec<
+        alpaka::Vec<
             TFraDim,
             ISAAC_IDX_TYPE
         > framebuffer_prod;
 
         //framebuffer pixel values
-        alpaka::mem::buf::Buf<
+        alpaka::Buf<
             TDevAcc,
             uint32_t,
             TFraDim,
@@ -4728,7 +4728,7 @@ namespace isaac
         > framebuffer;
 
         //ambient occlusion factor values
-        alpaka::mem::buf::Buf<
+        alpaka::Buf<
             TDevAcc, 
             isaac_float, 
             TFraDim, 
@@ -4736,7 +4736,7 @@ namespace isaac
         > framebufferAO;
 
         //pixel depth information
-        alpaka::mem::buf::Buf<
+        alpaka::Buf<
             TDevAcc, 
             isaac_float3, 
             TFraDim, 
@@ -4744,32 +4744,32 @@ namespace isaac
         > framebufferDepth;
 
         //pixel normal information
-        alpaka::mem::buf::Buf<
+        alpaka::Buf<
             TDevAcc, 
             isaac_float3, 
             TFraDim, 
             ISAAC_IDX_TYPE
         > framebufferNormal;  
 
-        alpaka::mem::buf::Buf<
+        alpaka::Buf<
             TDevAcc,
             isaac_functor_chain_pointer_N,
             TFraDim,
             ISAAC_IDX_TYPE
         > functor_chain_d;
-        alpaka::mem::buf::Buf<
+        alpaka::Buf<
             TDevAcc,
             isaac_functor_chain_pointer_N,
             TFraDim,
             ISAAC_IDX_TYPE
         > functor_chain_choose_d;
-        alpaka::mem::buf::Buf<
+        alpaka::Buf<
             TDevAcc,
             minmax_struct,
             TFraDim,
             ISAAC_IDX_TYPE
         > local_minmax_array_d;
-        alpaka::mem::buf::Buf<
+        alpaka::Buf<
             TDevAcc,
             minmax_struct,
             TFraDim,
@@ -4838,19 +4838,19 @@ namespace isaac
         pthread_t visualizationThread;
         ao_struct ambientOcclusion;                         //state of ambient occlusion on client site
 #if ISAAC_ALPAKA == 1
-        std::vector <alpaka::mem::buf::Buf<
+        std::vector <alpaka::Buf<
             TDevAcc,
             isaac_float4,
             TTexDim,
             ISAAC_IDX_TYPE
         >> transfer_d_buf;
-        std::vector <alpaka::mem::buf::Buf<
+        std::vector <alpaka::Buf<
             THost,
             isaac_float4,
             TTexDim,
             ISAAC_IDX_TYPE
         >> transfer_h_buf;
-        std::vector <alpaka::mem::buf::Buf<
+        std::vector <alpaka::Buf<
             TDevAcc,
             isaac_float,
             TFraDim,

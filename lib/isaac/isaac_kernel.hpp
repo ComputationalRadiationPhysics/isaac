@@ -1182,7 +1182,7 @@ namespace isaac
 
             //get pixel values from thread ids
 #if ISAAC_ALPAKA == 1
-            auto alpThreadIdx = alpaka::idx::getIdx<
+            auto alpThreadIdx = alpaka::getIdx<
                 alpaka::Grid,
                 alpaka::Threads
             >( acc );
@@ -2158,7 +2158,7 @@ namespace isaac
             isaac_uint2 pixel;
             //get pixel values from thread ids
 #if ISAAC_ALPAKA == 1
-                    auto alpThreadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
+                    auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
                     pixel.x = isaac_uint ( alpThreadIdx[2] );
                     pixel.y = isaac_uint ( alpThreadIdx[1] );
 #else
@@ -2331,7 +2331,7 @@ namespace isaac
             isaac_uint2 pixel;
             //get pixel values from thread ids
 #if ISAAC_ALPAKA == 1
-                    auto alpThreadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
+                    auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
                     pixel.x = isaac_uint ( alpThreadIdx[2] );
                     pixel.y = isaac_uint ( alpThreadIdx[1] );
 #else
@@ -2618,7 +2618,7 @@ N - 1
             };
 #if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
-            if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
+            if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
             {
                 grid_size.x = ISAAC_IDX_TYPE(
@@ -2628,23 +2628,23 @@ N - 1
                 block_size.x = ISAAC_IDX_TYPE( 1 );
                 block_size.y = ISAAC_IDX_TYPE( 1 );
             }
-            const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
+            const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> threads(
                 ISAAC_IDX_TYPE( 1 ),
                 ISAAC_IDX_TYPE( 1 ),
                 ISAAC_IDX_TYPE( ISAAC_VECTOR_ELEM )
             );
-            const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> blocks(
+            const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> blocks(
                 ISAAC_IDX_TYPE( 1 ),
                 block_size.y,
                 block_size.x
             );
-            const alpaka::vec::Vec <TAccDim, ISAAC_IDX_TYPE> grid(
+            const alpaka::Vec <TAccDim, ISAAC_IDX_TYPE> grid(
                 ISAAC_IDX_TYPE( 1 ),
                 grid_size.y,
                 grid_size.x
             );
             auto const workdiv(
-                alpaka::workdiv::WorkDivMembers<
+                alpaka::WorkDivMembers<
                     TAccDim,
                     ISAAC_IDX_TYPE
                 >(
@@ -2671,13 +2671,13 @@ N - 1
                 kernel; \
                 auto const instance \
                 ( \
-                    alpaka::kernel::createTaskKernel<TAcc> \
+                    alpaka::createTaskKernel<TAcc> \
                     ( \
                         workdiv, \
                         kernel, \
-                        alpaka::mem::view::getPtrNative(framebuffer), \
-                        alpaka::mem::view::getPtrNative(depthBuffer), \
-                        alpaka::mem::view::getPtrNative(normalBuffer), \
+                        alpaka::getPtrNative(framebuffer), \
+                        alpaka::getPtrNative(depthBuffer), \
+                        alpaka::getPtrNative(normalBuffer), \
                         framebuffer_size, \
                         framebuffer_start, \
                         particle_sources, \
@@ -2692,7 +2692,7 @@ N - 1
                         ambientOcclusion \
                     ) \
                 ); \
-                alpaka::queue::enqueue(stream, instance); \
+                alpaka::enqueue(stream, instance); \
             }
 #else
             dim3 block(
@@ -2794,7 +2794,7 @@ N - 1
             };
 #if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
-            if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
+            if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
             {
                 grid_size.x = ISAAC_IDX_TYPE ( readback_viewport[2] + ISAAC_VECTOR_ELEM - 1 ) /ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM );
@@ -2802,28 +2802,28 @@ N - 1
                 block_size.x = ISAAC_IDX_TYPE ( 1 );
                 block_size.y = ISAAC_IDX_TYPE ( 1 );
             }
-            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> threads ( ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ) );
-            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> blocks ( ISAAC_IDX_TYPE ( 1 ), block_size.y, block_size.x );
-            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> grid ( ISAAC_IDX_TYPE ( 1 ), grid_size.y, grid_size.x );
-            auto const workdiv ( alpaka::workdiv::WorkDivMembers<TAccDim, ISAAC_IDX_TYPE> ( grid,blocks,threads ) );
+            const alpaka::Vec<TAccDim, ISAAC_IDX_TYPE> threads ( ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ) );
+            const alpaka::Vec<TAccDim, ISAAC_IDX_TYPE> blocks ( ISAAC_IDX_TYPE ( 1 ), block_size.y, block_size.x );
+            const alpaka::Vec<TAccDim, ISAAC_IDX_TYPE> grid ( ISAAC_IDX_TYPE ( 1 ), grid_size.y, grid_size.x );
+            auto const workdiv ( alpaka::WorkDivMembers<TAccDim, ISAAC_IDX_TYPE> ( grid,blocks,threads ) );
 
             {
                 isaacSSAOKernel kernel;
                 auto const instance
                 (
-                    alpaka::kernel::createTaskKernel<TAcc>
+                    alpaka::createTaskKernel<TAcc>
                     (
                         workdiv,
                         kernel,
-                        alpaka::mem::view::getPtrNative(aoBuffer),
-                        alpaka::mem::view::getPtrNative(depthBuffer),
-                        alpaka::mem::view::getPtrNative(normalBuffer),
+                        alpaka::getPtrNative(aoBuffer),
+                        alpaka::getPtrNative(depthBuffer),
+                        alpaka::getPtrNative(normalBuffer),
                         framebuffer_size,
                         framebuffer_start,
                         ao_properties
                     )
                 );
-                alpaka::queue::enqueue(stream, instance);
+                alpaka::enqueue(stream, instance);
             }
 #else
             dim3 block ( block_size.x, block_size.y );
@@ -2877,7 +2877,7 @@ N - 1
             };
 #if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
-            if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
+            if ( mpl::not_<boost::is_same<TAcc, alpaka::AccGpuCudaRt<TAccDim, ISAAC_IDX_TYPE> > >::value )
 #endif
             {
                 grid_size.x = ISAAC_IDX_TYPE ( readback_viewport[2] + ISAAC_VECTOR_ELEM - 1 ) /ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM );
@@ -2885,28 +2885,28 @@ N - 1
                 block_size.x = ISAAC_IDX_TYPE ( 1 );
                 block_size.y = ISAAC_IDX_TYPE ( 1 );
             }
-            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> threads ( ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ) );
-            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> blocks ( ISAAC_IDX_TYPE ( 1 ), block_size.y, block_size.x );
-            const alpaka::vec::Vec<TAccDim, ISAAC_IDX_TYPE> grid ( ISAAC_IDX_TYPE ( 1 ), grid_size.y, grid_size.x );
-            auto const workdiv ( alpaka::workdiv::WorkDivMembers<TAccDim, ISAAC_IDX_TYPE> ( grid,blocks,threads ) );
+            const alpaka::Vec<TAccDim, ISAAC_IDX_TYPE> threads ( ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( 1 ), ISAAC_IDX_TYPE ( ISAAC_VECTOR_ELEM ) );
+            const alpaka::Vec<TAccDim, ISAAC_IDX_TYPE> blocks ( ISAAC_IDX_TYPE ( 1 ), block_size.y, block_size.x );
+            const alpaka::Vec<TAccDim, ISAAC_IDX_TYPE> grid ( ISAAC_IDX_TYPE ( 1 ), grid_size.y, grid_size.x );
+            auto const workdiv ( alpaka::WorkDivMembers<TAccDim, ISAAC_IDX_TYPE> ( grid,blocks,threads ) );
 
             {
                 isaacSSAOFilterKernel kernel;
                 auto const instance
                 (
-                    alpaka::kernel::createTaskKernel<TAcc>
+                    alpaka::createTaskKernel<TAcc>
                     (
                         workdiv,
                         kernel,
-                        alpaka::mem::view::getPtrNative(framebuffer),
-                        alpaka::mem::view::getPtrNative(aobuffer),
-                        alpaka::mem::view::getPtrNative(depthbuffer),
+                        alpaka::getPtrNative(framebuffer),
+                        alpaka::getPtrNative(aobuffer),
+                        alpaka::getPtrNative(depthbuffer),
                         framebuffer_size,
                         framebuffer_start,
                         ao_properties
                     )
                 );
-                alpaka::queue::enqueue(stream, instance);
+                alpaka::enqueue(stream, instance);
             }
 #else
             dim3 block ( block_size.x, block_size.y );
@@ -2985,7 +2985,7 @@ N - 1
 #endif
         {
 #if ISAAC_ALPAKA == 1
-            auto alpThreadIdx = alpaka::idx::getIdx<
+            auto alpThreadIdx = alpaka::getIdx<
                 alpaka::Grid,
                 alpaka::Threads
             >( acc );
@@ -3116,7 +3116,7 @@ N - 1
 #endif
         {
 #if ISAAC_ALPAKA == 1
-            auto alpThreadIdx = alpaka::idx::getIdx<
+            auto alpThreadIdx = alpaka::getIdx<
                 alpaka::Grid,
                 alpaka::Threads
             >( acc );
@@ -3238,7 +3238,7 @@ N - 1
 #endif
         {
 #if ISAAC_ALPAKA == 1
-            auto alpThreadIdx = alpaka::idx::getIdx<
+            auto alpThreadIdx = alpaka::getIdx<
                 alpaka::Grid,
                 alpaka::Threads
             >( acc );
