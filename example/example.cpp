@@ -79,9 +79,7 @@ public:
     {
         isaac_float3 value = ptr[nIndex.x + nIndex.y * VOLUME_X
                                  + nIndex.z * VOLUME_X * VOLUME_Y];
-        isaac_float_dim< 3 > result;
-        result.value = value;
-        return result;
+        return value;
     }
 };
 
@@ -135,17 +133,14 @@ public:
     {
         isaac_float value = ptr[nIndex.x + nIndex.y * VOLUME_X
                                 + nIndex.z * VOLUME_X * VOLUME_Y];
-        isaac_float_dim< 1 > result;
-        result.value
-            .x = value;
-        return result;
+        return isaac_float_dim<feature_dim>( value );
     }
 };
 
 
 // Particle Iterator
 
-template< size_t feature_dim, typename ElemType >
+template< ISAAC_IDX_TYPE feature_dim, typename ElemType >
 class ParticleIterator1
 {
 public:
@@ -245,8 +240,6 @@ public:
 
     // Returns correct particle iterator for the requested cell (in the example the same particle list for each cell)
     ISAAC_NO_HOST_DEVICE_WARNING ISAAC_HOST_DEVICE_INLINE
-
-
     ParticleIterator1<
         feature_dim,
         isaac_float3
@@ -383,12 +376,12 @@ int main(
     DevHost devHost( alpaka::getDevByIdx< PltfHost >( 0u ) );
     Stream stream( devAcc );
 
-    const alpaka::Vec< SimDim, ISAAC_IDX_TYPE > global_size(
+    const isaac_size_dim<SimDim::value> global_size(
         d[0] * VOLUME_X,
         d[1] * VOLUME_Y,
         d[2] * VOLUME_Z
     );
-    const alpaka::Vec< SimDim, ISAAC_IDX_TYPE > local_size(
+    const isaac_size_dim<SimDim::value> local_size(
         ISAAC_IDX_TYPE( VOLUME_X ),
         ISAAC_IDX_TYPE( VOLUME_Y ),
         ISAAC_IDX_TYPE( VOLUME_Z )
@@ -397,7 +390,7 @@ int main(
         ISAAC_IDX_TYPE( VOLUME_X ) * ISAAC_IDX_TYPE( VOLUME_Y )
         * ISAAC_IDX_TYPE( VOLUME_Z )
     );
-    const alpaka::Vec< SimDim, ISAAC_IDX_TYPE > position(
+    const isaac_size_dim<SimDim::value> position(
         p[0] * VOLUME_X,
         p[1] * VOLUME_Y,
         p[2] * VOLUME_Z
@@ -570,10 +563,7 @@ int main(
         );
     }
 
-    std::vector< float > scaling;
-    scaling.push_back( s_x );
-    scaling.push_back( s_y );
-    scaling.push_back( s_z );
+    isaac_float3 scaling( s_x, s_y, s_z );
 
     // Create isaac visualization object
     auto visualization = new IsaacVisualization<
@@ -581,15 +571,8 @@ int main(
         Acc, //Alpaka specific Accelerator Dev Type
         Stream, //Alpaka specific Stream Type
         AccDim, //Alpaka specific Acceleration Dimension Type
-        SimDim, //Dimension of the Simulation. In this case: 3D
         ParticleList, SourceList, //The boost::fusion list of Source Types
-        alpaka::Vec<
-            SimDim,
-            ISAAC_IDX_TYPE
-        >, //Type of the 3D vectors used later
         1024, //Size of the transfer functions
-        std::vector< float >, //user defined type of scaling
-
 #if ( ISAAC_STEREO == 0 )
         isaac::DefaultController,
         //isaac::OrthoController,

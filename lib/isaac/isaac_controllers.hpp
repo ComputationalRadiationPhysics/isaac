@@ -15,16 +15,18 @@
 
 #pragma once
 
+#include "isaac_types.hpp"
+
 namespace isaac
 {
 
 struct DefaultController
 {
 	static const int pass_count = 1;
-	inline bool updateProjection( IceTDouble * const projection, const isaac_size2 & framebuffer_size, json_t * const message, const bool first = false)
+	inline bool updateProjection( std::vector<isaac_dmat4>& projections, const isaac_size2 & framebuffer_size, json_t * const message, const bool first = false)
 	{
 		if (first)
-			setPerspective( projection, 45.0f, (isaac_float)framebuffer_size.x/(isaac_float)framebuffer_size.y,ISAAC_Z_NEAR, ISAAC_Z_FAR);
+			projections[0] = glm::perspective( (isaac_double)45.0, (isaac_double)framebuffer_size.x/(isaac_double)framebuffer_size.y,(isaac_double)ISAAC_Z_NEAR, (isaac_double)ISAAC_Z_FAR );
 		return false;
 	}
 	inline void sendFeedback( json_t * const json_root, bool force = false ) {}
@@ -33,10 +35,10 @@ struct DefaultController
 struct OrthoController
 {
 	static const int pass_count = 1;
-	inline bool updateProjection( IceTDouble * const projection, const isaac_size2 & framebuffer_size, json_t * const message, const bool first = false)
+	inline bool updateProjection( std::vector<isaac_dmat4>& projections, const isaac_size2 & framebuffer_size, json_t * const message, const bool first = false)
 	{
 		if (first)
-			setOrthographic( projection, (isaac_float)framebuffer_size.x/(isaac_float)framebuffer_size.y*isaac_float(2), isaac_float(2), ISAAC_Z_NEAR, ISAAC_Z_FAR);
+			setOrthographic( projections[0], (isaac_double)framebuffer_size.x/(isaac_double)framebuffer_size.y*isaac_double(2), isaac_double(2), (isaac_double)ISAAC_Z_NEAR, (isaac_double)ISAAC_Z_FAR);
 		return false;
 	}
 	inline void sendFeedback( json_t * const json_root, bool force = false ) {}
@@ -49,7 +51,7 @@ struct StereoController
 		eye_distance(0.06f),
 		send_stereo(true)
 	{}
-	inline bool updateProjection( IceTDouble * const projection, const isaac_size2 & framebuffer_size, json_t * const message, const bool first = false)
+	inline bool updateProjection( std::vector<isaac_dmat4>& projections, const isaac_size2 & framebuffer_size, json_t * const message, const bool first = false)
 	{
 		if ( json_t* js = json_object_get(message, "eye distance") )
 		{
@@ -59,8 +61,8 @@ struct StereoController
 		}
 		if (first || send_stereo)
 		{
-			spSetPerspectiveStereoscopic( &(projection[ 0]), 45.0f, (isaac_float)framebuffer_size.x/(isaac_float)framebuffer_size.y,ISAAC_Z_NEAR, ISAAC_Z_FAR, 5.0f,  eye_distance);
-			spSetPerspectiveStereoscopic( &(projection[16]), 45.0f, (isaac_float)framebuffer_size.x/(isaac_float)framebuffer_size.y,ISAAC_Z_NEAR, ISAAC_Z_FAR, 5.0f, -eye_distance);
+			spSetPerspectiveStereoscopic( glm::value_ptr( projections[0] ), 45.0f, (isaac_float)framebuffer_size.x/(isaac_float)framebuffer_size.y,ISAAC_Z_NEAR, ISAAC_Z_FAR, 5.0f,  eye_distance);
+			spSetPerspectiveStereoscopic( glm::value_ptr( projections[1] ), 45.0f, (isaac_float)framebuffer_size.x/(isaac_float)framebuffer_size.y,ISAAC_Z_NEAR, ISAAC_Z_FAR, 5.0f, -eye_distance);
 		}
 		return send_stereo;
 	}

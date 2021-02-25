@@ -74,13 +74,6 @@ void mulMatrixMatrix(IceTDouble* result,const IceTDouble* matrix1,const IceTDoub
 						  + matrix1[y+2*4] * matrix2[2+x*4]
 						  + matrix1[y+3*4] * matrix2[3+x*4];
 }
-void mulMatrixVector(IceTDouble* result,const IceTDouble* matrix,const IceTDouble* vector)
-{
-	result[0] =  matrix[ 0] * vector[0] + matrix[ 4] * vector[1] +  matrix[ 8] * vector[2] + matrix[12] * vector[3];
-	result[1] =  matrix[ 1] * vector[0] + matrix[ 5] * vector[1] +  matrix[ 9] * vector[2] + matrix[13] * vector[3];
-	result[2] =  matrix[ 2] * vector[0] + matrix[ 6] * vector[1] +  matrix[10] * vector[2] + matrix[14] * vector[3];
-	result[3] =  matrix[ 3] * vector[0] + matrix[ 7] * vector[1] +  matrix[11] * vector[2] + matrix[15] * vector[3];
-}
 
 void calcInverse(IceTDouble* inv,const IceTDouble* projection,const IceTDouble* modelview)
 {
@@ -253,7 +246,7 @@ isaac_float4 getHSVA(isaac_float h, isaac_float s, isaac_float v, isaac_float a)
 	return result;
 }
 
-void setFrustum(IceTDouble * const projection, const isaac_float left,const isaac_float right,const isaac_float bottom,const isaac_float top,const isaac_float znear,const isaac_float zfar )
+void setFrustum(isaac_double * const projection, const isaac_float left,const isaac_float right,const isaac_float bottom,const isaac_float top,const isaac_float znear,const isaac_float zfar )
 {
 	isaac_float  znear2 = znear * isaac_float(2);
 	isaac_float  width = right - left;
@@ -277,14 +270,14 @@ void setFrustum(IceTDouble * const projection, const isaac_float left,const isaa
 	projection[15] = isaac_float( 0);
 }
 
-void setPerspective(IceTDouble * const projection, const isaac_float fovyInDegrees,const isaac_float aspectRatio,const isaac_float znear,const isaac_float zfar )
+void setPerspective(isaac_double * const projection, const isaac_float fovyInDegrees,const isaac_float aspectRatio,const isaac_float znear,const isaac_float zfar )
 {
 	isaac_float ymax = znear * tan( fovyInDegrees * M_PI / isaac_float(360) );
 	isaac_float xmax = ymax * aspectRatio;
 	setFrustum(projection, -xmax, xmax, -ymax, ymax, znear, zfar );
 }
 
-void spSetPerspectiveStereoscopic( IceTDouble * const projection, const isaac_float fovyInDegrees,const isaac_float aspectRatio,const isaac_float znear,const isaac_float zfar,const isaac_float z0,const isaac_float distance )
+void spSetPerspectiveStereoscopic( isaac_double * const projection, const isaac_float fovyInDegrees,const isaac_float aspectRatio,const isaac_float znear,const isaac_float zfar,const isaac_float z0,const isaac_float distance )
 {
 	isaac_float t_z0 = znear * tan( fovyInDegrees * M_PI / isaac_float(360) );
 	isaac_float xmin = -t_z0 + distance/2.0f*znear/z0;
@@ -296,24 +289,13 @@ void spSetPerspectiveStereoscopic( IceTDouble * const projection, const isaac_fl
 }
 
 
-void setOrthographic(IceTDouble * const projection, const isaac_float right,const isaac_float top,const isaac_float znear,const isaac_float zfar )
+void setOrthographic(isaac_dmat4& projection, const isaac_double right,const isaac_double top,const isaac_double znear,const isaac_double zfar )
 {
-	projection[ 0] = 1.0 / right;
-	projection[ 1] = isaac_float( 0);
-	projection[ 2] = isaac_float( 0);
-	projection[ 3] = isaac_float( 0);
-	projection[ 4] = isaac_float( 0);
-	projection[ 5] = 1.0 / top;
-	projection[ 6] = isaac_float( 0);
-	projection[ 7] = isaac_float( 0);
-	projection[ 8] = isaac_float( 0);
-	projection[ 9] = isaac_float( 0);
-	projection[10] = -2.0 / (zfar-znear);
-	projection[11] = isaac_float( 0);
-	projection[12] = isaac_float( 0);
-	projection[13] = isaac_float( 0);
-	projection[14] = - (zfar+znear) / (zfar-znear);
-	projection[15] = isaac_float( 1);
+	projection = isaac_dmat4( 1 );
+	projection[0][0] = 1.0 / right;
+	projection[1][1] = 1.0 / top;
+	projection[2][2] = -2.0 / (zfar-znear);
+	projection[3][2] = - (zfar+znear) / (zfar-znear);
 }
 
 
