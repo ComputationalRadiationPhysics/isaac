@@ -15,12 +15,11 @@
 
 #include "ImageConnector.hpp"
 
-ImageConnector::ImageConnector() :
-	showClient(true)
+ImageConnector::ImageConnector() : showClient(true)
 {
 }
 
 void ImageConnector::setBroker(Broker* broker)
 {
-	this->broker = broker;
+    this->broker = broker;
 }

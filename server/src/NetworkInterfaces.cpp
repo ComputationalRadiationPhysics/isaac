@@ -14,52 +14,53 @@
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 #include "NetworkInterfaces.hpp"
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 
-struct ifaddrs * NetworkInterfaces::ifaddr = NULL;
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/socket.h>
+
+struct ifaddrs* NetworkInterfaces::ifaddr = NULL;
 
 void NetworkInterfaces::initIfaddr()
 {
-	if (ifaddr == NULL)
-		getifaddrs(&ifaddr);
+    if(ifaddr == NULL)
+        getifaddrs(&ifaddr);
 }
 
-void NetworkInterfaces::bindInterface(in_addr_t &s_addr,std::string interface,bool ipv6)
+void NetworkInterfaces::bindInterface(in_addr_t& s_addr, std::string interface, bool ipv6)
 {
-	if (interface.compare(std::string("*")) == 0)
-	{
-		s_addr = INADDR_ANY;
-		return;
-	}
-	else
-		s_addr = INADDR_NONE;
-	initIfaddr();
-	int correct_family = AF_INET;
-	int size_of_struct = sizeof(struct sockaddr_in);
-	if (ipv6)
-	{
-		correct_family = AF_INET6;
-		size_of_struct = sizeof(struct sockaddr_in6);
-	}
-	struct ifaddrs * it = ifaddr;
-	while (it)
-	{
-		int family, s;
-		char host[NI_MAXHOST];
-		family = it->ifa_addr->sa_family;
-		if (family == correct_family)
-		{
-			s = getnameinfo(it->ifa_addr,size_of_struct,host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-			(void)(s);
-			if (interface.compare(std::string(it->ifa_name)) == 0)
-			{
-				s_addr = inet_addr(host);
-				return;
-			}
-		}
-		it = it->ifa_next;
-	}
-	printf("Warning: interface %s does not exist, therefore no connection can be established!\n",interface.c_str());
+    if(interface.compare(std::string("*")) == 0)
+    {
+        s_addr = INADDR_ANY;
+        return;
+    }
+    else
+        s_addr = INADDR_NONE;
+    initIfaddr();
+    int correct_family = AF_INET;
+    int size_of_struct = sizeof(struct sockaddr_in);
+    if(ipv6)
+    {
+        correct_family = AF_INET6;
+        size_of_struct = sizeof(struct sockaddr_in6);
+    }
+    struct ifaddrs* it = ifaddr;
+    while(it)
+    {
+        int family, s;
+        char host[NI_MAXHOST];
+        family = it->ifa_addr->sa_family;
+        if(family == correct_family)
+        {
+            s = getnameinfo(it->ifa_addr, size_of_struct, host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+            (void) (s);
+            if(interface.compare(std::string(it->ifa_name)) == 0)
+            {
+                s_addr = inet_addr(host);
+                return;
+            }
+        }
+        it = it->ifa_next;
+    }
+    printf("Warning: interface %s does not exist, therefore no connection can be established!\n", interface.c_str());
 }

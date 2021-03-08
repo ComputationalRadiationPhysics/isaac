@@ -16,17 +16,18 @@
 #ifndef __NETWORKINTERFACES
 #define __NETWORKINTERFACES
 
-#include <sys/types.h>
 #include <ifaddrs.h>
-#include <string>
 #include <netinet/in.h>
+#include <string>
+#include <sys/types.h>
 
 class NetworkInterfaces
 {
-	public:
-		static void bindInterface(in_addr_t &s_addr,std::string interface, bool ipv6 = false);
-		static struct ifaddrs * ifaddr;
-	private:
-		static void initIfaddr();
+public:
+    static void bindInterface(in_addr_t& s_addr, std::string interface, bool ipv6 = false);
+    static struct ifaddrs* ifaddr;
+
+private:
+    static void initIfaddr();
 };
 #endif

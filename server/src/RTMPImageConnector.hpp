@@ -18,44 +18,50 @@
 #include "ImageConnector.hpp"
 #include "RTPImageConnector.hpp"
 #include "Runable.hpp"
-#include <gst/gst.h>
-#include <gst/gst.h>
+
 #include <gst/app/gstappsrc.h>
+#include <gst/gst.h>
 
 #define ISAAC_MAX_HEARTBEAT 200
 
 class RTMPImageConnector : public ImageConnector
 {
-	public:
-		RTMPImageConnector( std::string name, std::string apikey, std::string base_url, int bitrate = 400, bool dummy_audio = false );
-		errorCode init(int minport,int maxport);
-		errorCode run();
-		std::string getName();
-		static void* heartbeatFunction(void* ptr);
-		static uint64_t getTicksMs();
-		static void addFrame( ImageBuffer* image, GstAppSrc* appsrc, InsituConnectorGroup* group);
-	private:
-		InsituConnectorGroup* group;
-		std::string name;
-		std::string apikey;
-		std::string base_url;
-		GstElement *appsrc;
-		GstElement *audiotestsrc;
-		GstElement *voaacenc;
-		GstElement *videoconvert;
-		GstElement *capsfilter;
-		GstElement *videorate_capsfilter;
-		GstElement *videorate;
-		GstElement *x264enc;
-		GstElement *flvmux;
-		GstElement *rtmpsink;
-		GstElement *pipeline;
-		GstElement *bin;
-		pthread_mutex_t heartbeat_mutex;
-		pthread_t heartbeat_thread;
-		uint64_t heartbeat;
-		ImageBuffer* heartbeat_image;
-		volatile bool heartbeat_finish;
-		int bitrate;
-		bool dummy_audio;
+public:
+    RTMPImageConnector(
+        std::string name,
+        std::string apikey,
+        std::string base_url,
+        int bitrate = 400,
+        bool dummy_audio = false);
+    errorCode init(int minport, int maxport);
+    errorCode run();
+    std::string getName();
+    static void* heartbeatFunction(void* ptr);
+    static uint64_t getTicksMs();
+    static void addFrame(ImageBuffer* image, GstAppSrc* appsrc, InsituConnectorGroup* group);
+
+private:
+    InsituConnectorGroup* group;
+    std::string name;
+    std::string apikey;
+    std::string base_url;
+    GstElement* appsrc;
+    GstElement* audiotestsrc;
+    GstElement* voaacenc;
+    GstElement* videoconvert;
+    GstElement* capsfilter;
+    GstElement* videorate_capsfilter;
+    GstElement* videorate;
+    GstElement* x264enc;
+    GstElement* flvmux;
+    GstElement* rtmpsink;
+    GstElement* pipeline;
+    GstElement* bin;
+    pthread_mutex_t heartbeat_mutex;
+    pthread_t heartbeat_thread;
+    uint64_t heartbeat;
+    ImageBuffer* heartbeat_image;
+    volatile bool heartbeat_finish;
+    int bitrate;
+    bool dummy_audio;
 };

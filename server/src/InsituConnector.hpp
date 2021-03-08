@@ -14,27 +14,29 @@
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 #pragma once
-#include "Runable.hpp"
 #include "MessageAble.hpp"
+#include "Runable.hpp"
 #include "ThreadList.hpp"
 
 typedef struct
 {
-	int pos;
-	int count;
-	char buffer[ISAAC_MAX_RECEIVE];
+    int pos;
+    int count;
+    char buffer[ISAAC_MAX_RECEIVE];
 } json_load_callback_struct;
 
 class InsituConnector : public MessageAble<MessageContainer>
 {
-	friend class InsituConnectorMaster;
-	public:
-		InsituConnector(int sockfd,int id);
-		~InsituConnector();
-		int getID();
-		int getSockFD();
-	private:
-		json_load_callback_struct jlcb;
-		int id;
-		int sockfd;
+    friend class InsituConnectorMaster;
+
+public:
+    InsituConnector(int sockfd, int id);
+    ~InsituConnector();
+    int getID();
+    int getSockFD();
+
+private:
+    json_load_callback_struct jlcb;
+    int id;
+    int sockfd;
 };
