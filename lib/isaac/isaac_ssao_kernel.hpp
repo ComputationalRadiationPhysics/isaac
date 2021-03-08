@@ -19,59 +19,58 @@
 
 namespace isaac
 {
-    /* 
+    /*
      * SSAO
      * Kernels for ssao calculation
      */
 
-    //filter kernel
+    // filter kernel
     ISAAC_CONSTANT isaac_float3 SSAOKernelArray[64];
 
-    //vector rotation noise kernel
+    // vector rotation noise kernel
     ISAAC_CONSTANT isaac_float3 SSAONoiseArray[16];
 
     /**
      * @brief Calculate SSAO factor
-     * 
-     * 
+     *
+     *
      */
-    struct SSAOKernel {
-        template <typename T_Acc>
-        ISAAC_DEVICE void operator() (
-            T_Acc const &acc,
+    struct SSAOKernel
+    {
+        template<typename T_Acc>
+        ISAAC_DEVICE void operator()(
+            T_Acc const& acc,
             GBuffer gBuffer,
-            AOParams aoProperties              //properties for ambient occlusion
-            ) const
+            AOParams aoProperties // properties for ambient occlusion
+        ) const
         {
-
             isaac_uint2 pixel;
-            //get pixel values from thread ids
-            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
-            pixel.x = isaac_uint ( alpThreadIdx[2] );
-            pixel.y = isaac_uint ( alpThreadIdx[1] );
+            // get pixel values from thread ids
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            pixel.x = isaac_uint(alpThreadIdx[2]);
+            pixel.y = isaac_uint(alpThreadIdx[1]);
 
-            pixel = pixel + gBuffer.startOffset;    
-            if( !isInUpperBounds( pixel, gBuffer.size ) )
+            pixel = pixel + gBuffer.startOffset;
+            if(!isInUpperBounds(pixel, gBuffer.size))
                 return;
-            
 
 
             /*
-            * TODO:
-            * 
-            * Old standart ssao by crytech 
-            * 
-            * First implemntation failed and the source code is below
-            * Possible errors could be mv or proj matrix
-            */
+             * TODO:
+             *
+             * Old standart ssao by crytech
+             *
+             * First implemntation failed and the source code is below
+             * Possible errors could be mv or proj matrix
+             */
 
-            //search radius for depth testing
+            // search radius for depth testing
             isaac_int radius = 10;
 
             /*
             //isaac_float3 origin = gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x];
 
-            
+
 
             //get the normal value from the gbuffer
             isaac_float3 normal = gNormal[pixel.x + pixel.y * gBuffer.size.x];
@@ -84,8 +83,8 @@ namespace isaac
             }
 
             normal = normal / len;
-            
-            
+
+
 
             isaac_float3 rvec = {0.7f, 0.1f, 0.3f};
             isaac_float3 tangent = rvec - normal * (rvec.x * normal.x + rvec.y * normal.y + rvec.z * normal.z);
@@ -130,10 +129,12 @@ namespace isaac
 
                 //offset = projection * offset
                 offset = isaac_float4({
-                    ProjectionMatrix[0] * offset.x + ProjectionMatrix[4] * offset.y + ProjectionMatrix[8 ] * offset.z + ProjectionMatrix[12] * offset.w,
-                    ProjectionMatrix[1] * offset.x + ProjectionMatrix[5] * offset.y + ProjectionMatrix[9 ] * offset.z + ProjectionMatrix[13] * offset.w,
-                    ProjectionMatrix[2] * offset.x + ProjectionMatrix[6] * offset.y + ProjectionMatrix[10] * offset.z + ProjectionMatrix[14] * offset.w,
-                    ProjectionMatrix[3] * offset.x + ProjectionMatrix[7] * offset.y + ProjectionMatrix[11] * offset.z + ProjectionMatrix[15] * offset.w
+                    ProjectionMatrix[0] * offset.x + ProjectionMatrix[4] * offset.y + ProjectionMatrix[8 ] * offset.z +
+            ProjectionMatrix[12] * offset.w, ProjectionMatrix[1] * offset.x + ProjectionMatrix[5] * offset.y +
+            ProjectionMatrix[9 ] * offset.z + ProjectionMatrix[13] * offset.w, ProjectionMatrix[2] * offset.x +
+            ProjectionMatrix[6] * offset.y + ProjectionMatrix[10] * offset.z + ProjectionMatrix[14] * offset.w,
+                    ProjectionMatrix[3] * offset.x + ProjectionMatrix[7] * offset.y + ProjectionMatrix[11] * offset.z +
+            ProjectionMatrix[15] * offset.w
                 });
 
                 isaac_float2 offset2d = isaac_float2({offset.x / offset.w, offset.y / offset.w});
@@ -145,90 +146,94 @@ namespace isaac
                     isaac_uint(gBuffer.size.y * offset2d.y) + gBuffer.startOffset.y,
                 };
                 //printf("%f %f -- %u %u\n", offset2d.x, offset2d.y, offsetFramePos.x, offsetFramePos.y);
-                isaac_float sampleDepth = gBuffer.depth[offsetFramePos.x + offsetFramePos.y * gBuffer.size.x].z; 
+                isaac_float sampleDepth = gBuffer.depth[offsetFramePos.x + offsetFramePos.y * gBuffer.size.x].z;
                 occlusion += (sampleDepth - sample.z ? 1.0f : 0.0f);
             }*/
-            
 
-            /* 
-            * 1. compare all neighbour (+-2 pixel) depth values with the current one and increase the counter if the neighbour is
-            *    closer to the camera
-            * 
-            * 2. get average value by dividing the counter by the cell count (7x7=49)       * 
-            *
-            */
-            //closer to the camera
+
+            /*
+             * 1. compare all neighbour (+-2 pixel) depth values with the current one and increase the counter if the
+             * neighbour is closer to the camera
+             *
+             * 2. get average value by dividing the counter by the cell count (7x7=49)       *
+             *
+             */
+            // closer to the camera
             isaac_float occlusion = 0.0f;
             isaac_float refDepth = gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x];
-            for(int i = -3; i <= 3; ++i) {
-                for(int j = -3; j <= 3; ++j) {
-                    //avoid out of bounds by simple min max
-                    isaac_int x = glm::clamp(pixel.x + i * radius, gBuffer.startOffset.x, gBuffer.startOffset.x + gBuffer.size.x);
-                    isaac_int y = glm::clamp(pixel.y + j * radius, gBuffer.startOffset.y, gBuffer.startOffset.y + gBuffer.size.y);
+            for(int i = -3; i <= 3; ++i)
+            {
+                for(int j = -3; j <= 3; ++j)
+                {
+                    // avoid out of bounds by simple min max
+                    isaac_int x = glm::clamp(
+                        pixel.x + i * radius,
+                        gBuffer.startOffset.x,
+                        gBuffer.startOffset.x + gBuffer.size.x);
+                    isaac_int y = glm::clamp(
+                        pixel.y + j * radius,
+                        gBuffer.startOffset.y,
+                        gBuffer.startOffset.y + gBuffer.size.y);
 
-                    //get the neighbour depth value
+                    // get the neighbour depth value
                     isaac_float depthSample = gBuffer.depth[x + y * gBuffer.size.x];
 
-                    if(depthSample < refDepth) {
+                    if(depthSample < refDepth)
+                    {
                         occlusion += 1.0f;
                     }
                 }
             }
-            isaac_float depth = glm::clamp( (occlusion / 42.0f), 0.0f, 1.0f );
+            isaac_float depth = glm::clamp((occlusion / 42.0f), 0.0f, 1.0f);
 
-            //save the depth value in our ao buffer
+            // save the depth value in our ao buffer
             gBuffer.aoStrength[pixel.x + pixel.y * gBuffer.size.x] = depth;
         }
     };
 
     /**
      * @brief Filter SSAO artifacts and return the color with depth simulation
-     * 
-     * 
+     *
+     *
      */
-    struct SSAOFilterKernel {
-        template <typename T_Acc>
-        ISAAC_DEVICE void operator() (
-            T_Acc const &acc,
+    struct SSAOFilterKernel
+    {
+        template<typename T_Acc>
+        ISAAC_DEVICE void operator()(
+            T_Acc const& acc,
             GBuffer gBuffer,
-            AOParams aoProperties              //properties for ambient occlusion
-            ) const
+            AOParams aoProperties // properties for ambient occlusion
+        ) const
         {
-
             isaac_uint2 pixel;
-            //get pixel values from thread ids
-            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads> ( acc );
-            pixel.x = isaac_uint ( alpThreadIdx[2] );
-            pixel.y = isaac_uint ( alpThreadIdx[1] );
+            // get pixel values from thread ids
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            pixel.x = isaac_uint(alpThreadIdx[2]);
+            pixel.y = isaac_uint(alpThreadIdx[1]);
 
-            //get real pixel coordinate by offset
+            // get real pixel coordinate by offset
             pixel = pixel + gBuffer.startOffset;
-            if( !isInUpperBounds( pixel, gBuffer.size ) )
+            if(!isInUpperBounds(pixel, gBuffer.size))
                 return;
             /* TODO
-            * Normally the depth values are smoothed
-            * in this case the smooting filter is not applied for simplicity
-            * 
-            * If the real ssao algorithm is implemented, a real filter will be necessary
-            */
+             * Normally the depth values are smoothed
+             * in this case the smooting filter is not applied for simplicity
+             *
+             * If the real ssao algorithm is implemented, a real filter will be necessary
+             */
             isaac_float depth = gBuffer.aoStrength[pixel.x + pixel.y * gBuffer.size.x];
-            
-            isaac_float4 colorValues = getColor( gBuffer.color[pixel.x + pixel.y * gBuffer.size.x] );
 
-            //read the weight from the global ao settings and merge them with the color value
+            isaac_float4 colorValues = getColor(gBuffer.color[pixel.x + pixel.y * gBuffer.size.x]);
+
+            // read the weight from the global ao settings and merge them with the color value
             isaac_float weight = aoProperties.weight;
             isaac_float aoFactor = ((1.0f - weight) + weight * (1.0f - depth));
-            
-            isaac_float4 finalColor = { 
-                aoFactor * colorValues.x,
-                aoFactor * colorValues.y,
-                aoFactor * colorValues.z,
-                colorValues.w
-            };
 
-            //finally replace the old color value with the new ssao filtered color value
+            isaac_float4 finalColor
+                = {aoFactor * colorValues.x, aoFactor * colorValues.y, aoFactor * colorValues.z, colorValues.w};
+
+            // finally replace the old color value with the new ssao filtered color value
             setColor(gBuffer.color[pixel.x + pixel.y * gBuffer.size.x], finalColor);
-            
         }
     };
-}
+} // namespace isaac

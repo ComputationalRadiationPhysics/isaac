@@ -17,27 +17,29 @@
 
 #include "isaac_types.hpp"
 
-#define ISAAC_START_TIME_MEASUREMENT( unique_name, time_function ) \
-    uint64_t BOOST_PP_CAT( __tm_start_, unique_name ) = time_function;
-#define ISAAC_STOP_TIME_MEASUREMENT( result, operand, unique_name, time_function ) \
-    result operand time_function - BOOST_PP_CAT( __tm_start_, unique_name );
+#define ISAAC_START_TIME_MEASUREMENT(unique_name, time_function)                                                      \
+    uint64_t BOOST_PP_CAT(__tm_start_, unique_name) = time_function;
+#define ISAAC_STOP_TIME_MEASUREMENT(result, operand, unique_name, time_function)                                      \
+    result operand time_function - BOOST_PP_CAT(__tm_start_, unique_name);
 
 #ifdef ISAAC_THREADING
-    #define ISAAC_WAIT_VISUALIZATION \
-        if (visualizationThread) \
-        { \
-            pthread_join(visualizationThread,NULL); \
-            visualizationThread = 0; \
+#    define ISAAC_WAIT_VISUALIZATION                                                                                  \
+        if(visualizationThread)                                                                                       \
+        {                                                                                                             \
+            pthread_join(visualizationThread, NULL);                                                                  \
+            visualizationThread = 0;                                                                                  \
         }
 #else
-    #define ISAAC_WAIT_VISUALIZATION {}
+#    define ISAAC_WAIT_VISUALIZATION                                                                                  \
+        {                                                                                                             \
+        }
 #endif
 
-#define ISAAC_HANDLE_EPIPE(add,n,sockfd,readThread) \
-    if (add < 0) \
-    { \
-        pthread_join(readThread,NULL); \
-        readThread = 0; \
-        sockfd = 0; \
-        return n; \
+#define ISAAC_HANDLE_EPIPE(add, n, sockfd, readThread)                                                                \
+    if(add < 0)                                                                                                       \
+    {                                                                                                                 \
+        pthread_join(readThread, NULL);                                                                               \
+        readThread = 0;                                                                                               \
+        sockfd = 0;                                                                                                   \
+        return n;                                                                                                     \
     }
