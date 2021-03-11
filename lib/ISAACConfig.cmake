@@ -80,9 +80,6 @@ if (NOT ISAAC_JPEG)
     message( WARNING "Using ISAAC without libjpeg is not recommended. Set ISAAC_JPEG to ON to enable libjpeg compression." )
 endif (NOT ISAAC_JPEG)
 
-set(ISAAC_VECTOR_ELEM "1" CACHE STRING "The amounts of elements used for vectorization. On GPU 1 should be fine, on CPU 4..32, depending on the vectorization capabilities" )
-set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_VECTOR_ELEM=${ISAAC_VECTOR_ELEM})
-
 option(ISAAC_SPECULAR "Add the specular light component." ON)
 if (ISAAC_SPECULAR)
   set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_SPECULAR)

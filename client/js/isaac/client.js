@@ -49,7 +49,6 @@ var IsaacResponse = {
     "rotation": undefined,
     "interpolation": false,
     "step": 0.1,
-    "iso surface": false,
     "ao isEnabled": false,
     "ao maxCellParticles": 1,
     "framebuffer width": 0,

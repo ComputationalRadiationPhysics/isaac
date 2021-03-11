@@ -21,13 +21,13 @@ typedef float float3_t[3];
 
 
 template<
-    typename TStream,
+    typename T_Stream,
     typename THost3,
     typename TDev3,
     typename TSize
 >
 void update_particles(
-    TStream stream,
+    T_Stream stream,
     THost3 hostBuffer3,
     TDev3 deviceBuffer3,
     TSize particle_count,
@@ -59,7 +59,7 @@ void update_particles(
 
 
 template<
-    typename TStream,
+    typename T_Stream,
     typename THost1,
     typename TDev1,
     typename THost2,
@@ -69,39 +69,39 @@ template<
     typename TGlo
 >
 void update_data(
-    TStream stream,
+    T_Stream stream,
     THost1 hostBuffer1,
     TDev1 deviceBuffer1,
     THost2 hostBuffer2,
     TDev2 deviceBuffer2,
     size_t prod,
     float pos,
-    TLoc & local_size,
+    TLoc & localSize,
     TPos & position,
-    TGlo & global_size
+    TGlo & globalSize
 )
 {
     srand( 0 );
     float s = sin( pos );
-    for( size_t x = 0; x < local_size[0]; x++ )
+    for( size_t x = 0; x < localSize[0]; x++ )
     {
-        for( size_t y = 0; y < local_size[1]; y++ )
+        for( size_t y = 0; y < localSize[1]; y++ )
         {
-            for( size_t z = 0; z < local_size[2]; z++ )
+            for( size_t z = 0; z < localSize[2]; z++ )
             {
                 float l_pos[3] = {
                     float(
                         int( position[0] ) + int( x )
-                        - int( global_size[0] ) / 2
-                    ) / float( global_size[0] / 2 ),
+                        - int( globalSize[0] ) / 2
+                    ) / float( globalSize[0] / 2 ),
                     float(
                         int( position[1] ) + int( y )
-                        - int( global_size[1] ) / 2
-                    ) / float( global_size[1] / 2 ),
+                        - int( globalSize[1] ) / 2
+                    ) / float( globalSize[1] / 2 ),
                     float(
                         int( position[2] ) + int( z )
-                        - int( global_size[2] ) / 2
-                    ) / float( global_size[2] / 2 )
+                        - int( globalSize[2] ) / 2
+                    ) / float( globalSize[2] / 2 )
                 };
                 float l = sqrt(
                     l_pos[0] * l_pos[0] + l_pos[1] * l_pos[1]
@@ -120,7 +120,7 @@ void update_data(
                     intensity = 1.0f;
                 }
                 size_t pos =
-                    x + y * local_size[0] + z * local_size[0] * local_size[1];
+                    x + y * localSize[0] + z * localSize[0] * localSize[1];
 
                 alpaka::getPtrNative( hostBuffer1 )[pos].x =
                     intensity;
@@ -135,9 +135,9 @@ void update_data(
     }
     const alpaka::Vec <alpaka::DimInt< 1 >, ISAAC_IDX_TYPE>
         data_size(
-        ISAAC_IDX_TYPE( local_size[0] )
-        * ISAAC_IDX_TYPE( local_size[1] )
-        * ISAAC_IDX_TYPE( local_size[2] )
+        ISAAC_IDX_TYPE( localSize[0] )
+        * ISAAC_IDX_TYPE( localSize[1] )
+        * ISAAC_IDX_TYPE( localSize[2] )
     );
     alpaka::memcpy(
         stream,
@@ -227,7 +227,7 @@ void recursive_kgv(
 
 
 template<
-    typename TStream,
+    typename T_Stream,
     typename THost1,
     typename TDev1,
     typename THost2,
@@ -238,16 +238,16 @@ template<
 >
 void read_vtk_to_memory(
     char * filename,
-    TStream stream,
+    T_Stream stream,
     THost1 hostBuffer1,
     TDev1 deviceBuffer1,
     THost2 hostBuffer2,
     TDev2 deviceBuffer2,
     size_t prod,
     float pos,
-    TLoc & local_size,
+    TLoc & localSize,
     TPos & position,
-    TGlo & global_size,
+    TGlo & globalSize,
     int & s_x,
     int & s_y,
     int & s_z
@@ -262,9 +262,9 @@ void read_vtk_to_memory(
         deviceBuffer2,
         prod,
         pos,
-        local_size,
+        localSize,
         position,
-        global_size
+        globalSize
     );
     std::ifstream infile( filename );
     std::string line;
@@ -356,29 +356,29 @@ void read_vtk_to_memory(
         s_y,
         s_z
     );
-    if( size_t( x ) != global_size[0] )
+    if( size_t( x ) != globalSize[0] )
     {
         printf(
-            "Width needs to be %lu instead of %i!\n",
-            global_size[0],
+            "Width needs to be %i instead of %i!\n",
+            globalSize[0],
             x
         );
         return;
     }
-    if( size_t( y ) != global_size[1] )
+    if( size_t( y ) != globalSize[1] )
     {
         printf(
-            "Width needs to be %lu instead of %i!\n",
-            global_size[1],
+            "Width needs to be %i instead of %i!\n",
+            globalSize[1],
             y
         );
         return;
     }
-    if( size_t( z ) != global_size[2] )
+    if( size_t( z ) != globalSize[2] )
     {
         printf(
-            "Width needs to be %lu instead of %i!\n",
-            global_size[2],
+            "Width needs to be %i instead of %i!\n",
+            globalSize[2],
             z
         );
         return;
@@ -419,22 +419,22 @@ void read_vtk_to_memory(
             int t_x = x - position[0];
             int t_y = y - position[1];
             int t_z = z - position[2];
-            if( t_x >= 0 && size_t( t_x ) < local_size[0] && t_y >= 0
-                && size_t( t_y ) < local_size[1] && t_z >= 0
-                && size_t( t_z ) < local_size[2] )
+            if( t_x >= 0 && size_t( t_x ) < localSize[0] && t_y >= 0
+                && size_t( t_y ) < localSize[1] && t_z >= 0
+                && size_t( t_z ) < localSize[2] )
             {
-                size_t pos = t_x + t_y * local_size[0]
-                             + t_z * local_size[0] * local_size[1];
+                size_t pos = t_x + t_y * localSize[0]
+                             + t_z * localSize[0] * localSize[1];
 
                 alpaka::getPtrNative( hostBuffer2 )[pos] =
                     ( float ) value;
             }
             x++;
-            if( size_t( x ) >= global_size[0] )
+            if( size_t( x ) >= globalSize[0] )
             {
                 x = 0;
                 y++;
-                if( size_t( y ) >= global_size[1] )
+                if( size_t( y ) >= globalSize[1] )
                 {
                     y = 0;
                     z++;
@@ -445,9 +445,9 @@ void read_vtk_to_memory(
 
     const alpaka::Vec <alpaka::DimInt< 1 >, ISAAC_IDX_TYPE>
         data_size(
-        ISAAC_IDX_TYPE( local_size[0] )
-        * ISAAC_IDX_TYPE( local_size[1] )
-        * ISAAC_IDX_TYPE( local_size[2] )
+        ISAAC_IDX_TYPE( localSize[0] )
+        * ISAAC_IDX_TYPE( localSize[1] )
+        * ISAAC_IDX_TYPE( localSize[2] )
     );
     alpaka::memcpy(
         stream,

@@ -38,12 +38,9 @@
 namespace isaac
 {
 
-namespace fus = boost::fusion;
-namespace mpl = boost::mpl;
-
 struct IsaacFunctorIdem
 {
-    static const bool uses_parameter = false;
+    static const bool usesParameter = false;
     static const std::string name;
     static const std::string description;
     
@@ -68,7 +65,7 @@ struct IsaacFunctorIdem
 #if ISAAC_FUNCTOR_LENGTH_ENABLED == 1
 struct IsaacFunctorLength
 {
-    static const bool uses_parameter = false;
+    static const bool usesParameter = false;
     static const std::string name;
     static const std::string description;
 
@@ -94,7 +91,7 @@ struct IsaacFunctorLength
 #if ISAAC_FUNCTOR_MUL_ENABLED == 1
 struct IsaacFunctorMul
 {
-    static const bool uses_parameter = true;
+    static const bool usesParameter = true;
     static const std::string name;
     static const std::string description;
 
@@ -120,7 +117,7 @@ struct IsaacFunctorMul
 #if ISAAC_FUNCTOR_ADD_ENABLED == 1
 struct IsaacFunctorAdd
 {
-    static const bool uses_parameter = true;
+    static const bool usesParameter = true;
     static const std::string name;
     static const std::string description;
 
@@ -146,7 +143,7 @@ struct IsaacFunctorAdd
 #if ISAAC_FUNCTOR_POW_ENABLED == 1
 struct IsaacFunctorPow
 {
-    static const bool uses_parameter = true;
+    static const bool usesParameter = true;
     static const std::string name;
     static const std::string description;
 
@@ -172,7 +169,7 @@ struct IsaacFunctorPow
 #if ISAAC_FUNCTOR_SUM_ENABLED == 1
 struct IsaacFunctorSum
 {
-    static const bool uses_parameter = false;
+    static const bool usesParameter = false;
     static const std::string name;
     static const std::string description;
 
@@ -201,7 +198,7 @@ struct IsaacFunctorSum
 };
 #endif
 
-typedef fus::list <
+typedef boost::fusion::list <
     IsaacFunctorIdem
 #if ISAAC_FUNCTOR_ADD_ENABLED == 1
     ,IsaacFunctorAdd
