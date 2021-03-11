@@ -17,7 +17,7 @@
 
 void* Runable::run_runable(void* ptr)
 {
-	Runable* runable = (Runable*)ptr;
-	runable->run();
-	return ptr;
+    Runable* runable = (Runable*) ptr;
+    runable->run();
+    return ptr;
 }

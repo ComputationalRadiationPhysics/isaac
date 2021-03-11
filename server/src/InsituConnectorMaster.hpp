@@ -15,9 +15,10 @@
 
 #pragma once
 #include "Common.hpp"
+#include "InsituConnector.hpp"
 #include "Runable.hpp"
 #include "ThreadList.hpp"
-#include "InsituConnector.hpp"
+
 #include <memory>
 class InsituConnectorGroup;
 
@@ -25,24 +26,25 @@ class InsituConnectorGroup;
 
 typedef struct InsituConnectorContainer_struct
 {
-	InsituConnector* connector;
-	InsituConnectorGroup* group;
+    InsituConnector* connector;
+    InsituConnectorGroup* group;
 } InsituConnectorContainer;
 
-size_t json_load_callback_function (void *buffer, size_t buflen, void *data);
+size_t json_load_callback_function(void* buffer, size_t buflen, void* data);
 
 class InsituConnectorMaster : public Runable
 {
-	public:
-		InsituConnectorMaster();
-		errorCode init(int port,std::string interface);
-		errorCode run();
-		~InsituConnectorMaster();
-		ThreadList< InsituConnectorContainer* > insituConnectorList;
-		int getSockFD();
-		void setExit();
-	private:
-		int nextFreeNumber;
-		int sockfd;
-		volatile bool force_exit;
+public:
+    InsituConnectorMaster();
+    errorCode init(int port, std::string interface);
+    errorCode run();
+    ~InsituConnectorMaster();
+    ThreadList<InsituConnectorContainer*> insituConnectorList;
+    int getSockFD();
+    void setExit();
+
+private:
+    int nextFreeNumber;
+    int sockfd;
+    volatile bool force_exit;
 };

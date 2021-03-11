@@ -26,103 +26,104 @@
  * - As said: Only one thread can use push_back
  * - Only the thread, which uses pop_front, may also iterate over the list
  * - Iterating should only use getFront and ->next */
-template <typename T> class ThreadList
+template<typename T>
+class ThreadList
 {
-	public:
-		typedef struct ThreadListContainer_struct
-		{
-			T t;
-			struct ThreadListContainer_struct* next;
-		} ThreadListContainer;
-		typedef struct ThreadListContainer_struct *ThreadListContainer_ptr;
-		ThreadList()
-		{
-			pthread_mutex_init (&remove_mutex, NULL);
-			front = NULL;
-			back = NULL;
-			l = 0;
-		}
-		void push_back(T t)
-		{
-			ThreadListContainer_ptr ptr = (ThreadListContainer_ptr)malloc(sizeof(ThreadListContainer));
-			ptr->t = t;
-			ptr->next = NULL;
-			pthread_mutex_lock (&remove_mutex);
-			if (back)
-				back->next = ptr;
-			else
-				front = ptr;
-			back = ptr;
-			l++;
-			pthread_mutex_unlock (&remove_mutex);
-		}
-		T pop_front()
-		{
-			T t = NULL;
-			if (front)
-			{
-				t = front->t;
-				pthread_mutex_lock (&remove_mutex);
-				//delete front
-				ThreadListContainer_ptr	next = front->next;
-				free(front);
-				front = next;
-				if (front == NULL)
-					back = NULL;
-				l--;
-				pthread_mutex_unlock (&remove_mutex);
-			}
-			return t;
-		}
-		int length()
-		{
-			return l;
-		}
-		~ThreadList<T>()
-		{
-			while (front)
-				pop_front();
-			pthread_mutex_destroy(&remove_mutex);
-		}
-		ThreadListContainer_ptr getFront()
-		{
-			return front;
-		}
-		T remove(ThreadListContainer_ptr ptr)
-		{
-			if (ptr == NULL)
-				return NULL;
-			T t = NULL;
-			//Search before
-			ThreadListContainer_ptr before = NULL;
-			if (ptr != front)
-			{
-				before = front;
-				while (before)
-				{
-					if (before->next == ptr)
-						break;
-					before = before->next;
-				}
-				if (before == NULL)
-					return NULL;
-			}
-			pthread_mutex_lock (&remove_mutex);
-			if (before)
-				before->next = ptr->next;
-			else
-				front = ptr->next;
-			if (ptr == back)
-				back = before;
-			pthread_mutex_unlock (&remove_mutex);
-			t = ptr->t;
-			free(ptr);
-			l--;
-			return t;
-		}
-	//private:
-		volatile ThreadListContainer_ptr front;
-		volatile ThreadListContainer_ptr back;
-		pthread_mutex_t remove_mutex;
-		int l;
+public:
+    typedef struct ThreadListContainer_struct
+    {
+        T t;
+        struct ThreadListContainer_struct* next;
+    } ThreadListContainer;
+    typedef struct ThreadListContainer_struct* ThreadListContainer_ptr;
+    ThreadList()
+    {
+        pthread_mutex_init(&remove_mutex, NULL);
+        front = NULL;
+        back = NULL;
+        l = 0;
+    }
+    void push_back(T t)
+    {
+        ThreadListContainer_ptr ptr = (ThreadListContainer_ptr) malloc(sizeof(ThreadListContainer));
+        ptr->t = t;
+        ptr->next = NULL;
+        pthread_mutex_lock(&remove_mutex);
+        if(back)
+            back->next = ptr;
+        else
+            front = ptr;
+        back = ptr;
+        l++;
+        pthread_mutex_unlock(&remove_mutex);
+    }
+    T pop_front()
+    {
+        T t = NULL;
+        if(front)
+        {
+            t = front->t;
+            pthread_mutex_lock(&remove_mutex);
+            // delete front
+            ThreadListContainer_ptr next = front->next;
+            free(front);
+            front = next;
+            if(front == NULL)
+                back = NULL;
+            l--;
+            pthread_mutex_unlock(&remove_mutex);
+        }
+        return t;
+    }
+    int length()
+    {
+        return l;
+    }
+    ~ThreadList<T>()
+    {
+        while(front)
+            pop_front();
+        pthread_mutex_destroy(&remove_mutex);
+    }
+    ThreadListContainer_ptr getFront()
+    {
+        return front;
+    }
+    T remove(ThreadListContainer_ptr ptr)
+    {
+        if(ptr == NULL)
+            return NULL;
+        T t = NULL;
+        // Search before
+        ThreadListContainer_ptr before = NULL;
+        if(ptr != front)
+        {
+            before = front;
+            while(before)
+            {
+                if(before->next == ptr)
+                    break;
+                before = before->next;
+            }
+            if(before == NULL)
+                return NULL;
+        }
+        pthread_mutex_lock(&remove_mutex);
+        if(before)
+            before->next = ptr->next;
+        else
+            front = ptr->next;
+        if(ptr == back)
+            back = before;
+        pthread_mutex_unlock(&remove_mutex);
+        t = ptr->t;
+        free(ptr);
+        l--;
+        return t;
+    }
+    // private:
+    volatile ThreadListContainer_ptr front;
+    volatile ThreadListContainer_ptr back;
+    pthread_mutex_t remove_mutex;
+    int l;
 };

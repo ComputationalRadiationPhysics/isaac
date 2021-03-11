@@ -16,111 +16,114 @@
 #ifndef __BROKER
 #define __BROKER
 
-#include <string>
-#include <vector>
 #include "Common.hpp"
-#include "MetaDataConnector.hpp"
-class MetaDataConnector;
-
 #include "ImageConnector.hpp"
-class ImageConnector;
-
-#include <signal.h>
-#include "MetaDataClient.hpp"
 #include "InsituConnectorMaster.hpp"
-#include <memory>
+#include "MetaDataClient.hpp"
+#include "MetaDataConnector.hpp"
+
 #include <map>
-#include <unordered_map> 
+#include <memory>
+#include <signal.h>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+class MetaDataConnector;
+class ImageConnector;
 
 typedef struct MetaDataConnectorContainer_struct
 {
-	MetaDataConnector* connector;
-	pthread_t thread;
+    MetaDataConnector* connector;
+    pthread_t thread;
 } MetaDataConnectorContainer;
 
 typedef struct ImageConnectorContainer_struct
 {
-	ImageConnector* connector;
-	pthread_t thread;
+    ImageConnector* connector;
+    pthread_t thread;
 } ImageConnectorContainer;
 
 #define MAX_NODES 999999
 
 class InsituConnectorGroup
 {
-	friend class Broker;
-	public:
-		InsituConnectorGroup(std::string name) :
-			master( NULL ),
-			initData( NULL ),
-			id( 0 ),
-			name( name),
-			nodes( MAX_NODES ),
-			video_buffer_size( 0 )
-		{
-			pthread_mutex_init (&streams_mutex, NULL);
-		}
-		int getID()
-		{
-			return id;
-		}
-		int getVideoBufferSize()
-		{
-			return video_buffer_size;
-		}
-		int getFramebufferWidth()
-		{
-			return framebuffer_width;
-		}
-		int getFramebufferHeight()
-		{
-			return framebuffer_height;
-		}
-		std::string getName()
-		{
-			return name;
-		}
-		~InsituConnectorGroup()
-		{
-			pthread_mutex_destroy(&streams_mutex);
-		}
-	private:
-		InsituConnectorContainer* master;
-		json_t* initData;
-		int id;
-		std::string name;
-		int nodes;
-		int framebuffer_width;
-		int framebuffer_height;
-		size_t video_buffer_size;
-		std::map< std::string, std::map< void* , std::string > > streams;
-		pthread_mutex_t streams_mutex;
+    friend class Broker;
+
+public:
+    InsituConnectorGroup(std::string name)
+        : master(NULL)
+        , initData(NULL)
+        , id(0)
+        , name(name)
+        , nodes(MAX_NODES)
+        , video_buffer_size(0)
+    {
+        pthread_mutex_init(&streams_mutex, NULL);
+    }
+    int getID()
+    {
+        return id;
+    }
+    int getVideoBufferSize()
+    {
+        return video_buffer_size;
+    }
+    int getFramebufferWidth()
+    {
+        return framebuffer_width;
+    }
+    int getFramebufferHeight()
+    {
+        return framebuffer_height;
+    }
+    std::string getName()
+    {
+        return name;
+    }
+    ~InsituConnectorGroup()
+    {
+        pthread_mutex_destroy(&streams_mutex);
+    }
+
+private:
+    InsituConnectorContainer* master;
+    json_t* initData;
+    int id;
+    std::string name;
+    int nodes;
+    int framebuffer_width;
+    int framebuffer_height;
+    size_t video_buffer_size;
+    std::map<std::string, std::map<void*, std::string>> streams;
+    pthread_mutex_t streams_mutex;
 };
 
 class Broker
 {
-	public:
-		Broker(std::string name,int inner_port,std::string interface);
-		~Broker();
-		errorCode addDataConnector(MetaDataConnector *dataConnector);
-		errorCode addImageConnector(ImageConnector *imageConnector, int id);
-		MetaDataClient* addDataClient();
-		void receiveVideo(InsituConnectorGroup* group,uint8_t* video_buffer,char* payload);
-		errorCode run();
-		std::string getStream(std::string connector,std::string name,std::string ref);
-		static volatile sig_atomic_t force_exit;
-	private:
-		InsituConnectorMaster insituMaster;
-		json_t* masterHello;
-		json_t* masterHelloConnectorList;
-		std::string name;
-		std::vector< MetaDataConnectorContainer > dataConnectorList;
-		std::unordered_map< int, ImageConnectorContainer > imageConnectorList;
-		ThreadList< InsituConnectorGroup* > insituConnectorGroupList;
-		ThreadList< MetaDataClient* > dataClientList;
-		int inner_port;
-		std::string inner_interface;
-		pthread_t insituThread;
+public:
+    Broker(std::string name, int inner_port, std::string interface);
+    ~Broker();
+    errorCode addDataConnector(MetaDataConnector* dataConnector);
+    errorCode addImageConnector(ImageConnector* imageConnector, int id);
+    MetaDataClient* addDataClient();
+    void receiveVideo(InsituConnectorGroup* group, uint8_t* video_buffer, char* payload);
+    errorCode run();
+    std::string getStream(std::string connector, std::string name, std::string ref);
+    static volatile sig_atomic_t force_exit;
+
+private:
+    InsituConnectorMaster insituMaster;
+    json_t* masterHello;
+    json_t* masterHelloConnectorList;
+    std::string name;
+    std::vector<MetaDataConnectorContainer> dataConnectorList;
+    std::unordered_map<int, ImageConnectorContainer> imageConnectorList;
+    ThreadList<InsituConnectorGroup*> insituConnectorGroupList;
+    ThreadList<MetaDataClient*> dataClientList;
+    int inner_port;
+    std::string inner_interface;
+    pthread_t insituThread;
 };
 
 #endif

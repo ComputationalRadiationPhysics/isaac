@@ -23,11 +23,12 @@
  * some frontend. It defines and abstract interface isaac will use.*/
 class WebSocketDataConnector : public MetaDataConnector
 {
-	public:
-		WebSocketDataConnector();
-		errorCode init(int port,std::string interface);
-		errorCode run();
-		std::string getName();
-	private:
-		struct lws_context *context;
+public:
+    WebSocketDataConnector();
+    errorCode init(int port, std::string interface);
+    errorCode run();
+    std::string getName();
+
+private:
+    struct lws_context* context;
 };

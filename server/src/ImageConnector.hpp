@@ -17,27 +17,30 @@
 #define __IMAGECONNECTOR
 
 
-#include "Runable.hpp"
-#include "MessageAble.hpp"
-#include "ThreadList.hpp"
 #include "Broker.hpp"
+#include "MessageAble.hpp"
+#include "Runable.hpp"
+#include "ThreadList.hpp"
 class Broker;
 
-class ImageConnector : public Runable, public MessageAble<ImageBufferContainer>
+class ImageConnector
+    : public Runable
+    , public MessageAble<ImageBufferContainer>
 {
-	public:
-		ImageConnector();
-		//To be overwritten
-		virtual errorCode init(int minport,int maxport) = 0;
-		virtual errorCode run() = 0;
-		virtual std::string getName() = 0;
+public:
+    ImageConnector();
+    // To be overwritten
+    virtual errorCode init(int minport, int maxport) = 0;
+    virtual errorCode run() = 0;
+    virtual std::string getName() = 0;
 
-		//Called from the Master
-		void setBroker(Broker* broker);	
-		
-		bool showClient;
-	protected:
-		Broker* broker;
+    // Called from the Master
+    void setBroker(Broker* broker);
+
+    bool showClient;
+
+protected:
+    Broker* broker;
 };
 
 #endif

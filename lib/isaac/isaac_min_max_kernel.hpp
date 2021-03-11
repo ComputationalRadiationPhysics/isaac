@@ -19,116 +19,84 @@
 
 namespace isaac
 {
-    template<
-        typename T_Source
-    >
+    template<typename T_Source>
     struct MinMaxKernel
     {
-        template<
-            typename T_Acc
-        >
+        template<typename T_Acc>
         ISAAC_DEVICE void operator()(
-            T_Acc const & acc,
+            T_Acc const& acc,
             const T_Source source,
             const int nr,
-            MinMax * const result,
+            MinMax* const result,
             const isaac_size3 localSize,
-            void const * const pointer
-        ) const
+            void const* const pointer) const
         {
-            auto alpThreadIdx = alpaka::getIdx<
-                alpaka::Grid,
-                alpaka::Threads
-            >( acc );
-            isaac_int3 coord = {
-                isaac_int( alpThreadIdx[1] ),
-                isaac_int( alpThreadIdx[2] ),
-                0
-            };
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            isaac_int3 coord = {isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[2]), 0};
 
-            if( !isInUpperBounds(coord, localSize) )
+            if(!isInUpperBounds(coord, localSize))
                 return;
             isaac_float min = std::numeric_limits<isaac_float>::max();
             isaac_float max = -std::numeric_limits<isaac_float>::max();
-            for( ; coord.z < localSize.z; coord.z++ )
+            for(; coord.z < localSize.z; coord.z++)
             {
-                isaac_float_dim <T_Source::featureDim> data;
-                if( T_Source::persistent )
+                isaac_float_dim<T_Source::featureDim> data;
+                if(T_Source::persistent)
                 {
                     data = source[coord];
                 }
                 else
                 {
-                    isaac_float_dim <T_Source::featureDim> * ptr = (
-                        isaac_float_dim < T_Source::featureDim > *
-                    )( pointer );
-                    data = ptr[coord.x + ISAAC_GUARD_SIZE
-                               + ( coord.y + ISAAC_GUARD_SIZE )
-                                 * ( localSize.x + 2 * ISAAC_GUARD_SIZE )
-                               + ( coord.z + ISAAC_GUARD_SIZE ) * (
-                                   ( localSize.x + 2 * ISAAC_GUARD_SIZE )
-                                   * ( localSize.y + 2 * ISAAC_GUARD_SIZE )
-                               )];
+                    isaac_float_dim<T_Source::featureDim>* ptr = (isaac_float_dim<T_Source::featureDim>*) (pointer);
+                    data = ptr
+                        [coord.x + ISAAC_GUARD_SIZE
+                         + (coord.y + ISAAC_GUARD_SIZE) * (localSize.x + 2 * ISAAC_GUARD_SIZE)
+                         + (coord.z + ISAAC_GUARD_SIZE)
+                             * ((localSize.x + 2 * ISAAC_GUARD_SIZE) * (localSize.y + 2 * ISAAC_GUARD_SIZE))];
                 };
                 isaac_float value = applyFunctorChain(data, nr);
-                min = glm::min( min, value );
-                max = glm::max( max, value );
+                min = glm::min(min, value);
+                max = glm::max(max, value);
             }
             result[coord.x + coord.y * localSize.x].min = min;
             result[coord.x + coord.y * localSize.x].max = max;
         }
-
     };
 
 
-
-    template<
-        typename T_ParticleSource
-    >
+    template<typename T_ParticleSource>
     struct MinMaxParticleKernel
     {
-        template<
-            typename T_Acc
-        >
+        template<typename T_Acc>
         ISAAC_DEVICE void operator()(
-            T_Acc const & acc,
+            T_Acc const& acc,
             const T_ParticleSource particleSource,
             const int nr,
-            MinMax * const result,
-            const isaac_size3 localSize
-        ) const
+            MinMax* const result,
+            const isaac_size3 localSize) const
         {
-            auto alpThreadIdx = alpaka::getIdx<
-                alpaka::Grid,
-                alpaka::Threads
-            >( acc );
-            isaac_uint3 coord = {
-                isaac_uint( alpThreadIdx[1] ),
-                isaac_uint( alpThreadIdx[2] ),
-                0
-            };
-            if( !isInUpperBounds(coord, localSize) )
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            isaac_uint3 coord = {isaac_uint(alpThreadIdx[1]), isaac_uint(alpThreadIdx[2]), 0};
+            if(!isInUpperBounds(coord, localSize))
                 return;
             isaac_float min = std::numeric_limits<isaac_float>::max();
             isaac_float max = -std::numeric_limits<isaac_float>::max();
-            for( ; coord.z < localSize.z; coord.z++ )
+            for(; coord.z < localSize.z; coord.z++)
             {
-                auto particleIterator = particleSource.getIterator( coord );
-                for( int i = 0; i < particleIterator.size; i++ )
+                auto particleIterator = particleSource.getIterator(coord);
+                for(int i = 0; i < particleIterator.size; i++)
                 {
-                    isaac_float_dim <T_ParticleSource::featureDim> data;
+                    isaac_float_dim<T_ParticleSource::featureDim> data;
 
-                    data = particleIterator.getAttribute( );
+                    data = particleIterator.getAttribute();
 
                     isaac_float value = applyFunctorChain(data, nr);
-                    min = glm::min( min, value );
-                    max = glm::max( max, value );
+                    min = glm::min(min, value);
+                    max = glm::max(max, value);
                 }
-
             }
             result[coord.x + coord.y * localSize.x].min = min;
             result[coord.x + coord.y * localSize.x].max = max;
         }
-
     };
-}
+} // namespace isaac

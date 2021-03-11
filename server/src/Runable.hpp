@@ -12,13 +12,13 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
- 
+
 #pragma once
 #include "Common.hpp"
 
 class Runable
 {
-	public:
-		virtual errorCode run() = 0;
-		static void* run_runable(void* ptr);
+public:
+    virtual errorCode run() = 0;
+    static void* run_runable(void* ptr);
 };

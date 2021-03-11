@@ -21,11 +21,12 @@
  * some frontend. It defines and abstract interface isaac will use.*/
 class TCPDataConnector : public MetaDataConnector
 {
-	public:
-		TCPDataConnector();
-		errorCode init(int port,std::string interface);
-		errorCode run();
-		std::string getName();
-	private:
-		int sockfd;
+public:
+    TCPDataConnector();
+    errorCode init(int port, std::string interface);
+    errorCode run();
+    std::string getName();
+
+private:
+    int sockfd;
 };
