@@ -153,20 +153,30 @@ set(ISAAC_PRIVATE_FOUND true)
 ################################################################################
 # Alpaka LIB
 ################################################################################
-find_package(alpaka QUIET)
-if (NOT alpaka_FOUND)
-    set(ISAAC_PRIVATE_FOUND false)
-    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Alpaka")
+
+# alpaka target is already provided by another project
+if(NOT TARGET alpaka::alpaka)
+    set(isaac_MIN_ALPAKA_VERSION 0.6.0)
+    find_package(alpaka ${isaac_MIN_ALPAKA_VERSION})
+    if (NOT alpaka_FOUND)
+        set(ISAAC_PRIVATE_FOUND false)
+        set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Alpaka")
+    endif()
 endif()
+
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} "alpaka::alpaka")
 
 
 ################################################################################
 # GLM LIB
 ################################################################################
-find_package(glm REQUIRED)
-set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} "glm::glm")
-
+find_package(glm 0.9.9 REQUIRED)
+set(glm_TARGET_NAME "glm::glm")
+if(glm_VERSION VERSION_LESS 0.9.9.8)
+    # older glm version do not shipped the target glm::glm
+    set(glm_TARGET_NAME "glm")
+endif()
+set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${glm_TARGET_NAME})
 
 
 ################################################################################
