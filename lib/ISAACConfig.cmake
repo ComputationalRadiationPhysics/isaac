@@ -170,13 +170,8 @@ set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} "alpaka::alpaka")
 ################################################################################
 # GLM LIB
 ################################################################################
-find_package(glm 0.9.9 REQUIRED)
-set(glm_TARGET_NAME "glm::glm")
-if(glm_VERSION VERSION_LESS 0.9.9.8)
-    # older glm version do not shipped the target glm::glm
-    set(glm_TARGET_NAME "glm")
-endif()
-set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${glm_TARGET_NAME})
+find_package(glm REQUIRED)
+set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} glm::glm)
 
 
 ################################################################################

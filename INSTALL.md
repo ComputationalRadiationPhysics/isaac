@@ -165,7 +165,7 @@ The ISAACConfig.cmake searches for these requirements. See
 *__glm__ for the internal math types and functions
   * _Debian/Ubuntu_:
     * `sudo apt-get install libglm-dev`
-  * _From Source_ (at least version 0.9.9 for updated cmake interface required, 
+  * _From Source_ (at least version 0.9.9.8 for updated cmake interface required, 
     older versions might also work, if `glmConfig.cmake` can be located):
     * `git clone git@github.com:g-truc/glm.git`
       * As glm is a header only library no installation is needed. Later while 
