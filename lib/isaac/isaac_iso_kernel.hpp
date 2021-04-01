@@ -439,7 +439,7 @@ namespace isaac
             isaac_float depth = ray.endDepth;
             isaac_float4 hitColor = isaac_float4(0);
             isaac_float3 hitNormal;
-            isaac_float oldValues[boost::mpl::size<T_SourceList>::type::value];
+            isaac_float oldValues[ZeroCheck<boost::mpl::size<T_SourceList>::type::value>::value];
             for(int i = 0; i < boost::mpl::size<T_SourceList>::type::value; i++)
                 oldValues[i] = 0;
             // iterate over the volume

@@ -95,7 +95,7 @@ namespace isaac
     {
         isaac_size3 globalSize; // size of volume
         ISAAC_IDX_TYPE
-            maxGlobalSize; // each dimension has a size and this value contains the value of the greatest dimension
+        maxGlobalSize; // each dimension has a size and this value contains the value of the greatest dimension
         isaac_size3 position; // local position of subvolume
         isaac_size3 localSize; // size of local volume grid
         isaac_size3 localParticleSize; // size of local particle grid
@@ -116,16 +116,28 @@ namespace isaac
     };
 
     template<int T_n>
+    struct ZeroCheck
+    {
+        static const int value = T_n;
+    };
+
+    template<>
+    struct ZeroCheck<0>
+    {
+        static const int value = 1;
+    };
+
+    template<int T_n>
     struct TransferDeviceStruct
     {
-        isaac_float4* pointer[T_n];
+        isaac_float4* pointer[ZeroCheck<T_n>::value];
     };
 
     template<int T_n>
     struct TransferHostStruct
     {
-        isaac_float4* pointer[T_n];
-        std::map<isaac_uint, isaac_float4> description[T_n];
+        isaac_float4* pointer[ZeroCheck<T_n>::value];
+        std::map<isaac_uint, isaac_float4> description[ZeroCheck<T_n>::value];
     };
 
     struct FunctionsStruct
@@ -138,19 +150,19 @@ namespace isaac
     template<int T_n>
     struct IsoThresholdStruct
     {
-        isaac_float value[T_n];
+        isaac_float value[ZeroCheck<T_n>::value];
     };
 
     template<int T_n>
     struct SourceWeightStruct
     {
-        isaac_float value[T_n];
+        isaac_float value[ZeroCheck<T_n>::value];
     };
 
     template<int T_n>
     struct PointerArrayStruct
     {
-        void* pointer[T_n];
+        void* pointer[ZeroCheck<T_n>::value];
     };
 
     struct MinMax
@@ -162,8 +174,8 @@ namespace isaac
     template<int T_n>
     struct MinMaxArray
     {
-        isaac_float min[T_n];
-        isaac_float max[T_n];
+        isaac_float min[ZeroCheck<T_n>::value];
+        isaac_float max[ZeroCheck<T_n>::value];
     };
 
     struct ClippingStruct

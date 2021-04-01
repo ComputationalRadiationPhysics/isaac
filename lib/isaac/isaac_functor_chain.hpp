@@ -46,7 +46,7 @@ namespace isaac
     template<int T_n>
     struct DestArrayStruct
     {
-        isaac_int nr[T_n];
+        isaac_int nr[ZeroCheck<T_n>::value];
     };
 
     ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(isaac_float_dim<1>& data, const int nr)
