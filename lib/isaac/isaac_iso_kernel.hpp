@@ -413,9 +413,10 @@ namespace isaac
             isaac_float min_size = ISAAC_MIN(
                 int(SimulationSize.globalSize.x),
                 ISAAC_MIN(int(SimulationSize.globalSize.y), int(SimulationSize.globalSize.z)));
-            isaac_int startSteps = glm::ceil(ray.startDepth / stepSize);
-            isaac_int endSteps = glm::floor(ray.endDepth / stepSize);
-            isaac_float3 stepVec = stepSize * ray.dir / scale;
+            isaac_float stepSizeUnscaled = stepSize * (glm::length(ray.dir) / glm::length(ray.dir / scale));
+            isaac_int startSteps = glm::ceil(ray.startDepth / stepSizeUnscaled);
+            isaac_int endSteps = glm::floor(ray.endDepth / stepSizeUnscaled);
+            isaac_float3 stepVec = stepSizeUnscaled * ray.dir / scale;
             // unscale all data for correct memory access
             isaac_float3 startUnscaled = ray.start / scale;
 
@@ -446,14 +447,14 @@ namespace isaac
             {
                 pos = startUnscaled + stepVec * isaac_float(i);
                 bool first = ray.isClipped && i == startSteps;
-                isaac_float t = i * stepSize;
+                isaac_float t = i * stepSizeUnscaled;
                 forEachWithMplParams(
                     sources,
                     IsoStepSourceIterator<T_transferSize, T_Filter, T_interpolation>(),
                     ray,
                     t,
                     pos,
-                    stepSize,
+                    stepSizeUnscaled,
                     SimulationSize.localSize,
                     transferArray,
                     sourceIsoThreshold,
