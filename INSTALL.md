@@ -162,12 +162,12 @@ The ISAACConfig.cmake searches for these requirements. See
         the OpenMPI folder. Later while compiling an application using
         MPI (including the ISAAC examples) add `$MPI/install` to the
         CMake variable `CMAKE_MODULE_PATH` to use this version.
-*__glm__ for the internal math types and functions
+* __glm__ for the internal math types and functions
   * _Debian/Ubuntu_:
     * `sudo apt-get install libglm-dev`
   * _From Source_ (at least version 0.9.9.8 for updated cmake interface required, 
     older versions might also work, if `glmConfig.cmake` can be located):
-    * `git clone git@github.com:g-truc/glm.git`
+    * `git clone https://github.com/g-truc/glm.git`
       * As glm is a header only library no installation is needed. Later while 
         compiling an application using ISAAC (including the examples) add
         `-Dglm_DIR=$GLM/cmake/glm`, where
