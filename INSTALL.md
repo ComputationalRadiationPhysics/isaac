@@ -162,7 +162,7 @@ The ISAACConfig.cmake searches for these requirements. See
         the OpenMPI folder. Later while compiling an application using
         MPI (including the ISAAC examples) add `$MPI/install` to the
         CMake variable `CMAKE_MODULE_PATH` to use this version.
-*__glm__ for the internal math types and functions
+* __glm__ for the internal math types and functions
   * _Debian/Ubuntu_:
     * `sudo apt-get install libglm-dev`
   * _From Source_ (at least version 0.9.9.8 for updated cmake interface required, 
