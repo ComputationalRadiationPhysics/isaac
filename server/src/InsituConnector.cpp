@@ -14,25 +14,26 @@
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 #include "InsituConnector.hpp"
+
 #include "stdio.h"
 
-InsituConnector::InsituConnector(int sockfd,int id)
+InsituConnector::InsituConnector(int sockfd, int id)
 {
-	this->sockfd = sockfd;
-	this->id = id;
+    this->sockfd = sockfd;
+    this->id = id;
 }
 
 int InsituConnector::getID()
 {
-	return id;
+    return id;
 }
 
 int InsituConnector::getSockFD()
 {
-	return sockfd;
+    return sockfd;
 }
 
 InsituConnector::~InsituConnector()
 {
-	//fclose(sockfile);
+    // fclose(sockfile);
 }

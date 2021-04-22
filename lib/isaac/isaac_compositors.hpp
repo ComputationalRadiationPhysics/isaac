@@ -15,99 +15,104 @@
 
 #pragma once
 
+#include <IceT.h>
+
 namespace isaac
 {
+    struct DefaultCompositor
+    {
+        DefaultCompositor(isaac_size2 framebufferSize)
+        {
+        }
+        static inline isaac_size2 getCompositedbufferSize(isaac_size2 framebufferSize)
+        {
+            return framebufferSize;
+        }
+        inline uint32_t* doCompositing(IceTImage* image)
+        {
+            return icetImageGetColorui(image[0]);
+        }
+    };
 
-struct DefaultCompositor
-{
-	DefaultCompositor( isaac_size2 framebuffer_size ) {}
-	static inline isaac_size2 getCompositedbufferSize( isaac_size2 framebuffer_size )
-	{
-		return framebuffer_size;
-	}
-	inline uint32_t* doCompositing(IceTImage* image)
-	{
-		return icetImageGetColorui(image[0]);
-	}
-};
+    template<typename T_Controller>
+    class StereoCompositorSideBySide
+    {
+    public:
+        static inline isaac_size2 getCompositedbufferSize(isaac_size2 framebufferSize)
+        {
+            isaac_size2 compbufferSize = {framebufferSize.x * 2, framebufferSize.y};
+            return compbufferSize;
+        }
+        StereoCompositorSideBySide(isaac_size2 framebufferSize)
+            : framebufferSize(framebufferSize)
+            , compbufferSize(getCompositedbufferSize(framebufferSize))
+        {
+            compbuffer = (uint32_t*) malloc(sizeof(uint32_t) * compbufferSize.x * compbufferSize.y);
+        }
+        ~StereoCompositorSideBySide()
+        {
+            free(compbuffer);
+        }
+        inline uint32_t* doCompositing(IceTImage* image)
+        {
+            static_assert(
+                T_Controller::passCount >= 2,
+                "Not enough passes defined in Controller for StereoCompositor!");
+            uint32_t* left = icetImageGetColorui(image[0]);
+            uint32_t* right = icetImageGetColorui(image[1]);
+            for(unsigned int y = 0; y < compbufferSize.y; y++)
+            {
+                memcpy(
+                    &(compbuffer[y * compbufferSize.x]),
+                    &(left[y * framebufferSize.x]),
+                    sizeof(uint32_t) * framebufferSize.x);
+                memcpy(
+                    &(compbuffer[y * compbufferSize.x + framebufferSize.x]),
+                    &(right[y * framebufferSize.x]),
+                    sizeof(uint32_t) * framebufferSize.x);
+            }
+            return compbuffer;
+        }
 
-template <typename TController>
-class StereoCompositorSideBySide
-{
-	public:
-		static inline isaac_size2 getCompositedbufferSize( isaac_size2 framebuffer_size )
-		{
-			isaac_size2 compbuffer_size =
-			{
-				framebuffer_size.x * 2,
-				framebuffer_size.y
-			};
-			return compbuffer_size;
-		}
-		StereoCompositorSideBySide( isaac_size2 framebuffer_size ) :
-			framebuffer_size( framebuffer_size ),
-			compbuffer_size( getCompositedbufferSize( framebuffer_size ) )
-		{
-			compbuffer = (uint32_t*)malloc(sizeof(uint32_t) * compbuffer_size.x * compbuffer_size.y);
-		}
-		~StereoCompositorSideBySide()
-		{
-			free(compbuffer);
-		}
-		inline uint32_t* doCompositing(IceTImage* image)
-		{
-			static_assert(TController::pass_count >= 2, "Not enough passes defined in Controller for StereoCompositor!");
-			uint32_t* left = icetImageGetColorui(image[0]);
-			uint32_t* right = icetImageGetColorui(image[1]);
-			for (unsigned int y = 0; y < compbuffer_size.y; y++)
-			{
-				memcpy( &(compbuffer[y*compbuffer_size.x                     ]), &( left[y*framebuffer_size.x]), sizeof(uint32_t) * framebuffer_size.x);
-				memcpy( &(compbuffer[y*compbuffer_size.x + framebuffer_size.x]), &(right[y*framebuffer_size.x]), sizeof(uint32_t) * framebuffer_size.x);
-			}
-			return compbuffer;
-		}
-	private:
-		isaac_size2 compbuffer_size;
-		isaac_size2 framebuffer_size;
-		uint32_t* compbuffer;
-};
+    private:
+        isaac_size2 compbufferSize;
+        isaac_size2 framebufferSize;
+        uint32_t* compbuffer;
+    };
 
-template <
-	typename TController,
-	uint32_t LeftFilter,
-	uint32_t RightFilter
->
-class StereoCompositorAnaglyph
-{
-	public:
-		static inline isaac_size2 getCompositedbufferSize( isaac_size2 framebuffer_size )
-		{
-			return framebuffer_size;
-		}
-		StereoCompositorAnaglyph( isaac_size2 framebuffer_size ) :
-			framebuffer_size( framebuffer_size )
-		{
-			compbuffer = (uint32_t*)malloc(sizeof(uint32_t) * framebuffer_size.x * framebuffer_size.y);
-		}
-		~StereoCompositorAnaglyph()
-		{
-			free(compbuffer);
-		}
-		inline uint32_t* doCompositing(IceTImage* image)
-		{
-			static_assert(TController::pass_count >= 2, "Not enough passes defined in Controller for StereoCompositor!");
-			uint32_t* left = icetImageGetColorui(image[0]);
-			uint32_t* right = icetImageGetColorui(image[1]);
-			for (unsigned int x = 0; x < framebuffer_size.x; x++)
-				for (unsigned int y = 0; y < framebuffer_size.y; y++)
-					compbuffer[x+y*framebuffer_size.x] =
-						( left[x+y*framebuffer_size.x] &  LeftFilter) |
-						(right[x+y*framebuffer_size.x] & RightFilter);
-			return compbuffer;
-		}
-	private:
-		isaac_size2 framebuffer_size;
-		uint32_t* compbuffer;
-};
+    template<typename T_Controller, uint32_t LeftFilter, uint32_t RightFilter>
+    class StereoCompositorAnaglyph
+    {
+    public:
+        static inline isaac_size2 getCompositedbufferSize(isaac_size2 framebufferSize)
+        {
+            return framebufferSize;
+        }
+        StereoCompositorAnaglyph(isaac_size2 framebufferSize) : framebufferSize(framebufferSize)
+        {
+            compbuffer = (uint32_t*) malloc(sizeof(uint32_t) * framebufferSize.x * framebufferSize.y);
+        }
+        ~StereoCompositorAnaglyph()
+        {
+            free(compbuffer);
+        }
+        inline uint32_t* doCompositing(IceTImage* image)
+        {
+            static_assert(
+                T_Controller::passCount >= 2,
+                "Not enough passes defined in Controller for StereoCompositor!");
+            uint32_t* left = icetImageGetColorui(image[0]);
+            uint32_t* right = icetImageGetColorui(image[1]);
+            for(unsigned int x = 0; x < framebufferSize.x; x++)
+                for(unsigned int y = 0; y < framebufferSize.y; y++)
+                    compbuffer[x + y * framebufferSize.x] = (left[x + y * framebufferSize.x] & LeftFilter)
+                        | (right[x + y * framebufferSize.x] & RightFilter);
+            return compbuffer;
+        }
 
-} //namespace isaac;
+    private:
+        isaac_size2 framebufferSize;
+        uint32_t* compbuffer;
+    };
+
+} // namespace isaac

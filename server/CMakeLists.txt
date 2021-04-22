@@ -78,6 +78,12 @@ if (ISAAC_GST)
 	add_definitions(-DISAAC_GST)
 endif (ISAAC_GST)
 
+
+
+set(ISAAC_MAX_RECEIVE "8388608" CACHE STRING "The size of the reserved buffers for sending and receiving, default of 8 MB should work for up to 4K" )
+set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_MAX_RECEIVE=${ISAAC_MAX_RECEIVE})
+add_definitions(${ISAAC_DEFINITIONS})
+
 option(ISAAC_JPEG "Use JPEG compression between visualization and isaac server. Deactivating will not work with big images. And with big I am talking about bigger than 800x600." ON)
 if (ISAAC_JPEG)
 	find_package(JPEG REQUIRED)
@@ -96,9 +102,20 @@ add_executable(isaac ${HDRS} ${SRCS})
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules")
 
-find_package (Jansson CONFIG REQUIRED)
-set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
-set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
+find_package (Jansson CONFIG QUIET)
+if (Jansson_FOUND)
+	set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
+	set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
+else()
+	find_package (jansson CONFIG REQUIRED)
+	# required since 2.12
+	# interfacing cmake tagets with the old cmake variables we use in ISAAC
+	# since ISSAC has no CMake target we can not use target_link_library
+	get_target_property(JANSSON_LIBRARIES jansson::jansson LOCATION)
+	set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
+	get_target_property(JANSSON_INCLUDE_DIRS jansson::jansson INTERFACE_INCLUDE_DIRECTORIES)
+	set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
+endif()
 
 find_package(Libwebsockets 2.1.1 CONFIG REQUIRED)
 set(LIBS ${LIBS} ${LIBWEBSOCKETS_LIBRARIES})

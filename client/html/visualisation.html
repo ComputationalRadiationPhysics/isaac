@@ -65,6 +65,20 @@
 				<input type="button" value="Set" id="interval_change">
 				<input type="checkbox" id="controls_checkbox" onchange="controls_checkbox_click()"> Show controls
 			</form>
+			<div id="render_mode_div">
+				<h3>Debug Render Mode</h3>
+				<select id="render_mode_list" onchange="renderModeUpdate()">
+					<option>Full Shaded</option>
+					<option>No Specular</option>
+					<option>Only Solid</option>
+					<option>Only Volume</option>
+					<option>Normal</option>
+					<option>Depth</option>
+					<option>Ambient Occlusion</option>
+					<option>GPU Rank</option>
+					<option>GPU Rank Buffer</option>
+				</select>
+			</div>
 			<div id="ambient_occ_div">
 				<table>
 					<h3>Ambient Occlusion</h3>
@@ -84,9 +98,11 @@
 			</div>
 			<div id="stereo_div"></div>
 			<div id="functions_div"></div>
+			<h3>Volume Weights and Particle Size:</h3>
 			<div id="weight_div"></div>
+			<h3>Iso Surface Threshold:</h3>
+			<div id="iso_div"></div>
 			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation
-			<input type="checkbox" id="iso_surface_checkbox" checked onchange="iso_surface_checkbox_click()"> Iso Surface
 			<input id="step" size="4"><input type="button" value="Change step" id="step_button" onclick="step_button_click()"><br/>
 			<div id="clipping_add_div">
 				<b>Clipping planes:</b><br/>

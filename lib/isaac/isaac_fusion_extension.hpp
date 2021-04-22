@@ -15,83 +15,80 @@
 
 #pragma once
 
+#include <boost/fusion/include/empty.hpp>
+#include <boost/fusion/include/join.hpp>
 #include <boost/fusion/include/list.hpp>
-#include <boost/mpl/size.hpp>
 #include <boost/mpl/begin_end.hpp>
 #include <boost/mpl/int.hpp>
+#include <boost/mpl/size.hpp>
 
 namespace isaac
 {
+    template<int T_n, int T_i>
+    struct ForEachUnrolledParams
+    {
+        ISAAC_NO_HOST_DEVICE_WARNING
+        template<typename T_I0, typename T_F, typename... T_P>
+        ISAAC_HOST_DEVICE_INLINE static void call(T_I0 const& i0, T_F const& f, T_P&... p)
+        {
+            f(T_n - T_i, *i0, p...);
+            ForEachUnrolledParams<T_n, T_i - 1>::call(boost::fusion::next(i0), f, p...);
+        }
+    };
 
-template<int N,int I>
-struct isaac_for_each_unrolled_params
-{
-	ISAAC_NO_HOST_DEVICE_WARNING
-	template<typename I0, typename F, typename... P>
-	ISAAC_HOST_DEVICE_INLINE static void call(I0 const& i0, F const& f, P&... p)
-	{
-		f(N - I,*i0,p...);
-		isaac_for_each_unrolled_params<N,I-1>::call(boost::fusion::next(i0), f, p...);
-	}
-};
+    template<int T_n>
+    struct ForEachUnrolledParams<T_n, 0>
+    {
+        ISAAC_NO_HOST_DEVICE_WARNING
+        template<typename T_It, typename T_F, typename... T_P>
+        ISAAC_HOST_DEVICE_INLINE static void call(T_It const&, T_F const&, T_P&... p)
+        {
+        }
+    };
 
-template<int N>
-struct isaac_for_each_unrolled_params<N,0>
-{
-	ISAAC_NO_HOST_DEVICE_WARNING
-	template<typename It, typename F, typename... P>
-	ISAAC_HOST_DEVICE_INLINE static void call(It const&, F const&, P&... p)
-	{
-	}
-};
+    ISAAC_NO_HOST_DEVICE_WARNING
+    template<typename T_Sequence, typename T_F, typename... T_P>
+    ISAAC_HOST_DEVICE_INLINE void forEachParams(T_Sequence& seq, T_F const& f, T_P&... p)
+    {
+        typedef typename boost::fusion::result_of::begin<T_Sequence>::type begin;
+        typedef typename boost::fusion::result_of::end<T_Sequence>::type end;
+        ForEachUnrolledParams<
+            boost::fusion::result_of::distance<begin, end>::type::value,
+            boost::fusion::result_of::distance<begin, end>::type::value>::call(boost::fusion::begin(seq), f, p...);
+    }
 
-ISAAC_NO_HOST_DEVICE_WARNING
-template <typename Sequence, typename F,typename... P>
-ISAAC_HOST_DEVICE_INLINE void isaac_for_each_params(Sequence& seq, F const& f, P&... p)
-{
-	typedef typename boost::fusion::result_of::begin<Sequence>::type begin;
-	typedef typename boost::fusion::result_of::end<Sequence>::type end;
-	isaac_for_each_unrolled_params
-	<
-		boost::fusion::result_of::distance<begin, end>::type::value,
-		boost::fusion::result_of::distance<begin, end>::type::value
-	>::call(boost::fusion::begin(seq), f, p...);
-}
+    template<int T_n, int T_i>
+    struct ForEachWithMplUnrolledParams
+    {
+        ISAAC_NO_HOST_DEVICE_WARNING
+        template<typename T_I0, typename T_F, typename... T_P>
+        ISAAC_HOST_DEVICE_INLINE static void call(T_I0 const& i0, T_F const& f, T_P&... p)
+        {
+            boost::mpl::int_<T_n - T_i> nr;
+            f(nr, *i0, p...);
+            ForEachWithMplUnrolledParams<T_n, T_i - 1>::call(boost::fusion::next(i0), f, p...);
+        }
+    };
 
-template<int N,int I>
-struct isaac_for_each_with_mpl_unrolled_params
-{
-	ISAAC_NO_HOST_DEVICE_WARNING
-	template<typename I0, typename F, typename... P>
-	ISAAC_HOST_DEVICE_INLINE static void call( I0 const& i0, F const& f, P&... p)
-	{
-		boost::mpl::int_<N - I> nr;
-		f(nr,*i0,p...);
-		isaac_for_each_with_mpl_unrolled_params<N,I-1>::call(boost::fusion::next(i0), f, p...);
-	}
-};
+    template<int T_n>
+    struct ForEachWithMplUnrolledParams<T_n, 0>
+    {
+        ISAAC_NO_HOST_DEVICE_WARNING
+        template<typename T_It, typename T_F, typename... T_P>
+        ISAAC_HOST_DEVICE_INLINE static void call(T_It const&, T_F const&, T_P&... p)
+        {
+        }
+    };
 
-template<int N>
-struct isaac_for_each_with_mpl_unrolled_params<N,0>
-{
-	ISAAC_NO_HOST_DEVICE_WARNING
-	template<typename It, typename F, typename... P>
-	ISAAC_HOST_DEVICE_INLINE static void call(It const&, F const&, P&... p)
-	{
-	}
-};
+    ISAAC_NO_HOST_DEVICE_WARNING
+    template<typename T_Sequence, typename T_F, typename... T_P>
+    ISAAC_HOST_DEVICE_INLINE void forEachWithMplParams(T_Sequence& seq, T_F const& f, T_P&... p)
+    {
+        typedef typename boost::fusion::result_of::begin<T_Sequence>::type begin;
+        typedef typename boost::fusion::result_of::end<T_Sequence>::type end;
+        ForEachWithMplUnrolledParams<
+            boost::fusion::result_of::distance<begin, end>::type::value,
+            boost::fusion::result_of::distance<begin, end>::type::value>::call(boost::fusion::begin(seq), f, p...);
+    }
 
-ISAAC_NO_HOST_DEVICE_WARNING
-template <typename Sequence, typename F,typename... P>
-ISAAC_HOST_DEVICE_INLINE void isaac_for_each_with_mpl_params(Sequence& seq, F const& f, P&... p)
-{
-	typedef typename boost::fusion::result_of::begin<Sequence>::type begin;
-	typedef typename boost::fusion::result_of::end<Sequence>::type end;
-	isaac_for_each_with_mpl_unrolled_params
-	<
-		boost::fusion::result_of::distance<begin, end>::type::value,
-		boost::fusion::result_of::distance<begin, end>::type::value
-	>::call( boost::fusion::begin(seq), f, p...);
-}
-
-} //namespace isaac;
+} // namespace isaac

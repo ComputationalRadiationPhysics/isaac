@@ -17,18 +17,20 @@
 
 #include "ImageConnector.hpp"
 #include "Runable.hpp"
+
 #include <jpeglib.h>
 #include <list>
 #include <vector>
 
 class URIImageConnector : public ImageConnector
 {
-	public:
-		URIImageConnector();
-		~URIImageConnector();
-		errorCode init(int minport,int maxport);
-		errorCode run();
-		std::string getName();
-	private:
-		std::map<void*,InsituConnectorGroup*> streams;
+public:
+    URIImageConnector();
+    ~URIImageConnector();
+    errorCode init(int minport, int maxport);
+    errorCode run();
+    std::string getName();
+
+private:
+    std::map<void*, InsituConnectorGroup*> streams;
 };

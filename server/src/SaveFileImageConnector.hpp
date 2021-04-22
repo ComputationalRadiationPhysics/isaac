@@ -17,18 +17,19 @@
 
 #include "ImageConnector.hpp"
 
-#include <string>
 #include <map>
+#include <string>
 
 class SaveFileImageConnector : public ImageConnector
 {
-	public:
-		SaveFileImageConnector(std::string dir);
-		errorCode init(int minport,int maxport);
-		errorCode run();
-		std::string getName();
-	private:
-		std::string dir;
-		std::map<InsituConnectorGroup*,std::string> groupDir;
-		std::map<InsituConnectorGroup*,int> step;
+public:
+    SaveFileImageConnector(std::string dir);
+    errorCode init(int minport, int maxport);
+    errorCode run();
+    std::string getName();
+
+private:
+    std::string dir;
+    std::map<InsituConnectorGroup*, std::string> groupDir;
+    std::map<InsituConnectorGroup*, int> step;
 };

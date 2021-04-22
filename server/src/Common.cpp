@@ -12,7 +12,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
- 
+
 #include "Common.hpp"
 
 pthread_mutex_t MessageContainer::deep_copy_mutex = PTHREAD_MUTEX_INITIALIZER;

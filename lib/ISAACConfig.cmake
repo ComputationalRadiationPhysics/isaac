@@ -9,9 +9,8 @@
 # It defines the following options
 #  ISAAC_THREADING
 #  ISAAC_SHOWBORDER
-#  ISAAC_CUDA
-#  ISAAC_ALPAKA
 #  ISAAC_JPEG
+#  ISAAC_AO_BUG_FIX
 
 ###############################################################################
 # ISAAC
@@ -49,12 +48,7 @@ if (ISAAC_SHOWBORDER)
   set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_SHOWBORDER)
 endif ()
 
-option(ISAAC_CUDA "Using CUDA" ON)
-option(ISAAC_ALPAKA "Using ALPKA" OFF)
-
-if ( (NOT ISAAC_CUDA) AND (NOT ISAAC_ALPAKA) )
-    message( FATAL_ERROR "At least Alpaka or Cuda have to be activated!" )
-endif()
+option(ISAAC_AO_BUG_FIX "fix ambient occlusion bug" ON)
 
 ###############################################################################
 # JPEGLIB
@@ -86,9 +80,6 @@ if (NOT ISAAC_JPEG)
     message( WARNING "Using ISAAC without libjpeg is not recommended. Set ISAAC_JPEG to ON to enable libjpeg compression." )
 endif (NOT ISAAC_JPEG)
 
-set(ISAAC_VECTOR_ELEM "1" CACHE STRING "The amounts of elements used for vectorization. On GPU 1 should be fine, on CPU 4..32, depending on the vectorization capabilities" )
-set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_VECTOR_ELEM=${ISAAC_VECTOR_ELEM})
-
 option(ISAAC_SPECULAR "Add the specular light component." ON)
 if (ISAAC_SPECULAR)
   set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_SPECULAR)
@@ -104,14 +95,25 @@ set(ISAAC_DEPENDENCY_HINTS "missing dependencies:")
 ###############################################################################
 # JANSSON LIB
 ###############################################################################
-# set(JANSSON_DIR JANSSON_DIR_NOT-FOUND CACHE PATH "The location of the jansson library")
 find_package (Jansson CONFIG QUIET)
-if (NOT Jansson_FOUND)
-    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   libJansson")
+if (Jansson_FOUND)
+    set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
+    set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
+else()
+    find_package (jansson CONFIG QUIET)
+    if (TARGET jansson::jansson)
+        # required since 2.12
+        # interfacing cmake tagets with the old cmake variables we use in ISAAC
+        # since ISSAC has CMake no target we can not use target_link_library
+        get_target_property(JANSSON_LIBRARIES jansson::jansson LOCATION)
+        set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
+        get_target_property(JANSSON_INCLUDE_DIRS jansson::jansson INTERFACE_INCLUDE_DIRECTORIES)
+        set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
+    else()
+        # jansson not found
+        set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   jansson")
+    endif()
 endif()
-set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
-set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
-
 
 ###############################################################################
 # PTHREADS
@@ -147,35 +149,29 @@ set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DBOOST_ALL_NO_LIB)
 
 set(ISAAC_PRIVATE_FOUND true)
 
-################################################################################
-# CUDA LIB
-################################################################################
-if (ISAAC_CUDA)
-    find_package( CUDA 7.0 QUIET)
-    if (!CUDA_FOUND)
-        set(ISAAC_PRIVATE_FOUND false)
-    else()
-        set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS})
-    endif()
-endif()
-
 
 ################################################################################
 # Alpaka LIB
 ################################################################################
-if (ISAAC_ALPAKA)
-    find_package(alpaka QUIET)
-    if (!alpaka_FOUND)
+
+# alpaka target is already provided by another project
+if(NOT TARGET alpaka::alpaka)
+    set(isaac_MIN_ALPAKA_VERSION 0.6.0)
+    find_package(alpaka ${isaac_MIN_ALPAKA_VERSION})
+    if (NOT alpaka_FOUND)
         set(ISAAC_PRIVATE_FOUND false)
-        set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Cuda or Alpaka")
-    else()
-        set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${alpaka_INCLUDE_DIRS})
-        set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${alpaka_LIBRARIES})
-        set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} ${alpaka_DEFINITIONS})
-        set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} ${ALPAKA_DEV_COMPILE_OPTIONS})
-        set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_ALPAKA")
+        set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Alpaka")
     endif()
 endif()
+
+set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} "alpaka::alpaka")
+
+
+################################################################################
+# GLM LIB
+################################################################################
+find_package(glm REQUIRED)
+set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} glm::glm)
 
 
 ################################################################################

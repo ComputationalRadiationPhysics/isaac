@@ -16,16 +16,18 @@
 #pragma once
 
 #include "MessageAble.hpp"
+
 #include <map>
 
 class MetaDataClient : public MessageAble<MessageContainer>
 {
-	public:
-		MetaDataClient();
-		void observe(int nr,int stream,bool dropable);
-		void stopObserve(int nr,int& stream,bool& dropable);
-		bool doesObserve(int nr,int& stream,bool& dropable);
-	private:
-		std::map<int,int> observeList;
-		std::map<int,bool> dropableList;
+public:
+    MetaDataClient();
+    void observe(int nr, int stream, bool dropable);
+    void stopObserve(int nr, int& stream, bool& dropable);
+    bool doesObserve(int nr, int& stream, bool& dropable);
+
+private:
+    std::map<int, int> observeList;
+    std::map<int, bool> dropableList;
 };

@@ -16,16 +16,18 @@
 #pragma once
 
 #include "ImageConnector.hpp"
+
 #include <SDL.h>
 
 class SDLImageConnector : public ImageConnector
 {
-	public:
-		SDLImageConnector();
-		errorCode init(int minport,int maxport);
-		errorCode run();
-		std::string getName();
-	private:
-		SDL_Surface* window;
-		InsituConnectorGroup* group;
+public:
+    SDLImageConnector();
+    errorCode init(int minport, int maxport);
+    errorCode run();
+    std::string getName();
+
+private:
+    SDL_Surface* window;
+    InsituConnectorGroup* group;
 };

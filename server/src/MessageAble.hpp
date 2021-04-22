@@ -18,37 +18,37 @@
 #include "Common.hpp"
 #include "ThreadList.hpp"
 
-template <typename MessageTemplate>
+template<typename MessageTemplate>
 class MessageAble
 {
-	public:
-		virtual ~MessageAble()
-		{
-			MessageTemplate* mom;
-			while ((mom = messagesIn.pop_front()))
-				mom->suicide();
-			while ((mom = messagesOut.pop_front()))
-				mom->suicide();
-		}
-		//Called from MetaDataConnector / Client
-		void clientSendMessage(MessageTemplate* message)
-		{
-			messagesOut.push_back(message);
-		}
-		MessageTemplate* clientGetMessage()
-		{
-			return messagesIn.pop_front();
-		}
-		//Called from Master
-		void masterSendMessage(MessageTemplate* message)
-		{
-			messagesIn.push_back(message);
-		}
-		MessageTemplate* masterGetMessage()
-		{
-			return messagesOut.pop_front();
-		}
-	//protected:
-		ThreadList<MessageTemplate*> messagesIn; //From master to the client
-		ThreadList<MessageTemplate*> messagesOut; //From client to the master
+public:
+    virtual ~MessageAble()
+    {
+        MessageTemplate* mom;
+        while((mom = messagesIn.pop_front()))
+            mom->suicide();
+        while((mom = messagesOut.pop_front()))
+            mom->suicide();
+    }
+    // Called from MetaDataConnector / Client
+    void clientSendMessage(MessageTemplate* message)
+    {
+        messagesOut.push_back(message);
+    }
+    MessageTemplate* clientGetMessage()
+    {
+        return messagesIn.pop_front();
+    }
+    // Called from Master
+    void masterSendMessage(MessageTemplate* message)
+    {
+        messagesIn.push_back(message);
+    }
+    MessageTemplate* masterGetMessage()
+    {
+        return messagesOut.pop_front();
+    }
+    // protected:
+    ThreadList<MessageTemplate*> messagesIn; // From master to the client
+    ThreadList<MessageTemplate*> messagesOut; // From client to the master
 };

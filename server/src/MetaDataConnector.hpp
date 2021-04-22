@@ -16,28 +16,32 @@
 #ifndef __METADATACONNECTOR
 #define __METADATACONNECTOR
 
-#include "Common.hpp"
-#include <string>
-#include "ThreadList.hpp"
-#include "Runable.hpp"
-#include "MessageAble.hpp"
 #include "Broker.hpp"
+#include "Common.hpp"
+#include "MessageAble.hpp"
+#include "Runable.hpp"
+#include "ThreadList.hpp"
+
+#include <string>
 class Broker;
 
 /** This class is used for the connection between the isaac server and
  * some frontend. It defines and abstracts an interface isaac will use.*/
-class MetaDataConnector : public Runable, public MessageAble<MessageContainer>
+class MetaDataConnector
+    : public Runable
+    , public MessageAble<MessageContainer>
 {
-	public:
-		//To be overwritten
-		virtual errorCode init(int port,std::string interface) = 0;
-		virtual errorCode run() = 0;
-		virtual std::string getName() = 0;
+public:
+    // To be overwritten
+    virtual errorCode init(int port, std::string interface) = 0;
+    virtual errorCode run() = 0;
+    virtual std::string getName() = 0;
 
-		//Called from the Master
-		void setBroker(Broker* broker);
-	protected:
-		Broker* broker;
+    // Called from the Master
+    void setBroker(Broker* broker);
+
+protected:
+    Broker* broker;
 };
 
 #endif

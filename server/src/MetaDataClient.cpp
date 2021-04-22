@@ -14,40 +14,40 @@
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
 #include "MetaDataClient.hpp"
+
 #include <algorithm>
 
 MetaDataClient::MetaDataClient()
 {
-	
 }
 
-void MetaDataClient::observe(int nr,int stream, bool dropable)
+void MetaDataClient::observe(int nr, int stream, bool dropable)
 {
-	observeList.insert( std::pair<int,int>(nr,stream) );
-	dropableList.insert( std::pair<int,bool>(nr,dropable) );
+    observeList.insert(std::pair<int, int>(nr, stream));
+    dropableList.insert(std::pair<int, bool>(nr, dropable));
 }
 
-void MetaDataClient::stopObserve(int nr,int& stream,bool& dropable)
+void MetaDataClient::stopObserve(int nr, int& stream, bool& dropable)
 {
-	auto it = observeList.find( nr );
-	if (it != observeList.end())
-		stream = it->second;
-	auto it2 = dropableList.find( nr );
-	if (it2 != dropableList.end())
-		dropable = it2->second;
-	observeList.erase(nr);
-	dropableList.erase(nr);
+    auto it = observeList.find(nr);
+    if(it != observeList.end())
+        stream = it->second;
+    auto it2 = dropableList.find(nr);
+    if(it2 != dropableList.end())
+        dropable = it2->second;
+    observeList.erase(nr);
+    dropableList.erase(nr);
 }
 
-bool MetaDataClient::doesObserve(int nr,int& stream,bool& dropable)
+bool MetaDataClient::doesObserve(int nr, int& stream, bool& dropable)
 {
-	auto it = observeList.find( nr );
-	if (it == observeList.end())
-		return false;
-	auto it2 = dropableList.find( nr );
-	if (it2 == dropableList.end())
-		return false;
-	stream = it->second;
-	dropable = it2->second;
-	return true;
+    auto it = observeList.find(nr);
+    if(it == observeList.end())
+        return false;
+    auto it2 = dropableList.find(nr);
+    if(it2 == dropableList.end())
+        return false;
+    stream = it->second;
+    dropable = it2->second;
+    return true;
 }
