@@ -121,8 +121,8 @@ The ISAACConfig.cmake searches for these requirements. See
   * _Debian/Ubuntu_ (as part of Paraview):
     * `sudo apt-get install paraview-dev`
   * _From Source_:
-    * `git clone git://public.kitware.com/IceT.git`
-    * `cd IceT`
+    * `git clone https://gitlab.kitware.com/icet/icet.git`
+    * `cd icet`
     * `mkdir build`
     * With admin rights and no other version of IceT installed:
       * `cd build`
