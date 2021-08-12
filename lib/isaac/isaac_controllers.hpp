@@ -15,8 +15,8 @@
 
 #pragma once
 
-#include "isaac_types.hpp"
 #include "isaac/isaac_helper.hpp"
+#include "isaac_types.hpp"
 
 namespace isaac
 {

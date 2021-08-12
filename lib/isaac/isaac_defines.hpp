@@ -18,6 +18,8 @@
 #include <alpaka/alpaka.hpp>
 #include <boost/preprocessor.hpp>
 
+#define ISAAC_MAX_ADVECTION_STEP_SIZE 3
+
 #ifndef ISAAC_MAX_DIFFERENCE
 #    define ISAAC_MAX_DIFFERENCE 4
 #endif
@@ -33,10 +35,6 @@
 
 #ifndef ISAAC_MAX_SOURCES
 #    define ISAAC_MAX_SOURCES 16
-#endif
-
-#ifndef ISAAC_GUARD_SIZE
-#    define ISAAC_GUARD_SIZE 1
 #endif
 
 #ifndef ISAAC_DEFAULT_STEP

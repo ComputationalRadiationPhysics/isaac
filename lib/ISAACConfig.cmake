@@ -7,6 +7,9 @@
 #  ISAAC_DEPENDENCY_HINTS - hints about missing dependencies
 #
 # It defines the following options
+#  ISAAC_RENDERER_LEGACY
+#  ISAAC_RENDERER_OPTIMIZED
+#  ISAAC_MORTON_CODE
 #  ISAAC_THREADING
 #  ISAAC_SHOWBORDER
 #  ISAAC_JPEG
@@ -38,6 +41,27 @@ include("${CMAKE_CURRENT_LIST_DIR}/ISAACBaseDir.cmake")
 ###############################################################################
 # OPTIONS
 ###############################################################################
+option(ISAAC_RENDERER_LEGACY "Compiles the legacy renderer" OFF)
+if (ISAAC_RENDERER_LEGACY)
+  set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_RENDERER_LEGACY)
+  message(STATUS "ISAAC_RENDERER_LEGACY is enabled") 
+endif ()
+option(ISAAC_RENDERER_OPTIMIZED "Compiles the optimized renderer" ON)
+if (ISAAC_RENDERER_OPTIMIZED)
+  set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_RENDERER_OPTIMIZED)
+  message(STATUS "ISAAC_RENDERER_OPTIMIZED is enabled") 
+endif ()
+
+if (NOT ISAAC_RENDERER_LEGACY AND NOT ISAAC_RENDERER_OPTIMIZED)
+    message( WARNING "No renderer enabled, enable optimized or legacy renderer to allow the rendering of images!" )
+endif ()
+
+option(ISAAC_MORTON_CODE "(WARNING EXPERIMENTAL!) Enables usage of morton indexing for the optimized renderer" OFF)
+if (ISAAC_MORTON_CODE)
+  set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_MORTON_CODE)
+  message(STATUS "ISAAC_MORTON_CODE is enabled") 
+endif ()
+
 option(ISAAC_THREADING "Do the video and metadata transmission transport in background." ON)
 if (ISAAC_THREADING)
   set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} -DISAAC_THREADING)

@@ -19,19 +19,53 @@
 
 namespace isaac
 {
-    ISAAC_HOST_DEVICE_INLINE void setColor(uint32_t& destination, const isaac_float4& color)
+    // Morton code seperation of bits by Fabian "ryg" Giesen
+    // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
+
+    ISAAC_HOST_DEVICE_INLINE uint32_t part1By1(uint32_t x)
     {
-        isaac_uint4 result = clamp(color, isaac_float(0), isaac_float(1)) * isaac_float(255);
-        destination = (result.w << 24) | (result.z << 16) | (result.y << 8) | (result.x << 0);
+        x &= 0x0000ffff; // x = ---- ---- ---- ---- fedc ba98 7654 3210
+        x = (x ^ (x << 8)) & 0x00ff00ff; // x = ---- ---- fedc ba98 ---- ---- 7654 3210
+        x = (x ^ (x << 4)) & 0x0f0f0f0f; // x = ---- fedc ---- ba98 ---- 7654 ---- 3210
+        x = (x ^ (x << 2)) & 0x33333333; // x = --fe --dc --ba --98 --76 --54 --32 --10
+        x = (x ^ (x << 1)) & 0x55555555; // x = -f-e -d-c -b-a -9-8 -7-6 -5-4 -3-2 -1-0
+        return x;
     }
 
-    ISAAC_HOST_DEVICE_INLINE isaac_float4 getColor(const uint32_t& samplePoint)
+    ISAAC_HOST_DEVICE_INLINE uint32_t part1By2(uint32_t x)
     {
-        return {
-            ((samplePoint >> 0) & 0xff) / 255.0f,
-            ((samplePoint >> 8) & 0xff) / 255.0f,
-            ((samplePoint >> 16) & 0xff) / 255.0f,
-            ((samplePoint >> 24) & 0xff) / 255.0f};
+        x &= 0x000003ff; // x = ---- ---- ---- ---- ---- --98 7654 3210
+        x = (x ^ (x << 16)) & 0xff0000ff; // x = ---- --98 ---- ---- ---- ---- 7654 3210
+        x = (x ^ (x << 8)) & 0x0300f00f; // x = ---- --98 ---- ---- 7654 ---- ---- 3210
+        x = (x ^ (x << 4)) & 0x030c30c3; // x = ---- --98 ---- 76-- --54 ---- 32-- --10
+        x = (x ^ (x << 2)) & 0x09249249; // x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
+        return x;
+    }
+
+    //--------------------------------------------------------------------------------------------------------------
+
+    uint64_t getTicksUs()
+    {
+        struct timespec ts;
+        if(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0)
+        {
+            return ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+        }
+        return 0;
+    }
+
+    ISAAC_HOST_DEVICE_INLINE isaac_float halton(isaac_uint index, isaac_uint base)
+    {
+        isaac_float result = 0;
+        isaac_float f = 1;
+
+        while(index > 0)
+        {
+            f /= isaac_float(base);
+            result += f * (index % base);
+            index /= base;
+        }
+        return result;
     }
 
     ISAAC_HOST_DEVICE_INLINE isaac_byte4 transformColor(const isaac_float4& floatColor)
@@ -184,7 +218,7 @@ namespace isaac
         }
     }
 
-    isaac_float4 getHSVA(isaac_float h, isaac_float s, isaac_float v, isaac_float a)
+    ISAAC_HOST_DEVICE_INLINE isaac_float4 getHSVA(isaac_float h, isaac_float s, isaac_float v, isaac_float a)
     {
         isaac_int hi = isaac_int(floor(h / (M_PI / 3)));
         isaac_float f = h / (M_PI / 3) - isaac_float(hi);

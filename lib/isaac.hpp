@@ -26,12 +26,8 @@
 #include "isaac/isaac_compositors.hpp"
 #include "isaac/isaac_controllers.hpp"
 #include "isaac/isaac_helper.hpp"
+#include "isaac/isaac_kernel.hpp"
 #include "isaac/isaac_version.hpp"
-#include "isaac_iso_kernel.hpp"
-#include "isaac_min_max_kernel.hpp"
-#include "isaac_particle_kernel.hpp"
-#include "isaac_ssao_kernel.hpp"
-#include "isaac_volume_kernel.hpp"
 
 #include <iostream>
 #include <memory>
@@ -64,13 +60,23 @@ namespace isaac
         typename T_Acc,
         typename T_Stream,
         typename T_AccDim,
+        typename T_VolumeSourceList,
+        typename T_FieldSourceList,
         typename T_ParticleList,
-        typename T_SourceList,
         ISAAC_IDX_TYPE T_transferSize,
         typename T_Controller,
         typename T_Compositor>
     class IsaacVisualization
     {
+        static const int vSourceListSize = boost::mpl::size<T_VolumeSourceList>::type::value;
+        static const int fSourceListSize = boost::mpl::size<T_FieldSourceList>::type::value;
+        static const int pSourceListSize = boost::mpl::size<T_ParticleList>::type::value;
+
+        static const int volumeFieldSourceListSize = vSourceListSize + fSourceListSize;
+
+        static const int combinedSourceListSize = vSourceListSize + fSourceListSize + pSourceListSize;
+
+
     public:
         IsaacCommunicator* getCommunicator()
         {
@@ -82,7 +88,7 @@ namespace isaac
         using FraDim = alpaka::DimInt<1>;
         using TexDim = alpaka::DimInt<1>;
 
-        struct source_2_json_iterator
+        struct Source2jsonIterator
         {
             template<typename T_Source, typename T_JsonRoot>
             ISAAC_HOST_INLINE void operator()(const int I, const T_Source& s, T_JsonRoot& jsonRoot) const
@@ -91,18 +97,6 @@ namespace isaac
                 json_array_append_new(jsonRoot, content);
                 json_object_set_new(content, "name", json_string(T_Source::getName().c_str()));
                 json_object_set_new(content, "feature dimension", json_integer(s.featureDim));
-            }
-        };
-
-        struct ParticleSource2jsonIterator
-        {
-            template<typename T_Source, typename T_JsonRoot>
-            ISAAC_HOST_INLINE void operator()(const int I, const T_Source& s, T_JsonRoot& jsonRoot) const
-            {
-                json_t* content = json_object();
-                json_array_append_new(jsonRoot, content);
-                json_object_set_new(content, "name", json_string(T_Source::getName().c_str()));
-                json_object_set_new(content, "feature dimension", json_integer(3));
             }
         };
 
@@ -139,13 +133,13 @@ namespace isaac
 
         struct UpdateFunctorChainIterator
         {
-            template<typename T_Source, typename T_Functions, typename T_Offset, typename T_Dest>
+            template<typename T_Source, typename T_Functions, typename T_Dest>
             ISAAC_HOST_INLINE void operator()(
                 const int I,
                 const T_Source& source,
                 const T_Functions& functions,
-                const T_Offset& offset,
-                T_Dest& dest) const
+                T_Dest& dest,
+                const int offset = 0) const
             {
                 isaac_int chain_nr = 0;
                 for(int i = 0; i < ISAAC_MAX_FUNCTORS; i++)
@@ -157,31 +151,68 @@ namespace isaac
             }
         };
 
-        struct AllocatePointerArrayIterator
+        struct AllocatePersistentTextureIterator
         {
             template<typename T_Source, typename T_Array, typename T_LocalSize, typename T_Vector, typename T_DevAcc>
             ISAAC_HOST_INLINE void operator()(
                 const int I,
                 const T_Source& source,
-                T_Array& pointerArray,
+                T_Array& persistentTextureArray,
                 const T_LocalSize& localSize,
-                T_Vector& alpaka_vector,
-                const T_DevAcc& acc) const
+                T_Vector& allocatorVector,
+                const T_DevAcc& acc,
+                const int offset = 0) const
             {
-                if(T_Source::persistent)
+                if(!T_Source::persistent)
                 {
-                    pointerArray.pointer[I] = NULL;
+                    allocatorVector.push_back(
+                        Tex3DAllocator<T_DevAcc, isaac_float>(acc, localSize, isaac_size3(T_Source::guardSize)));
+                    persistentTextureArray.textures[I + offset] = allocatorVector.back().getTexture();
                 }
-                else
+            }
+        };
+
+        struct AllocateFieldTextureIterator
+        {
+            template<
+                typename T_Source,
+                typename T_Array,
+                typename T_LocalSize,
+                typename T_Vector,
+                typename T_AdvectionVector,
+                typename T_AdvectionArray,
+                typename T_DevAcc>
+            ISAAC_HOST_INLINE void operator()(
+                const int I,
+                const T_Source& source,
+                T_Array& persistentTextureArray,
+                const T_LocalSize& localSize,
+                const isaac_float3& scale,
+                T_Vector& allocatorVector,
+                T_AdvectionVector& advectionAllocators,
+                T_AdvectionVector& advectionAllocatorsBackBuffer,
+                T_AdvectionArray& advectionTextures,
+                T_AdvectionArray& advectionTexturesBackBuffer,
+                const T_DevAcc& acc,
+                const int offset = 0) const
+            {
+                if(!T_Source::persistent)
                 {
-                    alpaka_vector.push_back(alpaka::Buf<T_DevAcc, isaac_float, FraDim, ISAAC_IDX_TYPE>(
-                        alpaka::allocBuf<isaac_float, ISAAC_IDX_TYPE>(
-                            acc,
-                            alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(
-                                T_Source::featureDim * (localSize[0] + 2 * ISAAC_GUARD_SIZE)
-                                * (localSize[1] + 2 * ISAAC_GUARD_SIZE) * (localSize[2] + 2 * ISAAC_GUARD_SIZE))))));
-                    pointerArray.pointer[I] = alpaka::getPtrNative(alpaka_vector.back());
+                    allocatorVector.push_back(
+                        Tex3DAllocator<T_DevAcc, isaac_float>(acc, localSize, isaac_size3(T_Source::guardSize)));
+                    persistentTextureArray.textures[I + offset] = allocatorVector.back().getTexture();
                 }
+
+                advectionAllocators.push_back(SyncedTexture3DAllocator<T_DevAcc, isaac_byte>(
+                    acc,
+                    localSize,
+                    isaac_size3(glm::ceil(isaac_float3(ISAAC_MAX_ADVECTION_STEP_SIZE + 1) / scale))));
+                advectionTextures.textures[I] = advectionAllocators.back().getTexture();
+                advectionAllocatorsBackBuffer.push_back(SyncedTexture3DAllocator<T_DevAcc, isaac_byte>(
+                    acc,
+                    localSize,
+                    isaac_size3(glm::ceil(isaac_float3(ISAAC_MAX_ADVECTION_STEP_SIZE + 1) / scale))));
+                advectionTexturesBackBuffer.textures[I] = advectionAllocatorsBackBuffer.back().getTexture();
             }
         };
 
@@ -215,63 +246,125 @@ namespace isaac
             }
         };
 
-        struct UpdatePointerArrayIterator
+        struct UpdatePersistentTextureIterator
         {
             template<
                 typename T_Source,
                 typename T_Array,
+                typename T_TransferArray,
                 typename T_Weight,
                 typename T_IsoTheshold,
                 typename T_Stream__>
             ISAAC_HOST_INLINE void operator()(
                 const int I,
                 T_Source& source,
-                T_Array& pointerArray,
+                T_Array& persistentTextureArray,
                 const isaac_size3& localSize,
+                const T_TransferArray& transferArray,
                 const T_Weight& weight,
                 const T_IsoTheshold& isoThreshold,
                 void* pointer,
-                T_Stream__& stream) const
+                T_Stream__& stream,
+                int offset = 0) const
             {
-                bool enabled = weight.value[I] != isaac_float(0) || isoThreshold.value[I] != isaac_float(0);
+                int index = I + offset;
+                bool enabled = weight.value[index] != isaac_float(0) || isoThreshold.value[index] != isaac_float(0);
                 source.update(enabled, pointer);
-                if(!T_Source::persistent && enabled)
+                if(enabled)
                 {
-                    isaac_size2 gridSize = {
-                        ISAAC_IDX_TYPE((localSize[0] + ISAAC_GUARD_SIZE * 2 + 15) / 16),
-                        ISAAC_IDX_TYPE((localSize[1] + ISAAC_GUARD_SIZE * 2 + 15) / 16),
-                    };
-                    isaac_size2 blockSize = {
-                        ISAAC_IDX_TYPE(16),
-                        ISAAC_IDX_TYPE(16),
-                    };
-                    isaac_int3 localSizeArray
-                        = {isaac_int(localSize[0]), isaac_int(localSize[1]), isaac_int(localSize[2])};
-#if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
-                    if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuCudaRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
-#endif
+                    if(!T_Source::persistent)
                     {
-                        gridSize.x = ISAAC_IDX_TYPE(localSize[0] + ISAAC_GUARD_SIZE * 2);
-                        gridSize.y = ISAAC_IDX_TYPE(localSize[0] + ISAAC_GUARD_SIZE * 2);
-                        blockSize.x = ISAAC_IDX_TYPE(1);
-                        blockSize.y = ISAAC_IDX_TYPE(1);
+                        UpdatePersistendTextureKernel<T_Source> kernel;
+                        executeKernelOnVolume<T_Acc>(
+                            localSize + T_Source::guardSize * 2,
+                            stream,
+                            kernel,
+                            index,
+                            source,
+                            persistentTextureArray.textures[index],
+                            isaac_int3(localSize));
+                        alpaka::wait(stream);
                     }
-                    const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> threads(
-                        ISAAC_IDX_TYPE(1),
-                        ISAAC_IDX_TYPE(1),
-                        ISAAC_IDX_TYPE(1));
-                    const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> blocks(ISAAC_IDX_TYPE(1), blockSize.x, blockSize.y);
-                    const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> grid(ISAAC_IDX_TYPE(1), gridSize.x, gridSize.y);
-                    auto const workdiv(alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>(grid, blocks, threads));
-                    UpdateBufferKernel<T_Source> kernel;
-                    auto const instance(alpaka::createTaskKernel<T_Acc>(
-                        workdiv,
-                        kernel,
-                        source,
-                        pointerArray.pointer[I],
-                        localSizeArray));
-                    alpaka::enqueue(stream, instance);
-                    alpaka::wait(stream);
+                }
+            }
+        };
+
+        struct UpdateAdvectionTextureIterator
+        {
+            template<
+                typename T_Source,
+                typename T_Array,
+                typename T_TransferArray,
+                typename T_AdvectionArray,
+                typename T_Weight,
+                typename T_IsoTheshold,
+                typename T_Stream__>
+            ISAAC_HOST_INLINE void operator()(
+                const int I,
+                T_Source& source,
+                T_Array& persistentTextureArray,
+                T_AdvectionArray& advectionTextures,
+                T_AdvectionArray& advectionTexturesBackBuffer,
+                const Tex3D<isaac_float>& noiseTexture,
+                const isaac_size3& localSize,
+                const T_TransferArray& transferArray,
+                const isaac_float3& scale,
+                const T_Weight& weight,
+                const T_IsoTheshold& isoThreshold,
+                void* pointer,
+                T_Stream__& stream,
+                isaac_int timeStep,
+                bool updateAdvection,
+                const isaac_float& advectionStepFactor,
+                const isaac_float& advectionHistoryWeight,
+                const isaac_int& advectionSeedingPeriod,
+                const isaac_int& advectionSeedingTime,
+                uint64_t& advectionTime,
+                int offset = 0) const
+            {
+                int index = I + offset;
+                bool enabled = weight.value[index] != isaac_float(0) || isoThreshold.value[index] != isaac_float(0);
+                source.update(enabled, pointer);
+                if(enabled)
+                {
+                    if(updateAdvection)
+                    {
+                        // update advection if enabled
+                        ISAAC_START_TIME_MEASUREMENT(advection, getTicksUs());
+                        GenerateAdvectionTextureKernel<T_Source> kernel;
+                        executeKernelOnVolume<T_Acc>(
+                            localSize + T_Source::guardSize * 2,
+                            stream,
+                            kernel,
+                            index,
+                            source,
+                            advectionTextures.textures[I],
+                            advectionTexturesBackBuffer.textures[I],
+                            noiseTexture,
+                            isaac_int3(localSize),
+                            scale,
+                            advectionStepFactor * ISAAC_MAX_ADVECTION_STEP_SIZE,
+                            advectionHistoryWeight,
+                            advectionSeedingPeriod,
+                            advectionSeedingTime,
+                            timeStep);
+                        alpaka::wait(stream);
+                        ISAAC_STOP_TIME_MEASUREMENT(advectionTime, +=, advection, getTicksUs());
+                    }
+                    if(!T_Source::persistent)
+                    {
+                        // update persistent buffer if source is non-persistend
+                        UpdatePersistendTextureKernel<T_Source> kernel;
+                        executeKernelOnVolume<T_Acc>(
+                            localSize + T_Source::guardSize * 2,
+                            stream,
+                            kernel,
+                            index,
+                            source,
+                            persistentTextureArray.textures[index],
+                            isaac_int3(localSize));
+                        alpaka::wait(stream);
+                    }
                 }
             }
         };
@@ -283,51 +376,37 @@ namespace isaac
                 typename T_Array,
                 typename T_Minmax,
                 typename T_LocalMinmax,
-                typename T_LocalSize,
                 typename T_Stream__,
                 typename T_Host__>
             ISAAC_HOST_INLINE void operator()(
                 const int I,
                 const T_Source& source,
-                T_Array& pointerArray,
+                T_Array& persistentTextureArray,
                 T_Minmax& minMax,
                 T_LocalMinmax& localMinMax,
-                T_LocalSize& localSize,
+                const isaac_size3& localSize,
                 T_Stream__& stream,
-                const T_Host__& host) const
+                const T_Host__& host,
+                const int offset = 0) const
             {
-                isaac_size2 gridSize = (localSize + ISAAC_IDX_TYPE(15)) / ISAAC_IDX_TYPE(16);
-                isaac_size2 blockSize(16);
-
+                const int index = I + offset;
                 MinMax localMinMaxHostArray[localSize.x * localSize.y];
 
                 if(localSize.x != 0 && localSize.y != 0)
                 {
-#if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
-                    if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuCudaRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
-#endif
-                    {
-                        gridSize = localSize;
-                        blockSize = isaac_size2(1);
-                    }
-                    const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> threads(
-                        ISAAC_IDX_TYPE(1),
-                        ISAAC_IDX_TYPE(1),
-                        ISAAC_IDX_TYPE(1));
-                    const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> blocks(ISAAC_IDX_TYPE(1), blockSize.x, blockSize.y);
-                    const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> grid(ISAAC_IDX_TYPE(1), gridSize.x, gridSize.y);
-                    auto const workdiv(alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>(grid, blocks, threads));
+                    isaac_size3 volumeSize = isaac_size3(localSize.x, localSize.y, 1);
                     MinMaxKernel<T_Source> kernel;
-                    auto const instance(alpaka::createTaskKernel<T_Acc>(
-                        workdiv,
+                    executeKernelOnVolume<T_Acc>(
+                        volumeSize,
+                        stream,
                         kernel,
                         source,
-                        I,
+                        index,
                         alpaka::getPtrNative(localMinMax),
                         localSize,
-                        pointerArray.pointer[I]));
-                    alpaka::enqueue(stream, instance);
+                        persistentTextureArray.textures[index]);
                     alpaka::wait(stream);
+
                     alpaka::ViewPlainPtr<T_Host, MinMax, FraDim, ISAAC_IDX_TYPE> minMaxBuffer(
                         localMinMaxHostArray,
                         host,
@@ -338,17 +417,17 @@ namespace isaac
                         localMinMax,
                         alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(localSize.x * localSize.y));
                 }
-                minMax.min[I] = std::numeric_limits<isaac_float>::max();
-                minMax.max[I] = -std::numeric_limits<isaac_float>::max();
+                minMax.min[index] = std::numeric_limits<isaac_float>::max();
+                minMax.max[index] = -std::numeric_limits<isaac_float>::max();
                 for(ISAAC_IDX_TYPE i = 0; i < localSize.x * localSize.y; i++)
                 {
-                    if(localMinMaxHostArray[i].min < minMax.min[I])
+                    if(localMinMaxHostArray[i].min < minMax.min[index])
                     {
-                        minMax.min[I] = localMinMaxHostArray[i].min;
+                        minMax.min[index] = localMinMaxHostArray[i].min;
                     }
-                    if(localMinMaxHostArray[i].max > minMax.max[I])
+                    if(localMinMaxHostArray[i].max > minMax.max[index])
                     {
-                        minMax.max[I] = localMinMaxHostArray[i].max;
+                        minMax.max[index] = localMinMaxHostArray[i].max;
                     }
                 }
             }
@@ -362,7 +441,6 @@ namespace isaac
                 typename T_ParticleSource,
                 typename T_Minmax,
                 typename T_LocalMinmax,
-                typename T_LocalSize,
                 typename T_Stream__,
                 typename T_Host__>
             ISAAC_HOST_INLINE void operator()(
@@ -370,43 +448,27 @@ namespace isaac
                 const T_ParticleSource& particleSource,
                 T_Minmax& minMax,
                 T_LocalMinmax& localMinMax,
-                T_LocalSize& localSize,
+                const isaac_size3& localSize,
                 T_Stream__& stream,
                 const T_Host__& host) const
             {
                 // iterate over all cells and the particle lists
-
-                isaac_size2 gridSize = (localSize + ISAAC_IDX_TYPE(15)) / ISAAC_IDX_TYPE(16);
-                isaac_size2 blockSize(16);
-
                 MinMax localMinMaxHostArray[localSize.x * localSize.y];
 
                 if(localSize.x != 0 && localSize.y != 0)
                 {
-#if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
-                    if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuCudaRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
-#endif
-                    {
-                        gridSize = localSize;
-                        blockSize = isaac_size2(1);
-                    }
-                    const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> threads(
-                        ISAAC_IDX_TYPE(1),
-                        ISAAC_IDX_TYPE(1),
-                        ISAAC_IDX_TYPE(1));
-                    const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> blocks(ISAAC_IDX_TYPE(1), blockSize.x, blockSize.y);
-                    const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> grid(ISAAC_IDX_TYPE(1), gridSize.x, gridSize.y);
-                    auto const workdiv(alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>(grid, blocks, threads));
+                    isaac_size3 volumeSize = isaac_size3(localSize.x, localSize.y, 1);
                     MinMaxParticleKernel<T_ParticleSource> kernel;
-                    auto const instance(alpaka::createTaskKernel<T_Acc>(
-                        workdiv,
+                    executeKernelOnVolume<T_Acc>(
+                        volumeSize,
+                        stream,
                         kernel,
                         particleSource,
                         I + T_offset,
                         alpaka::getPtrNative(localMinMax),
-                        localSize));
-                    alpaka::enqueue(stream, instance);
+                        localSize);
                     alpaka::wait(stream);
+
                     alpaka::ViewPlainPtr<T_Host, MinMax, FraDim, ISAAC_IDX_TYPE> minMaxBuffer(
                         localMinMaxHostArray,
                         host,
@@ -434,6 +496,71 @@ namespace isaac
             }
         };
 
+        void updateNoiseTexture(isaac_uint seedNumber)
+        {
+            deviceNoiseTextureAllocator.clearColor(stream);
+            alpaka::wait(stream);
+            // generate sparse noise with halton sequence
+            const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> threadElements(
+                ISAAC_IDX_TYPE(1),
+                ISAAC_IDX_TYPE(1),
+                ISAAC_IDX_TYPE(1));
+            const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> blocks(
+                ISAAC_IDX_TYPE(1),
+                ISAAC_IDX_TYPE(1),
+                ISAAC_IDX_TYPE(1));
+            const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> grid(ISAAC_IDX_TYPE(1), ISAAC_IDX_TYPE(1), ISAAC_IDX_TYPE(1));
+            const auto workdiv = alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>(grid, blocks, threadElements);
+            HaltonSeedingKernel haltonKernel;
+            auto haltonKernelInstance = alpaka::createTaskKernel<T_Acc>(
+                workdiv,
+                haltonKernel,
+                deviceNoiseTextureAllocator.getTexture(),
+                seedNumber);
+            alpaka::enqueue(stream, haltonKernelInstance);
+            // three passes of separable gauss blur
+            GaussBlur7Kernel gaussKernel;
+            executeKernelOnVolume<T_Acc>(
+                localSize,
+                stream,
+                gaussKernel,
+                deviceNoiseTextureAllocator.getTexture(),
+                noiseTmpTexAllocator.getTexture(),
+                scale,
+                isaac_float3(1, 0, 0));
+            alpaka::wait(stream);
+            executeKernelOnVolume<T_Acc>(
+                localSize,
+                stream,
+                gaussKernel,
+                noiseTmpTexAllocator.getTexture(),
+                deviceNoiseTextureAllocator.getTexture(),
+                scale,
+                isaac_float3(0, 1, 0));
+            alpaka::wait(stream);
+            executeKernelOnVolume<T_Acc>(
+                localSize,
+                stream,
+                gaussKernel,
+                deviceNoiseTextureAllocator.getTexture(),
+                noiseTmpTexAllocator.getTexture(),
+                scale,
+                isaac_float3(0, 0, 1));
+            alpaka::wait(stream);
+
+            MultiplyClampKernel mcKernel;
+            executeKernelOnVolume<T_Acc>(
+                localSize,
+                stream,
+                mcKernel,
+                noiseTmpTexAllocator.getTexture(),
+                deviceNoiseTextureAllocator.getTexture(),
+                isaac_float(30),
+                isaac_float(0),
+                isaac_float(1));
+            alpaka::wait(stream);
+        }
+
 
         IsaacVisualization(
             T_Host host,
@@ -448,8 +575,9 @@ namespace isaac
             const isaac_size3 localSize,
             const isaac_size3 localParticleSize,
             const isaac_size3 position,
+            T_VolumeSourceList& volumeSources,
+            T_FieldSourceList& fieldSources,
             T_ParticleList& particleSources,
-            T_SourceList& sources,
             isaac_float3 scale
 
             )
@@ -475,26 +603,24 @@ namespace isaac
             , copyTime(0)
             , sortingTime(0)
             , bufferTime(0)
+            , advectionTime(0)
+            , optimizationBufferTime(0)
             , interpolation(false)
             , step(isaac_float(ISAAC_DEFAULT_STEP))
+            , seedPoints(1000)
             , framebufferProd(ISAAC_IDX_TYPE(framebufferSize.x) * ISAAC_IDX_TYPE(framebufferSize.y))
+            , volumeSources(volumeSources)
+            , fieldSources(fieldSources)
             , particleSources(particleSources)
-            , sources(sources)
             , scale(scale)
             , icetBoundingBox(true)
-            , framebuffer(alpaka::allocBuf<uint32_t, ISAAC_IDX_TYPE>(acc, framebufferProd))
-            , framebufferAO(alpaka::allocBuf<isaac_float, ISAAC_IDX_TYPE>(acc, framebufferProd))
-            , framebufferDepth(alpaka::allocBuf<isaac_float, ISAAC_IDX_TYPE>(acc, framebufferProd))
-            , framebufferNormal(alpaka::allocBuf<isaac_float3, ISAAC_IDX_TYPE>(acc, framebufferProd))
             , functor_chain_d(alpaka::allocBuf<FunctorChainPointerN, ISAAC_IDX_TYPE>(
                   acc,
                   ISAAC_IDX_TYPE(ISAAC_FUNCTOR_COMPLEX * 4)))
             ,
 
-            functorChainChooseDevice(alpaka::allocBuf<FunctorChainPointerN, ISAAC_IDX_TYPE>(
-                acc,
-                ISAAC_IDX_TYPE(
-                    (boost ::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value))))
+            functorChainChooseDevice(
+                alpaka::allocBuf<FunctorChainPointerN, ISAAC_IDX_TYPE>(acc, ISAAC_IDX_TYPE(combinedSourceListSize)))
             ,
 
             localMinMaxArrayDevice(
@@ -504,6 +630,22 @@ namespace isaac
             localParticleMinMaxArrayDevice(alpaka::allocBuf<MinMax, ISAAC_IDX_TYPE>(
                 acc,
                 ISAAC_IDX_TYPE(localParticleSize[0] * localParticleSize[1])))
+            , framebuffer(acc, framebufferSize)
+            , framebufferAO(acc, framebufferSize)
+            , framebufferNormal(acc, framebufferSize)
+            , framebufferDepth(acc, framebufferSize)
+            , deviceNoiseTextureAllocator(acc, localSize)
+            , noiseTmpTexAllocator(acc, localSize)
+            , advectionStepFactor(1)
+            , advectionHistoryWeight(0.95)
+            , advectionSeedingPeriod(1)
+            , advectionSeedingTime(1)
+            , advectionOnPause(false)
+            , updateAdvectionBorderMPI(true)
+#ifdef ISAAC_RENDERER_OPTIMIZED
+            , combinedVolumeTextureAllocator(acc, localSize)
+            , combinedIsoTextureAllocator(acc, localSize)
+#endif
         {
 #if ISAAC_VALGRIND_TWEAKS == 1
             // Jansson has some optimizations for 2 and 4 byte aligned
@@ -523,7 +665,17 @@ namespace isaac
             backgroundColor[2] = 0;
             backgroundColor[3] = 1;
 
+            for(isaac_int& id : neighbourNodeIds.array)
+            {
+                id = -1;
+            }
+
+#ifdef ISAAC_RENDERER_OPTIMIZED
+            renderOptimization = true;
+#endif
+
             // INIT
+            // TODO: get mpi communicator from application and duplicate that one!
             MPI_Comm_dup(MPI_COMM_WORLD, &mpiWorld);
             MPI_Comm_rank(mpiWorld, &rank);
             MPI_Comm_size(mpiWorld, &numProc);
@@ -546,6 +698,8 @@ namespace isaac
             distance = -4.5f;
             updateModelview();
 
+            updateNoiseTexture(seedPoints);
+
             // Create functor chain pointer lookup table
             const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> threads(
                 ISAAC_IDX_TYPE(1),
@@ -563,21 +717,46 @@ namespace isaac
             alpaka::enqueue(stream, instance);
             alpaka::wait(stream);
             // Init functions:
-            for(int i = 0;
-                i < (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value);
-                i++)
+            for(int i = 0; i < vSourceListSize; i++)
+            {
+                functions[i].source = std::string("idem");
+            }
+            for(int i = vSourceListSize; i < volumeFieldSourceListSize; i++)
+            {
+                functions[i].source = std::string("length");
+            }
+            for(int i = volumeFieldSourceListSize; i < combinedSourceListSize; i++)
             {
                 functions[i].source = std::string("idem");
             }
             updateFunctions();
 
             // non persistent buffer memory
-            forEachParams(sources, AllocatePointerArrayIterator(), pointerArray, localSize, pointerArrayAlpaka, acc);
+            forEachParams(
+                volumeSources,
+                AllocatePersistentTextureIterator(),
+                persistentTextureArray,
+                localSize,
+                persistentTextureAllocators,
+                acc);
+
+            int offset = vSourceListSize;
+            forEachParams(
+                fieldSources,
+                AllocateFieldTextureIterator(),
+                persistentTextureArray,
+                localSize,
+                scale,
+                persistentTextureAllocators,
+                advectionTextureAllocators,
+                advectionTextureAllocatorsBackBuffer,
+                advectionTextures,
+                advectionTexturesBackBuffer,
+                acc,
+                offset);
 
             // Transfer func memory:
-            for(int i = 0;
-                i < (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value);
-                i++)
+            for(int i = 0; i < combinedSourceListSize; i++)
             {
                 sourceWeight.value[i] = ISAAC_DEFAULT_WEIGHT;
                 transferDeviceBuf.push_back(alpaka::Buf<DevAcc, isaac_float4, TexDim, ISAAC_IDX_TYPE>(
@@ -591,53 +770,25 @@ namespace isaac
                 transferDevice.pointer[i] = alpaka::getPtrNative(transferDeviceBuf[i]);
                 transferHost.pointer[i] = alpaka::getPtrNative(transferHostBuf[i]);
                 // Init volume transfer func with a alpha ramp from 0 -> 1
-                if(i < boost::mpl::size<T_SourceList>::type::value)
+                if(i < volumeFieldSourceListSize)
                 {
                     sourceIsoThreshold.value[i] = isaac_float(0);
                     transferHost.description[i].insert(std::pair<isaac_uint, isaac_float4>(
                         0,
-                        getHSVA(
-                            isaac_float(2 * i) * M_PI
-                                / isaac_float(
-                                    (boost::mpl::size<T_SourceList>::type::value
-                                     + boost::mpl::size<T_ParticleList>::type::value)),
-                            1,
-                            1,
-                            0)));
+                        getHSVA(isaac_float(2 * i) * M_PI / isaac_float(combinedSourceListSize), 1, 1, 0)));
                     transferHost.description[i].insert(std::pair<isaac_uint, isaac_float4>(
                         T_transferSize,
-                        getHSVA(
-                            isaac_float(2 * i) * M_PI
-                                / isaac_float(
-                                    (boost::mpl::size<T_SourceList>::type::value
-                                     + boost::mpl::size<T_ParticleList>::type::value)),
-                            1,
-                            1,
-                            1)));
+                        getHSVA(isaac_float(2 * i) * M_PI / isaac_float(combinedSourceListSize), 1, 1, 1)));
                 }
                 // Init particle transfer func with constant alpha = 1
                 else
                 {
                     transferHost.description[i].insert(std::pair<isaac_uint, isaac_float4>(
                         0,
-                        getHSVA(
-                            isaac_float(2 * i) * M_PI
-                                / isaac_float(
-                                    (boost::mpl::size<T_SourceList>::type::value
-                                     + boost::mpl::size<T_ParticleList>::type::value)),
-                            1,
-                            1,
-                            1)));
+                        getHSVA(isaac_float(2 * i) * M_PI / isaac_float(combinedSourceListSize), 1, 1, 1)));
                     transferHost.description[i].insert(std::pair<isaac_uint, isaac_float4>(
                         T_transferSize,
-                        getHSVA(
-                            isaac_float(2 * i) * M_PI
-                                / isaac_float(
-                                    (boost::mpl::size<T_SourceList>::type::value
-                                     + boost::mpl::size<T_ParticleList>::type::value)),
-                            1,
-                            1,
-                            1)));
+                        getHSVA(isaac_float(2 * i) * M_PI / isaac_float(combinedSourceListSize), 1, 1, 1)));
                 }
             }
             updateTransfer();
@@ -719,8 +870,9 @@ namespace isaac
                 json_t* jsonSourcesArray = json_array();
                 json_object_set_new(jsonRoot, "sources", jsonSourcesArray);
 
-                forEachParams(sources, source_2_json_iterator(), jsonSourcesArray);
-                forEachParams(particleSources, source_2_json_iterator(), jsonSourcesArray);
+                forEachParams(volumeSources, Source2jsonIterator(), jsonSourcesArray);
+                forEachParams(fieldSources, Source2jsonIterator(), jsonSourcesArray);
+                forEachParams(particleSources, Source2jsonIterator(), jsonSourcesArray);
 
                 json_object_set_new(jsonRoot, "interpolation", json_boolean(interpolation));
                 json_object_set_new(jsonRoot, "step", json_real(step));
@@ -894,6 +1046,12 @@ namespace isaac
             }
         }
 
+        void updateNeighbours(const Neighbours<isaac_int> neighbourIds)
+        {
+            ISAAC_WAIT_VISUALIZATION
+            this->neighbourNodeIds = neighbourIds;
+        }
+
 
         void updatePosition(const isaac_size3 position)
         {
@@ -922,12 +1080,8 @@ namespace isaac
         {
             ISAAC_WAIT_VISUALIZATION
             IsaacFunctorPool functors;
-            isaac_float4 functorParameterHost
-                [(boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value)
-                 * ISAAC_MAX_FUNCTORS];
-            for(int i = 0;
-                i < (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value);
-                i++)
+            isaac_float4 functorParameterHost[combinedSourceListSize * ISAAC_MAX_FUNCTORS];
+            for(int i = 0; i < combinedSourceListSize; i++)
             {
                 functions[i].errorCode = 0;
                 // Going from | to |...
@@ -1033,23 +1187,18 @@ namespace isaac
             }
 
             // Calculate functor chain nr per source
-            DestArrayStruct<(
-                boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value)>
-                dest;
-            int zero = 0;
-            forEachParams(sources, UpdateFunctorChainIterator(), functions, zero, dest);
-            forEachParams(
-                particleSources,
-                UpdateFunctorChainIterator(),
-                functions,
-                boost::mpl::size<T_SourceList>::type::value,
-                dest);
+            DestArrayStruct<combinedSourceListSize> dest;
+            forEachParams(volumeSources, UpdateFunctorChainIterator(), functions, dest);
+            int offset = vSourceListSize;
+            forEachParams(fieldSources, UpdateFunctorChainIterator(), functions, dest, offset);
+            offset = volumeFieldSourceListSize;
+            forEachParams(particleSources, UpdateFunctorChainIterator(), functions, dest, offset);
+
+
             alpaka::ViewPlainPtr<T_Host, isaac_float4, FraDim, ISAAC_IDX_TYPE> parameterBuffer(
                 functorParameterHost,
                 host,
-                alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(
-                    ISAAC_MAX_FUNCTORS
-                    * (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value))));
+                alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(ISAAC_MAX_FUNCTORS * combinedSourceListSize)));
 
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const parameterDeviceExtent(ISAAC_IDX_TYPE(16));
             auto parameterDeviceView(
@@ -1058,9 +1207,7 @@ namespace isaac
                 stream,
                 parameterDeviceView,
                 parameterBuffer,
-                alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(
-                    ISAAC_MAX_FUNCTORS
-                    * (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value))));
+                alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(ISAAC_MAX_FUNCTORS * combinedSourceListSize)));
 
             const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> threads(
                 ISAAC_IDX_TYPE(1),
@@ -1072,11 +1219,7 @@ namespace isaac
                 ISAAC_IDX_TYPE(1));
             const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> grid(ISAAC_IDX_TYPE(1), ISAAC_IDX_TYPE(1), ISAAC_IDX_TYPE(1));
             auto const workdiv(alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>(grid, blocks, threads));
-            UpdateFunctorChainPointerKernel<
-                (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value),
-                DestArrayStruct<(
-                    boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value)>>
-                kernel;
+            UpdateFunctorChainPointerKernel<combinedSourceListSize, DestArrayStruct<combinedSourceListSize>> kernel;
             auto const instance(alpaka::createTaskKernel<T_Acc>(
                 workdiv,
                 kernel,
@@ -1094,17 +1237,14 @@ namespace isaac
                 stream,
                 functionChainDeviceView,
                 functorChainChooseDevice,
-                ISAAC_IDX_TYPE(
-                    (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value)));
+                ISAAC_IDX_TYPE(combinedSourceListSize));
         }
 
 
         void updateTransfer()
         {
             ISAAC_WAIT_VISUALIZATION
-            for(int i = 0;
-                i < (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value);
-                i++)
+            for(int i = 0; i < combinedSourceListSize; i++)
             {
                 auto next = transferHost.description[i].begin();
                 auto before = next;
@@ -1160,29 +1300,20 @@ namespace isaac
             void* pointer = NULL,
             bool redraw = true)
         {
-            if(redraw)
-            {
-                ISAAC_START_TIME_MEASUREMENT(buffer, getTicksUs())
-                forEachParams(
-                    sources,
-                    UpdatePointerArrayIterator(),
-                    pointerArray,
-                    localSize,
-                    sourceWeight,
-                    sourceIsoThreshold,
-                    pointer,
-                    stream);
-                forEachParams(
-                    particleSources,
-                    UpdateParticleSourceIterator(),
-                    sourceWeight,
-                    pointer,
-                    boost::mpl::size<T_SourceList>::type::value);
-                ISAAC_STOP_TIME_MEASUREMENT(bufferTime, +=, buffer, getTicksUs())
-            }
-            ISAAC_WAIT_VISUALIZATION
+            redraw = redraw || advectionOnPause;
+            bool updatePersistentBuffers = redraw;
+            bool updateAdvection = redraw;
 
             myself = this;
+
+            kernelTime = 0;
+            mergeTime = 0;
+            copyTime = 0;
+            sortingTime = 0;
+            bufferTime = 0;
+            advectionTime = 0;
+            advectionBorderTime = 0;
+            optimizationBufferTime = 0;
 
             sendDistance = false;
             sendLookAt = false;
@@ -1190,7 +1321,15 @@ namespace isaac
             sendRotation = false;
             sendTransfer = false;
             sendInterpolation = false;
+            sendRenderOptimization = false;
             sendStep = false;
+            sendSeedPoints = false;
+            sendAdvectionStepSize = false;
+            sendAdvectionHistoryWeight = false;
+            sendAdvectionSeedingPeriod = false;
+            sendAdvectionSeedingTime = false;
+            sendAdvectionOnPause = false;
+            sendAdvectionBorderMPI = false;
             sendIsoThreshold = false;
             sendFunctions = false;
             sendWeight = false;
@@ -1200,6 +1339,8 @@ namespace isaac
             sendController = false;
             sendInitJson = false;
             sendAO = false;
+            sendRenderMode = false;
+            sendDitherMode = false;
 
             // Handle messages
             json_t* message;
@@ -1247,7 +1388,7 @@ namespace isaac
                         {
                             sendStep = true;
                         }
-                        if(strcmp(target, "iso mask") == 0)
+                        if(strcmp(target, "iso threshold") == 0)
                         {
                             sendIsoThreshold = true;
                         }
@@ -1278,6 +1419,29 @@ namespace isaac
                         if(strcmp(target, "ao") == 0)
                         {
                             sendAO = true;
+                        }
+                        if(strcmp(target, "start observing") == 0)
+                        {
+                            sendTransfer = true;
+                            sendFunctions = true;
+                            sendWeight = true;
+                            sendIsoThreshold = true;
+                            sendClipping = true;
+                            sendController = true;
+                            sendInterpolation = true;
+                            sendRenderOptimization = true;
+                            sendStep = true;
+                            sendSeedPoints = true;
+                            sendAdvectionStepSize = true;
+                            sendAdvectionHistoryWeight = true;
+                            sendAdvectionSeedingPeriod = true;
+                            sendAdvectionSeedingTime = true;
+                            sendAdvectionOnPause = true;
+                            sendAdvectionBorderMPI = true;
+                            sendBackgroundColor = true;
+                            sendAO = true;
+                            sendRenderMode = true;
+                            sendDitherMode = true;
                         }
                     }
                     // Search for scene changes
@@ -1427,6 +1591,7 @@ namespace isaac
             if(json_array_size(js = json_object_get(message, "transfer points")))
             {
                 redraw = true;
+                updatePersistentBuffers = true;
                 json_array_foreach(js, index, value)
                 {
                     transferHost.description[index].clear();
@@ -1451,6 +1616,13 @@ namespace isaac
                 interpolation = json_boolean_value(js);
                 sendInterpolation = true;
             }
+            if(js = json_object_get(message, "render optimization"))
+            {
+                redraw = true;
+                updatePersistentBuffers = true;
+                renderOptimization = json_boolean_value(js);
+                sendRenderOptimization = true;
+            }
             if(js = json_object_get(message, "step"))
             {
                 redraw = true;
@@ -1461,15 +1633,66 @@ namespace isaac
                 }
                 sendStep = true;
             }
+            if(js = json_object_get(message, "seed points"))
+            {
+                redraw = true;
+                seedPoints = glm::max(isaac_int(json_integer_value(js)), isaac_int(0));
+                updateNoiseTexture(seedPoints);
+                sendSeedPoints = true;
+            }
+            if(js = json_object_get(message, "advection step"))
+            {
+                advectionStepFactor = json_number_value(js);
+                sendAdvectionStepSize = true;
+            }
+            if(js = json_object_get(message, "advection weight"))
+            {
+                advectionHistoryWeight = json_number_value(js);
+                sendAdvectionHistoryWeight = true;
+            }
+            if(js = json_object_get(message, "advection seeding period"))
+            {
+                advectionSeedingPeriod = json_integer_value(js);
+                sendAdvectionSeedingPeriod = true;
+            }
+            if(js = json_object_get(message, "advection seeding duration"))
+            {
+                advectionSeedingTime = json_integer_value(js);
+                sendAdvectionSeedingTime = true;
+            }
+            if(js = json_object_get(message, "advection on pause"))
+            {
+                advectionOnPause = json_boolean_value(js);
+                sendAdvectionOnPause = true;
+            }
+            if(js = json_object_get(message, "advection border"))
+            {
+                updateAdvectionBorderMPI = json_boolean_value(js);
+                sendAdvectionBorderMPI = true;
+                if(!updateAdvectionBorderMPI)
+                {
+                    for(auto& advectionTexture : advectionTextureAllocators)
+                    {
+                        advectionTexture.clearColor(stream);
+                    }
+                    for(auto& advectionTexture : advectionTextureAllocatorsBackBuffer)
+                    {
+                        advectionTexture.clearColor(stream);
+                    }
+                }
+            }
             if(json_array_size(js = json_object_get(message, "iso threshold")))
             {
                 redraw = true;
+                updatePersistentBuffers = true;
                 json_array_foreach(js, index, value) sourceIsoThreshold.value[index] = json_number_value(value);
                 sendIsoThreshold = true;
             }
             if(json_array_size(js = json_object_get(message, "functions")))
             {
                 redraw = true;
+                // set updatePersistentBuffers because they need new functor chain for updated values
+                updatePersistentBuffers = true;
                 json_array_foreach(js, index, value) functions[index].source = std::string(json_string_value(value));
                 updateFunctions();
                 sendFunctions = true;
@@ -1477,6 +1700,7 @@ namespace isaac
             if(json_array_size(js = json_object_get(message, "weight")))
             {
                 redraw = true;
+                updatePersistentBuffers = true;
                 json_array_foreach(js, index, value) sourceWeight.value[index] = json_number_value(value);
                 sendWeight = true;
             }
@@ -1553,11 +1777,21 @@ namespace isaac
                 sendAO = true;
             }
 
-            if(js = json_object_get(message, "render_mode"))
+            if(js = json_object_get(message, "render mode"))
             {
                 redraw = true;
                 json_t* mode = json_object_get(js, "mode");
                 myself->renderMode = (isaac_int) json_integer_value(mode);
+                sendRenderMode = true;
+            }
+
+            if(js = json_object_get(message, "dither mode"))
+            {
+                redraw = true;
+                updatePersistentBuffers = true;
+                json_t* mode = json_object_get(js, "mode");
+                myself->ditherMode = (isaac_int) json_integer_value(mode);
+                sendDitherMode = true;
             }
 
             json_t* metadata = json_object_get(message, "metadata");
@@ -1568,20 +1802,177 @@ namespace isaac
             json_decref(message);
             thrMetaTargets = metaTargets;
 
+            if(updatePersistentBuffers)
+            {
+                ISAAC_START_TIME_MEASUREMENT(buffer, getTicksUs())
+                forEachParams(
+                    volumeSources,
+                    UpdatePersistentTextureIterator(),
+                    persistentTextureArray,
+                    localSize,
+                    transferDevice,
+                    sourceWeight,
+                    sourceIsoThreshold,
+                    pointer,
+                    stream);
+
+                // swap back buffers with main buffers, as the last frames main buffer is this frames history back
+                // buffer
+                if(updateAdvection)
+                {
+                    std::swap(advectionTextureAllocators, advectionTextureAllocatorsBackBuffer);
+                    std::swap(advectionTextures, advectionTexturesBackBuffer);
+                    timeStep++;
+                }
+                int offset = vSourceListSize;
+                // update advection and non-perisitent sources
+                forEachParams(
+                    fieldSources,
+                    UpdateAdvectionTextureIterator(),
+                    persistentTextureArray,
+                    advectionTextures,
+                    advectionTexturesBackBuffer,
+                    deviceNoiseTextureAllocator.getTexture(),
+                    localSize,
+                    transferDevice,
+                    scale,
+                    sourceWeight,
+                    sourceIsoThreshold,
+                    pointer,
+                    stream,
+                    timeStep,
+                    updateAdvection,
+                    advectionStepFactor,
+                    advectionHistoryWeight,
+                    advectionSeedingPeriod,
+                    advectionSeedingTime,
+                    advectionTime,
+                    offset);
+
+                offset = volumeFieldSourceListSize;
+                forEachParams(particleSources, UpdateParticleSourceIterator(), sourceWeight, pointer, offset);
+                ISAAC_STOP_TIME_MEASUREMENT(bufferTime, +=, buffer, getTicksUs())
+                bufferTime -= advectionTime;
+                ISAAC_START_TIME_MEASUREMENT(advectionBorder, getTicksUs())
+
+                // if border advection over mpi is enabled iterate over all sources
+                if(updateAdvection && updateAdvectionBorderMPI)
+                {
+                    for(isaac_uint j = 0; j < fSourceListSize; ++j)
+                    {
+                        if(sourceWeight.value[j + vSourceListSize] > 0
+                           || sourceIsoThreshold.value[j + vSourceListSize] > 0)
+                        {
+                            auto& advectionTextureAllocator = advectionTextureAllocators[j];
+
+                            // prepare the main texture borders for mpi communication with copy kernel to dedicated
+                            // texture
+                            syncOwnGuardTextures<T_Acc>(stream, advectionTextureAllocator, neighbourNodeIds);
+                            std::vector<MPI_Request> mpiRequests;
+                            // iterate over all sides and exchange the guard textures with neighbours over mpi
+                            for(isaac_int i = 1; i < 27; ++i)
+                            {
+                                // if border has valid mpi rank id
+                                if(neighbourNodeIds.array[i] != -1)
+                                {
+                                    // async receiving of buffers
+                                    mpiRequests.push_back(MPI_Request());
+                                    Tex3D<isaac_byte>& neighbourGuard
+                                        = advectionTextureAllocator.getNeighbourGuardTexture(i);
+                                    isaac_size3 neighbourSize = neighbourGuard.getSize();
+                                    MPI_Irecv(
+                                        neighbourGuard.getPtr(),
+                                        neighbourSize.x * neighbourSize.y * neighbourSize.z,
+                                        MPI_BYTE,
+                                        neighbourNodeIds.array[i],
+                                        i,
+                                        mpiWorld,
+                                        &(mpiRequests.back()));
+
+                                    // async sending of buffers
+                                    mpiRequests.push_back(MPI_Request());
+                                    Tex3D<isaac_byte>& ownGuard = advectionTextureAllocator.getOwnGuardTexture(i);
+                                    isaac_size3 ownSize = ownGuard.getSize();
+                                    MPI_Isend(
+                                        ownGuard.getPtr(),
+                                        ownSize.x * ownSize.y * ownSize.z,
+                                        MPI_BYTE,
+                                        neighbourNodeIds.array[i],
+                                        toMirroredIndex(i),
+                                        mpiWorld,
+                                        &(mpiRequests.back()));
+                                }
+                            }
+                            // wait for all mpi communications to be finished
+                            MPI_Waitall(mpiRequests.size(), &mpiRequests[0], NULL);
+
+                            // sync the received neighbour guard information with the main guards in the texture
+                            syncNeighbourGuardTextures<T_Acc>(stream, advectionTextureAllocator, neighbourNodeIds);
+                        }
+                    }
+                }
+                ISAAC_STOP_TIME_MEASUREMENT(advectionBorderTime, +=, advectionBorder, getTicksUs())
+
+#ifdef ISAAC_RENDERER_OPTIMIZED
+                ISAAC_START_TIME_MEASUREMENT(optimizationBuffer, getTicksUs())
+                isaac_float totalWeight = 0;
+                for(int i = 0; i < volumeFieldSourceListSize; i++)
+                {
+                    totalWeight += sourceWeight.value[i];
+                }
+                if(renderOptimization)
+                {
+                    combinedVolumeTextureAllocator.clearColor(stream);
+                    combinedIsoTextureAllocator.clearColor(stream);
+                    MergeToCombinedTextureKernel<T_transferSize> kernel;
+                    executeKernelOnVolume<T_Acc>(
+                        localSize,
+                        stream,
+                        kernel,
+                        volumeSources,
+                        fieldSources,
+                        persistentTextureArray,
+                        isaac_int3(localSize),
+                        transferDevice,
+                        totalWeight,
+                        sourceWeight,
+                        sourceIsoThreshold,
+                        advectionTextures,
+                        ditherMode,
+                        combinedVolumeTextureAllocator.getTexture(),
+                        combinedIsoTextureAllocator.getTexture());
+                    alpaka::wait(stream);
+                }
+                ISAAC_STOP_TIME_MEASUREMENT(optimizationBufferTime, +=, optimizationBuffer, getTicksUs())
+#endif
+            }
+            ISAAC_WAIT_VISUALIZATION
+
             if(sendMinMax)
             {
                 forEachParams(
-                    sources,
+                    volumeSources,
                     CalcMinMaxIterator(),
-                    pointerArray,
+                    persistentTextureArray,
                     minMaxArray,
                     localMinMaxArrayDevice,
                     localSize,
                     stream,
                     host);
+                int offset = vSourceListSize;
+                forEachParams(
+                    fieldSources,
+                    CalcMinMaxIterator(),
+                    persistentTextureArray,
+                    minMaxArray,
+                    localMinMaxArrayDevice,
+                    localSize,
+                    stream,
+                    host,
+                    offset);
                 forEachParams(
                     particleSources,
-                    CalcParticleMinMaxIterator<boost::mpl::size<T_SourceList>::type::value>(),
+                    CalcParticleMinMaxIterator<volumeFieldSourceListSize>(),
                     minMaxArray,
                     localParticleMinMaxArrayDevice,
                     localParticleSize,
@@ -1593,7 +1984,7 @@ namespace isaac
                     MPI_Reduce(
                         MPI_IN_PLACE,
                         minMaxArray.min,
-                        (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value),
+                        combinedSourceListSize,
                         MPI_FLOAT,
                         MPI_MIN,
                         master,
@@ -1601,7 +1992,7 @@ namespace isaac
                     MPI_Reduce(
                         MPI_IN_PLACE,
                         minMaxArray.max,
-                        (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value),
+                        combinedSourceListSize,
                         MPI_FLOAT,
                         MPI_MAX,
                         master,
@@ -1609,22 +2000,8 @@ namespace isaac
                 }
                 else
                 {
-                    MPI_Reduce(
-                        minMaxArray.min,
-                        NULL,
-                        (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value),
-                        MPI_FLOAT,
-                        MPI_MIN,
-                        master,
-                        mpiWorld);
-                    MPI_Reduce(
-                        minMaxArray.max,
-                        NULL,
-                        (boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value),
-                        MPI_FLOAT,
-                        MPI_MAX,
-                        master,
-                        mpiWorld);
+                    MPI_Reduce(minMaxArray.min, NULL, combinedSourceListSize, MPI_FLOAT, MPI_MIN, master, mpiWorld);
+                    MPI_Reduce(minMaxArray.max, NULL, combinedSourceListSize, MPI_FLOAT, MPI_MAX, master, mpiWorld);
                 }
             }
 
@@ -1749,23 +2126,15 @@ namespace isaac
         }
 
 
-        uint64_t getTicksUs()
-        {
-            struct timespec ts;
-            if(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0)
-            {
-                return ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
-            }
-            return 0;
-        }
-
-
         uint64_t kernelTime;
         uint64_t mergeTime;
         uint64_t videoSendTime;
         uint64_t copyTime;
         uint64_t sortingTime;
         uint64_t bufferTime;
+        uint64_t advectionTime;
+        uint64_t advectionBorderTime;
+        uint64_t optimizationBufferTime;
 
     private:
         static void drawCallBack(
@@ -1870,7 +2239,7 @@ namespace isaac
             IceTUByte* pixels = icetImageGetColorub(result);
 
             // start time for performance measurment
-            ISAAC_START_TIME_MEASUREMENT(kernel, myself->getTicksUs())
+            ISAAC_START_TIME_MEASUREMENT(kernel, getTicksUs())
 
             // set color values for background color
             isaac_float4 bgColor
@@ -1903,16 +2272,13 @@ namespace isaac
             const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> grid(ISAAC_IDX_TYPE(1), gridSize.y, gridSize.x);
             alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE> const workdiv(grid, blocks, threads);
 
-            const int SourceListLength
-                = boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value;
-
             GBuffer gBuffer;
             gBuffer.size = myself->framebufferSize;
             gBuffer.startOffset = framebufferStart;
-            gBuffer.color = alpaka::getPtrNative(myself->framebuffer);
-            gBuffer.depth = alpaka::getPtrNative(myself->framebufferDepth);
-            gBuffer.normal = alpaka::getPtrNative(myself->framebufferNormal);
-            gBuffer.aoStrength = alpaka::getPtrNative(myself->framebufferAO);
+            gBuffer.color = myself->framebuffer.getTexture();
+            gBuffer.depth = myself->framebufferDepth.getTexture();
+            gBuffer.normal = myself->framebufferNormal.getTexture();
+            gBuffer.aoStrength = myself->framebufferAO.getTexture();
 
             // reset the GBuffer to default values
             {
@@ -1925,15 +2291,15 @@ namespace isaac
             // call particle render kernel
             ParticleRenderKernelCaller<
                 T_ParticleList,
-                TransferDeviceStruct<SourceListLength>,
-                SourceWeightStruct<SourceListLength>,
+                TransferDeviceStruct<combinedSourceListSize>,
+                SourceWeightStruct<combinedSourceListSize>,
                 boost::mpl::vector<>,
                 T_transferSize,
                 alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>,
                 T_Acc,
                 T_Stream,
-                boost::mpl::size<T_SourceList>::type::value,
-                boost::mpl::size<T_ParticleList>::type::value>::
+                volumeFieldSourceListSize,
+                pSourceListSize>::
                 call(
                     myself->stream,
                     gBuffer,
@@ -1946,32 +2312,84 @@ namespace isaac
             // wait until render kernel has finished
             alpaka::wait(myself->stream);
 
-            // call iso render kernel
-            IsoRenderKernelCaller<
-                T_SourceList,
-                TransferDeviceStruct<SourceListLength>,
-                IsoThresholdStruct<boost::mpl::size<T_SourceList>::type::value>,
-                PointerArrayStruct<boost::mpl::size<T_SourceList>::type::value>,
-                boost::mpl::vector<>,
-                T_transferSize,
-                alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>,
-                T_Acc,
-                T_Stream,
-                boost::mpl::size<T_SourceList>::type::value>::
-                call(
-                    myself->stream,
-                    gBuffer,
-                    myself->sources,
-                    myself->step,
-                    myself->transferDevice,
-                    myself->sourceIsoThreshold,
-                    myself->pointerArray,
-                    workdiv,
-                    myself->interpolation,
-                    isaac_scale,
-                    myself->clipping);
-            // wait until render kernel has finished
-            alpaka::wait(myself->stream);
+#ifdef ISAAC_RENDERER_OPTIMIZED
+            if(myself->renderOptimization)
+            {
+                // check if any isosurface source is activated if not skip rendering
+                bool anyIsoSourceActive = false;
+                for(int i = 0; i < volumeFieldSourceListSize; ++i)
+                {
+                    if(myself->sourceIsoThreshold.value[i] > 0)
+                        anyIsoSourceActive = true;
+                }
+                if(anyIsoSourceActive)
+                {
+                    // use iso ray casting kernel with or without interpolation
+                    if(myself->interpolation)
+                    {
+                        CombinedIsoRenderKernel<FilterType::LINEAR> kernel;
+                        auto const instance(alpaka::createTaskKernel<T_Acc>(
+                            workdiv,
+                            kernel,
+                            gBuffer,
+                            myself->combinedIsoTextureAllocator.getTexture(),
+                            myself->step,
+                            isaac_scale,
+                            myself->clipping));
+                        alpaka::enqueue(myself->stream, instance);
+                    }
+                    else
+                    {
+                        CombinedIsoRenderKernel<FilterType::NEAREST> kernel;
+                        auto const instance(alpaka::createTaskKernel<T_Acc>(
+                            workdiv,
+                            kernel,
+                            gBuffer,
+                            myself->combinedIsoTextureAllocator.getTexture(),
+                            myself->step,
+                            isaac_scale,
+                            myself->clipping));
+                        alpaka::enqueue(myself->stream, instance);
+                    }
+                    alpaka::wait(myself->stream);
+                }
+            }
+#endif
+#ifdef ISAAC_RENDERER_LEGACY
+            if(!myself->renderOptimization)
+            {
+                // call iso render kernel
+                IsoRenderKernelCaller<
+                    T_VolumeSourceList,
+                    T_FieldSourceList,
+                    TransferDeviceStruct<combinedSourceListSize>,
+                    IsoThresholdStruct<volumeFieldSourceListSize>,
+                    PersistentArrayStruct<volumeFieldSourceListSize>,
+                    AdvectionArrayStruct<fSourceListSize>,
+                    boost::mpl::vector<>,
+                    T_transferSize,
+                    alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>,
+                    T_Acc,
+                    T_Stream,
+                    volumeFieldSourceListSize>::
+                    call(
+                        myself->stream,
+                        gBuffer,
+                        myself->volumeSources,
+                        myself->fieldSources,
+                        myself->step,
+                        myself->transferDevice,
+                        myself->sourceIsoThreshold,
+                        myself->persistentTextureArray,
+                        myself->advectionTextures,
+                        workdiv,
+                        myself->interpolation,
+                        isaac_scale,
+                        myself->clipping);
+                // wait until render kernel has finished
+                alpaka::wait(myself->stream);
+            }
+#endif
 
             // process color and depth values for depth simulation
             if(myself->ambientOcclusion.isEnabled && myself->ambientOcclusion.weight > 0.0f)
@@ -2022,54 +2440,104 @@ namespace isaac
                 alpaka::enqueue(myself->stream, instance);
                 alpaka::wait(myself->stream);
             }
+#ifdef ISAAC_RENDERER_OPTIMIZED
+            if(myself->renderOptimization)
+            {
+                // check if any volume source is activated if not skip rendering
+                isaac_float totalWeight = 0;
+                for(int i = 0; i < combinedSourceListSize; i++)
+                {
+                    totalWeight += myself->sourceWeight.value[i];
+                }
+                if(totalWeight > 0)
+                {
+                    // use volume ray casting kernel with or without interpolation
+                    if(myself->interpolation)
+                    {
+                        CombinedVolumeRenderKernel<FilterType::LINEAR, volumeFieldSourceListSize> kernel;
+                        auto const instance(alpaka::createTaskKernel<T_Acc>(
+                            workdiv,
+                            kernel,
+                            gBuffer,
+                            myself->combinedVolumeTextureAllocator.getTexture(),
+                            myself->step,
+                            totalWeight,
+                            isaac_scale,
+                            myself->clipping));
+                        alpaka::enqueue(myself->stream, instance);
+                    }
+                    else
+                    {
+                        CombinedVolumeRenderKernel<FilterType::NEAREST, volumeFieldSourceListSize> kernel;
+                        auto const instance(alpaka::createTaskKernel<T_Acc>(
+                            workdiv,
+                            kernel,
+                            gBuffer,
+                            myself->combinedVolumeTextureAllocator.getTexture(),
+                            myself->step,
+                            totalWeight,
+                            isaac_scale,
+                            myself->clipping));
+                        alpaka::enqueue(myself->stream, instance);
+                    }
+                    alpaka::wait(myself->stream);
+                }
+            }
 
-            // call volume render kernel
-            VolumeRenderKernelCaller<
-                T_SourceList,
-                TransferDeviceStruct<SourceListLength>,
-                SourceWeightStruct<SourceListLength>,
-                PointerArrayStruct<boost::mpl::size<T_SourceList>::type::value>,
-                boost::mpl::vector<>,
-                T_transferSize,
-                alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>,
-                T_Acc,
-                T_Stream,
-                boost::mpl::size<T_SourceList>::type::value>::
-                call(
-                    myself->stream,
-                    gBuffer,
-                    myself->sources,
-                    myself->step,
-                    myself->transferDevice,
-                    myself->sourceWeight,
-                    myself->pointerArray,
-                    workdiv,
-                    myself->interpolation,
-                    isaac_scale,
-                    myself->clipping);
+#endif
+#ifdef ISAAC_RENDERER_LEGACY
 
-            // wait until render kernel has finished
-            alpaka::wait(myself->stream);
+            if(!myself->renderOptimization)
+            {
+                // call volume render kernel
+                VolumeRenderKernelCaller<
+                    T_VolumeSourceList,
+                    T_FieldSourceList,
+                    TransferDeviceStruct<combinedSourceListSize>,
+                    SourceWeightStruct<combinedSourceListSize>,
+                    PersistentArrayStruct<volumeFieldSourceListSize>,
+                    AdvectionArrayStruct<fSourceListSize>,
+                    boost::mpl::vector<>,
+                    T_transferSize,
+                    alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>,
+                    T_Acc,
+                    T_Stream,
+                    volumeFieldSourceListSize>::
+                    call(
+                        myself->stream,
+                        gBuffer,
+                        myself->volumeSources,
+                        myself->fieldSources,
+                        myself->step,
+                        myself->transferDevice,
+                        myself->sourceWeight,
+                        myself->persistentTextureArray,
+                        myself->advectionTextures,
+                        workdiv,
+                        myself->interpolation,
+                        isaac_scale,
+                        myself->clipping);
+
+                // wait until render kernel has finished
+                alpaka::wait(myself->stream);
+            }
+#endif
 
             // stop and restart time for delta calculation
-            ISAAC_STOP_TIME_MEASUREMENT(myself->kernelTime, +=, kernel, myself->getTicksUs())
-            ISAAC_START_TIME_MEASUREMENT(copy, myself->getTicksUs())
+            ISAAC_STOP_TIME_MEASUREMENT(myself->kernelTime, +=, kernel, getTicksUs())
+            ISAAC_START_TIME_MEASUREMENT(copy, getTicksUs())
 
             // get memory view from IceT pixels on host
-            alpaka::ViewPlainPtr<T_Host, uint32_t, FraDim, ISAAC_IDX_TYPE> result_buffer(
-                (uint32_t*) (pixels),
+            alpaka::ViewPlainPtr<T_Host, isaac_byte4, FraDim, ISAAC_IDX_TYPE> result_buffer(
+                (isaac_byte4*) (pixels),
                 myself->host,
                 alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(myself->framebufferProd));
 
             // copy device framebuffer to result IceT pixel buffer
-            alpaka::memcpy(
-                myself->stream,
-                result_buffer,
-                myself->framebuffer,
-                alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(myself->framebufferProd));
+            myself->framebuffer.copyToBuffer(myself->stream, result_buffer);
 
             // stop timer and calculate copy time
-            ISAAC_STOP_TIME_MEASUREMENT(myself->copyTime, +=, copy, myself->getTicksUs())
+            ISAAC_STOP_TIME_MEASUREMENT(myself->copyTime, +=, copy, getTicksUs())
         }
 
 
@@ -2124,10 +2592,7 @@ namespace isaac
                 if(myself->sendTransfer)
                 {
                     json_object_set_new(myself->jsonRoot, "transfer array", matrix = json_array());
-                    for(ISAAC_IDX_TYPE i = 0; i
-                        < (boost::mpl::size<T_SourceList>::type::value
-                           + boost::mpl::size<T_ParticleList>::type::value);
-                        i++)
+                    for(ISAAC_IDX_TYPE i = 0; i < combinedSourceListSize; i++)
                     {
                         json_t* transfer = json_array();
                         json_array_append_new(matrix, transfer);
@@ -2150,10 +2615,7 @@ namespace isaac
                         }
                     }
                     json_object_set_new(myself->jsonRoot, "transfer points", matrix = json_array());
-                    for(ISAAC_IDX_TYPE i = 0; i
-                        < (boost::mpl::size<T_SourceList>::type::value
-                           + boost::mpl::size<T_ParticleList>::type::value);
-                        i++)
+                    for(ISAAC_IDX_TYPE i = 0; i < combinedSourceListSize; i++)
                     {
                         json_t* points = json_array();
                         json_array_append_new(matrix, points);
@@ -2174,10 +2636,7 @@ namespace isaac
                 if(myself->sendFunctions)
                 {
                     json_object_set_new(myself->jsonRoot, "functions", matrix = json_array());
-                    for(ISAAC_IDX_TYPE i = 0; i
-                        < (boost::mpl::size<T_SourceList>::type::value
-                           + boost::mpl::size<T_ParticleList>::type::value);
-                        i++)
+                    for(ISAAC_IDX_TYPE i = 0; i < combinedSourceListSize; i++)
                     {
                         json_t* f = json_object();
                         json_array_append_new(matrix, f);
@@ -2188,10 +2647,7 @@ namespace isaac
                 if(myself->sendWeight)
                 {
                     json_object_set_new(myself->jsonRoot, "weight", matrix = json_array());
-                    for(ISAAC_IDX_TYPE i = 0; i
-                        < (boost::mpl::size<T_SourceList>::type::value
-                           + boost::mpl::size<T_ParticleList>::type::value);
-                        i++)
+                    for(ISAAC_IDX_TYPE i = 0; i < combinedSourceListSize; i++)
                     {
                         json_array_append_new(matrix, json_real(myself->sourceWeight.value[i]));
                     }
@@ -2202,16 +2658,104 @@ namespace isaac
                     json_object_set_new(myself->jsonInitRoot, "interpolation", json_boolean(myself->interpolation));
                     myself->sendInitJson = true;
                 }
+                if(myself->sendRenderOptimization)
+                {
+                    json_object_set_new(
+                        myself->jsonRoot,
+                        "render optimization",
+                        json_boolean(myself->renderOptimization));
+                    json_object_set_new(
+                        myself->jsonInitRoot,
+                        "render optimization",
+                        json_boolean(myself->renderOptimization));
+                    myself->sendInitJson = true;
+                }
                 if(myself->sendStep)
                 {
                     json_object_set_new(myself->jsonRoot, "step", json_real(myself->step));
-                    json_object_set_new(myself->jsonInitRoot, "step", json_boolean(myself->step));
+                    json_object_set_new(myself->jsonInitRoot, "step", json_real(myself->step));
                     myself->sendInitJson = true;
                 }
+                if(myself->sendSeedPoints)
+                {
+                    json_object_set_new(myself->jsonRoot, "seed points", json_integer(myself->seedPoints));
+                    json_object_set_new(myself->jsonInitRoot, "seed points", json_integer(myself->seedPoints));
+                    myself->sendInitJson = true;
+                }
+                if(myself->sendAdvectionStepSize)
+                {
+                    json_object_set_new(myself->jsonRoot, "advection step", json_real(myself->advectionStepFactor));
+                    json_object_set_new(
+                        myself->jsonInitRoot,
+                        "advection step",
+                        json_real(myself->advectionStepFactor));
+                    myself->sendInitJson = true;
+                }
+                if(myself->sendAdvectionHistoryWeight)
+                {
+                    json_object_set_new(
+                        myself->jsonRoot,
+                        "advection weight",
+                        json_real(myself->advectionHistoryWeight));
+                    json_object_set_new(
+                        myself->jsonInitRoot,
+                        "advection weight",
+                        json_real(myself->advectionHistoryWeight));
+                    myself->sendInitJson = true;
+                }
+                if(myself->sendAdvectionSeedingPeriod)
+                {
+                    json_object_set_new(
+                        myself->jsonRoot,
+                        "advection seeding period",
+                        json_integer(myself->advectionSeedingPeriod));
+                    json_object_set_new(
+                        myself->jsonInitRoot,
+                        "advection seeding period",
+                        json_integer(myself->advectionSeedingPeriod));
+                    myself->sendInitJson = true;
+                }
+                if(myself->sendAdvectionSeedingTime)
+                {
+                    json_object_set_new(
+                        myself->jsonRoot,
+                        "advection seeding duration",
+                        json_integer(myself->advectionSeedingTime));
+                    json_object_set_new(
+                        myself->jsonInitRoot,
+                        "advection seeding duration",
+                        json_integer(myself->advectionSeedingTime));
+                    myself->sendInitJson = true;
+                }
+                if(myself->sendAdvectionOnPause)
+                {
+                    json_object_set_new(
+                        myself->jsonRoot,
+                        "advection on pause",
+                        json_boolean(myself->advectionOnPause));
+                    json_object_set_new(
+                        myself->jsonInitRoot,
+                        "advection on pause",
+                        json_boolean(myself->advectionOnPause));
+                    myself->sendInitJson = true;
+                }
+                if(myself->sendAdvectionBorderMPI)
+                {
+                    json_object_set_new(
+                        myself->jsonRoot,
+                        "advection border",
+                        json_boolean(myself->updateAdvectionBorderMPI));
+                    json_object_set_new(
+                        myself->jsonInitRoot,
+                        "advection border",
+                        json_boolean(myself->updateAdvectionBorderMPI));
+                    myself->sendInitJson = true;
+                }
+
                 if(myself->sendIsoThreshold)
                 {
                     json_object_set_new(myself->jsonRoot, "iso threshold", matrix = json_array());
-                    for(ISAAC_IDX_TYPE i = 0; i < boost::mpl::size<T_SourceList>::type::value; i++)
+                    for(ISAAC_IDX_TYPE i = 0; i < volumeFieldSourceListSize; i++)
                     {
                         json_array_append_new(matrix, json_real(myself->sourceIsoThreshold.value[i]));
                     }
@@ -2219,10 +2763,7 @@ namespace isaac
                 if(myself->sendMinMax)
                 {
                     json_object_set_new(myself->jsonRoot, "minmax", matrix = json_array());
-                    for(ISAAC_IDX_TYPE i = 0; i
-                        < (boost::mpl::size<T_SourceList>::type::value
-                           + boost::mpl::size<T_ParticleList>::type::value);
-                        i++)
+                    for(ISAAC_IDX_TYPE i = 0; i < combinedSourceListSize; i++)
                     {
                         json_t* v = json_object();
                         json_array_append_new(matrix, v);
@@ -2275,6 +2816,18 @@ namespace isaac
                     json_object_set_new(myself->jsonInitRoot, "ao weight", json_real(myself->ambientOcclusion.weight));
                     myself->sendInitJson = true;
                 }
+                if(myself->sendRenderMode)
+                {
+                    json_object_set_new(myself->jsonRoot, "render mode", json_integer(myself->renderMode));
+                    json_object_set_new(myself->jsonInitRoot, "render mode", json_integer(myself->renderMode));
+                    myself->sendInitJson = true;
+                }
+                if(myself->sendDitherMode)
+                {
+                    json_object_set_new(myself->jsonRoot, "dither mode", json_integer(myself->ditherMode));
+                    json_object_set_new(myself->jsonInitRoot, "dither mode", json_integer(myself->ditherMode));
+                    myself->sendInitJson = true;
+                }
                 myself->controller.sendFeedback(myself->jsonRoot, myself->sendController);
                 if(myself->sendInitJson)
                 {
@@ -2288,7 +2841,8 @@ namespace isaac
             myself->recreateJSON();
 
             // Sending video
-            ISAAC_START_TIME_MEASUREMENT(video_send, myself->getTicksUs())
+            ISAAC_START_TIME_MEASUREMENT(video_send, getTicksUs())
+#if 1
             if(myself->communicator)
             {
                 if(myself->image[0].opaque_internals)
@@ -2304,7 +2858,8 @@ namespace isaac
                     myself->communicator->serverSend(NULL, false, true);
                 }
             }
-            ISAAC_STOP_TIME_MEASUREMENT(myself->videoSendTime, +=, video_send, myself->getTicksUs())
+#endif
+            ISAAC_STOP_TIME_MEASUREMENT(myself->videoSendTime, =, video_send, getTicksUs())
             myself->metaNr++;
             return 0;
         }
@@ -2343,22 +2898,37 @@ namespace isaac
         alpaka::Vec<FraDim, ISAAC_IDX_TYPE> framebufferProd;
 
         // framebuffer pixel values
-        alpaka::Buf<DevAcc, uint32_t, FraDim, ISAAC_IDX_TYPE> framebuffer;
+        Tex2DAllocator<DevAcc, isaac_byte4> framebuffer;
 
         // ambient occlusion factor values
-        alpaka::Buf<DevAcc, isaac_float, FraDim, ISAAC_IDX_TYPE> framebufferAO;
+        Tex2DAllocator<DevAcc, isaac_float> framebufferAO;
 
         // pixel depth information
-        alpaka::Buf<DevAcc, isaac_float, FraDim, ISAAC_IDX_TYPE> framebufferDepth;
+        Tex2DAllocator<DevAcc, isaac_float> framebufferDepth;
 
         // pixel normal information
-        alpaka::Buf<DevAcc, isaac_float3, FraDim, ISAAC_IDX_TYPE> framebufferNormal;
+        Tex2DAllocator<DevAcc, isaac_float3> framebufferNormal;
+
+        Tex3DAllocator<DevAcc, isaac_float> deviceNoiseTextureAllocator;
+        Tex3DAllocator<DevAcc, isaac_float> noiseTmpTexAllocator;
+
+#ifdef ISAAC_RENDERER_OPTIMIZED
+#    ifdef ISAAC_MORTON_CODE
+        Tex3DAllocator<DevAcc, isaac_byte4, IndexType::MORTON> combinedVolumeTextureAllocator;
+        Tex3DAllocator<DevAcc, isaac_byte4, IndexType::MORTON> combinedIsoTextureAllocator;
+#    else
+        Tex3DAllocator<DevAcc, isaac_byte4> combinedVolumeTextureAllocator;
+        Tex3DAllocator<DevAcc, isaac_byte4> combinedIsoTextureAllocator;
+#    endif
+#endif
+
 
         alpaka::Buf<DevAcc, FunctorChainPointerN, FraDim, ISAAC_IDX_TYPE> functor_chain_d;
         alpaka::Buf<DevAcc, FunctorChainPointerN, FraDim, ISAAC_IDX_TYPE> functorChainChooseDevice;
         alpaka::Buf<DevAcc, MinMax, FraDim, ISAAC_IDX_TYPE> localMinMaxArrayDevice;
         alpaka::Buf<DevAcc, MinMax, FraDim, ISAAC_IDX_TYPE> localParticleMinMaxArrayDevice;
 
+        isaac_int timeStep = 0;
         isaac_size3 globalSize;
         isaac_size3 localSize;
         isaac_size3 localParticleSize;
@@ -2380,7 +2950,9 @@ namespace isaac
         bool sendProjection;
         bool sendTransfer;
         bool sendInterpolation;
+        bool sendRenderOptimization;
         bool sendStep;
+        bool sendSeedPoints;
         bool sendIsoThreshold;
         bool sendFunctions;
         bool sendWeight;
@@ -2390,22 +2962,34 @@ namespace isaac
         bool sendController;
         bool sendInitJson;
         bool sendAO;
+        bool sendRenderMode;
+        bool sendDitherMode;
+        bool sendAdvectionStepSize;
+        bool sendAdvectionHistoryWeight;
+        bool sendAdvectionSeedingPeriod;
+        bool sendAdvectionSeedingTime;
+        bool sendAdvectionOnPause;
+        bool sendAdvectionBorderMPI;
 
 
         bool interpolation;
+        bool renderOptimization = false;
         bool icetBoundingBox;
         isaac_float step;
+        isaac_int seedPoints;
         IsaacCommunicator* communicator = nullptr;
         json_t* jsonRoot = nullptr;
         json_t* jsonInitRoot = nullptr;
         json_t* jsonMetaRoot = nullptr;
         isaac_int rank;
         isaac_int renderMode = 0;
+        isaac_int ditherMode = 1;
         isaac_int master;
         isaac_int numProc;
         isaac_uint metaNr;
+        T_VolumeSourceList& volumeSources;
+        T_FieldSourceList& fieldSources;
         T_ParticleList& particleSources;
-        T_SourceList& sources;
         IceTContext icetContext[T_Controller::passCount];
         IsaacVisualizationMetaEnum thrMetaTargets;
         pthread_t visualizationThread;
@@ -2413,23 +2997,30 @@ namespace isaac
 
         std::vector<alpaka::Buf<DevAcc, isaac_float4, TexDim, ISAAC_IDX_TYPE>> transferDeviceBuf;
         std::vector<alpaka::Buf<T_Host, isaac_float4, TexDim, ISAAC_IDX_TYPE>> transferHostBuf;
-        std::vector<alpaka::Buf<DevAcc, isaac_float, FraDim, ISAAC_IDX_TYPE>> pointerArrayAlpaka;
+        std::vector<Tex3DAllocator<DevAcc, isaac_float>> persistentTextureAllocators;
+        std::vector<SyncedTexture3DAllocator<DevAcc, isaac_byte>> advectionTextureAllocators;
+        std::vector<SyncedTexture3DAllocator<DevAcc, isaac_byte>> advectionTextureAllocatorsBackBuffer;
+        AdvectionArrayStruct<fSourceListSize> advectionTextures;
+        AdvectionArrayStruct<fSourceListSize> advectionTexturesBackBuffer;
+        isaac_float advectionStepFactor;
+        isaac_float advectionHistoryWeight;
+        isaac_int advectionSeedingPeriod;
+        isaac_int advectionSeedingTime;
+        bool advectionOnPause;
+        bool updateAdvectionBorderMPI;
 
-        TransferDeviceStruct<(
-            boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value)>
-            transferDevice;
-        TransferHostStruct<(
-            boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value)>
-            transferHost;
-        SourceWeightStruct<(
-            boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value)>
-            sourceWeight;
-        IsoThresholdStruct<(boost::mpl::size<T_SourceList>::type::value)> sourceIsoThreshold;
-        PointerArrayStruct<(boost::mpl::size<T_SourceList>::type::value)> pointerArray;
-        MinMaxArray<(boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value)>
-            minMaxArray;
-        FunctionsStruct
-            functions[(boost::mpl::size<T_SourceList>::type::value + boost::mpl::size<T_ParticleList>::type::value)];
+        Neighbours<isaac_int> neighbourNodeIds;
+
+        TransferDeviceStruct<combinedSourceListSize> transferDevice;
+        TransferHostStruct<combinedSourceListSize> transferHost;
+        SourceWeightStruct<combinedSourceListSize> sourceWeight;
+        MinMaxArray<combinedSourceListSize> minMaxArray;
+        FunctionsStruct functions[combinedSourceListSize];
+
+        // Iso threshold array and persistent textures only needed for volume and field sources
+        IsoThresholdStruct<volumeFieldSourceListSize> sourceIsoThreshold;
+        PersistentArrayStruct<volumeFieldSourceListSize> persistentTextureArray;
+
         ISAAC_IDX_TYPE maxSize;
         ISAAC_IDX_TYPE maxSizeScaled;
         IceTFloat backgroundColor[4];
@@ -2447,8 +3038,9 @@ namespace isaac
         typename T_Acc,
         typename T_Stream,
         typename T_AccDim,
+        typename T_VolumeSourceList,
+        typename T_FieldSourceList,
         typename T_ParticleList,
-        typename T_SourceList,
         ISAAC_IDX_TYPE T_transferSize,
         typename T_Controller,
         typename T_Compositor>
@@ -2457,8 +3049,9 @@ namespace isaac
         T_Acc,
         T_Stream,
         T_AccDim,
+        T_VolumeSourceList,
+        T_FieldSourceList,
         T_ParticleList,
-        T_SourceList,
         T_transferSize,
         T_Controller,
         T_Compositor>*
@@ -2467,8 +3060,9 @@ namespace isaac
             T_Acc,
             T_Stream,
             T_AccDim,
+            T_VolumeSourceList,
+            T_FieldSourceList,
             T_ParticleList,
-            T_SourceList,
             T_transferSize,
             T_Controller,
             T_Compositor>::myself

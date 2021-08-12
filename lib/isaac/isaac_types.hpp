@@ -29,12 +29,12 @@ namespace isaac
     using isaac_double = double;
     using isaac_int = int32_t;
     using isaac_uint = uint32_t;
+    using isaac_ushort = uint16_t;
     using isaac_byte = uint8_t;
 
 #ifndef ISAAC_IDX_TYPE
 #    define ISAAC_IDX_TYPE size_t
 #endif
-
 
     template<int T_n, typename T_Type>
     using isaac_vec_dim = glm::vec<T_n, T_Type, glm::defaultp>;
@@ -65,6 +65,10 @@ namespace isaac
     using isaac_uint3 = isaac_vec_dim<3, isaac_uint>;
     using isaac_uint2 = isaac_vec_dim<2, isaac_uint>;
 
+    using isaac_ushort4 = isaac_vec_dim<4, isaac_ushort>;
+    using isaac_ushort3 = isaac_vec_dim<3, isaac_ushort>;
+    using isaac_ushort2 = isaac_vec_dim<2, isaac_ushort>;
+
     using isaac_byte4 = isaac_vec_dim<4, isaac_byte>;
     using isaac_byte3 = isaac_vec_dim<3, isaac_byte>;
     using isaac_byte2 = isaac_vec_dim<2, isaac_byte>;
@@ -85,6 +89,27 @@ namespace isaac
     using isaac_dmat3 = isaac_mat_dim<3, isaac_double>;
     using isaac_dmat2 = isaac_mat_dim<2, isaac_double>;
 
+    template<typename T_Type>
+    struct TypeDim
+    {
+        static const int value = 1;
+    };
+    template<int T_n, typename T_CompType>
+    struct TypeDim<isaac_vec_dim<T_n, T_CompType>>
+    {
+        static const int value = T_n;
+    };
+
+    template<typename T_Type>
+    struct CompType
+    {
+        using type = T_Type;
+    };
+    template<int T_n, typename T_CompType>
+    struct CompType<isaac_vec_dim<T_n, T_CompType>>
+    {
+        using type = T_CompType;
+    };
 
     /**
      * @brief Container for all simulation sizes
@@ -105,14 +130,50 @@ namespace isaac
         isaac_size3 localSizeScaled; // same as globalSizeScaled
     };
 
-    struct GBuffer
+    inline isaac_int3 indexToDirection(isaac_uint index)
     {
-        isaac_size2 size;
-        isaac_uint2 startOffset;
-        uint32_t* color;
-        isaac_float* depth;
-        isaac_float3* normal;
-        isaac_float* aoStrength;
+        isaac_int3 direction;
+        for(isaac_int d = 0; d < 3; ++d)
+        {
+            const isaac_int dimDirection(index % 3);
+            direction[d] = (dimDirection == 2 ? -1 : dimDirection);
+            index /= 3;
+        }
+        return direction;
+    }
+
+    inline isaac_uint directionToIndex(isaac_int3 direction)
+    {
+        isaac_uint index = 0;
+        // printf("Direction: %d, %d, %d\n", direction.x, direction.y, direction.z);
+        for(isaac_int d = 2; d >= 0; --d)
+        {
+            index *= 3;
+            index += (direction[d] == -1 ? 2 : direction[d]);
+        }
+        // printf("Index %d\n", index);
+        return index;
+    }
+
+    inline isaac_int toMirroredIndex(isaac_uint index)
+    {
+        return directionToIndex(indexToDirection(index) * isaac_int(-1));
+    }
+
+    template<typename T_Type>
+    struct Neighbours
+    {
+        T_Type array[27];
+
+        T_Type& get(isaac_int3 direction)
+        {
+            return array[directionToIndex(direction)];
+        }
+
+        void set(isaac_int3 direction, T_Type element)
+        {
+            array[directionToIndex(direction)] = element;
+        }
     };
 
     template<int T_n>
@@ -157,12 +218,6 @@ namespace isaac
     struct SourceWeightStruct
     {
         isaac_float value[ZeroCheck<T_n>::value];
-    };
-
-    template<int T_n>
-    struct PointerArrayStruct
-    {
-        void* pointer[ZeroCheck<T_n>::value];
     };
 
     struct MinMax

@@ -25,14 +25,14 @@ namespace isaac
         template<typename T_Acc>
         ISAAC_DEVICE void operator()(
             T_Acc const& acc,
-            const T_Source source,
+            T_Source source,
             const int nr,
             MinMax* const result,
             const isaac_size3 localSize,
-            void const* const pointer) const
+            const Tex3D<isaac_float> texture) const
         {
             auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-            isaac_int3 coord = {isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[2]), 0};
+            isaac_int3 coord = {isaac_int(alpThreadIdx[2]), isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[0])};
 
             if(!isInUpperBounds(coord, localSize))
                 return;
@@ -40,21 +40,17 @@ namespace isaac
             isaac_float max = -std::numeric_limits<isaac_float>::max();
             for(; coord.z < localSize.z; coord.z++)
             {
-                isaac_float_dim<T_Source::featureDim> data;
+                isaac_float value;
                 if(T_Source::persistent)
                 {
-                    data = source[coord];
+                    isaac_float_dim<T_Source::featureDim> data = source[coord];
+                    value = applyFunctorChain(data, nr);
                 }
                 else
                 {
-                    isaac_float_dim<T_Source::featureDim>* ptr = (isaac_float_dim<T_Source::featureDim>*) (pointer);
-                    data = ptr
-                        [coord.x + ISAAC_GUARD_SIZE
-                         + (coord.y + ISAAC_GUARD_SIZE) * (localSize.x + 2 * ISAAC_GUARD_SIZE)
-                         + (coord.z + ISAAC_GUARD_SIZE)
-                             * ((localSize.x + 2 * ISAAC_GUARD_SIZE) * (localSize.y + 2 * ISAAC_GUARD_SIZE))];
+                    value = texture[coord];
                 };
-                isaac_float value = applyFunctorChain(data, nr);
+
                 min = glm::min(min, value);
                 max = glm::max(max, value);
             }
@@ -76,7 +72,7 @@ namespace isaac
             const isaac_size3 localSize) const
         {
             auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-            isaac_uint3 coord = {isaac_uint(alpThreadIdx[1]), isaac_uint(alpThreadIdx[2]), 0};
+            isaac_uint3 coord = {isaac_int(alpThreadIdx[2]), isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[0])};
             if(!isInUpperBounds(coord, localSize))
                 return;
             isaac_float min = std::numeric_limits<isaac_float>::max();

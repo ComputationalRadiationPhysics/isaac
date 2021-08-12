@@ -68,17 +68,17 @@ namespace isaac
             isaac_int radius = 10;
 
             /*
-            //isaac_float3 origin = gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x];
+            //isaac_float3 origin = gBuffer.depth[pixel];
 
 
 
             //get the normal value from the gbuffer
-            isaac_float3 normal = gNormal[pixel.x + pixel.y * gBuffer.size.x];
+            isaac_float3 normal = gNormal[pixel];
 
             //normalize the normal
             isaac_float len = sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
             if(len == 0) {
-                gBuffer.aoStrength[pixel.x + pixel.y * gBuffer.size.x] = 0.0f;
+                gBuffer.aoStrength[pixel] = 0.0f;
                 return;
             }
 
@@ -160,23 +160,15 @@ namespace isaac
              */
             // closer to the camera
             isaac_float occlusion = 0.0f;
-            isaac_float refDepth = gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x];
+            isaac_float refDepth = gBuffer.depth[pixel];
+            const Sampler<FilterType::NEAREST, BorderType::CLAMP> sampler;
             for(int i = -3; i <= 3; ++i)
             {
                 for(int j = -3; j <= 3; ++j)
                 {
-                    // avoid out of bounds by simple min max
-                    isaac_int x = glm::clamp(
-                        pixel.x + i * radius,
-                        gBuffer.startOffset.x,
-                        gBuffer.startOffset.x + gBuffer.size.x);
-                    isaac_int y = glm::clamp(
-                        pixel.y + j * radius,
-                        gBuffer.startOffset.y,
-                        gBuffer.startOffset.y + gBuffer.size.y);
-
                     // get the neighbour depth value
-                    isaac_float depthSample = gBuffer.depth[x + y * gBuffer.size.x];
+                    isaac_float depthSample
+                        = sampler.safeMemoryAccess(gBuffer.depth, isaac_int2(pixel) + isaac_int2(i, j) * radius);
 
                     if(depthSample < refDepth)
                     {
@@ -187,7 +179,7 @@ namespace isaac
             isaac_float depth = glm::clamp((occlusion / 42.0f), 0.0f, 1.0f);
 
             // save the depth value in our ao buffer
-            gBuffer.aoStrength[pixel.x + pixel.y * gBuffer.size.x] = depth;
+            gBuffer.aoStrength[pixel] = depth;
         }
     };
 
@@ -221,9 +213,9 @@ namespace isaac
              *
              * If the real ssao algorithm is implemented, a real filter will be necessary
              */
-            isaac_float depth = gBuffer.aoStrength[pixel.x + pixel.y * gBuffer.size.x];
+            isaac_float depth = gBuffer.aoStrength[pixel];
 
-            isaac_float4 colorValues = getColor(gBuffer.color[pixel.x + pixel.y * gBuffer.size.x]);
+            isaac_float4 colorValues = transformColor(gBuffer.color[pixel]);
 
             // read the weight from the global ao settings and merge them with the color value
             isaac_float weight = aoProperties.weight;
@@ -233,7 +225,7 @@ namespace isaac
                 = {aoFactor * colorValues.x, aoFactor * colorValues.y, aoFactor * colorValues.z, colorValues.w};
 
             // finally replace the old color value with the new ssao filtered color value
-            setColor(gBuffer.color[pixel.x + pixel.y * gBuffer.size.x], finalColor);
+            gBuffer.color[pixel] = transformColor(finalColor);
         }
     };
 } // namespace isaac
