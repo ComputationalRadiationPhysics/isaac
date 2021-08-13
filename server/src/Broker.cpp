@@ -547,13 +547,7 @@ errorCode Broker::run()
                             imageConnectorList[stream].connector->masterSendMessage(
                                 new ImageBufferContainer(GROUP_OBSERVED, NULL, group, 1, url, ref));
                         // Send request for (transfer) functions and most recent frame
-                        char buffer[] = "{\"type\": \"feedback\", \"request\": \"transfer\"} "
-                                        "{\"type\": \"feedback\", \"request\": \"functions\"} "
-                                        "{\"type\": \"feedback\", \"request\": \"weight\"} "
-                                        "{\"type\": \"feedback\", \"request\": \"iso mask\"} "
-                                        "{\"type\": \"feedback\", \"request\": \"clipping\"} "
-                                        "{\"type\": \"feedback\", \"request\": \"redraw\"} "
-                                        "{\"type\": \"feedback\", \"request\": \"controller\"}";
+                        char buffer[] = "{\"type\": \"feedback\", \"request\": \"start observing\"} ";
                         send(group->master->connector->getSockFD(), buffer, strlen(buffer), MSG_NOSIGNAL);
                     }
                 }

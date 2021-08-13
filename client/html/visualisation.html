@@ -63,10 +63,6 @@
 				Interval: <input type="range" value="1" min="1" max="32" id="interval_range">
 				<span id="interval_span">1</span>
 				<input type="button" value="Set" id="interval_change">
-				<input type="checkbox" id="controls_checkbox" onchange="controls_checkbox_click()"> Show controls
-			</form>
-			<div id="render_mode_div">
-				<h3>Debug Render Mode</h3>
 				<select id="render_mode_list" onchange="renderModeUpdate()">
 					<option>Full Shaded</option>
 					<option>No Specular</option>
@@ -78,7 +74,17 @@
 					<option>GPU Rank</option>
 					<option>GPU Rank Buffer</option>
 				</select>
-			</div>
+				<input type="checkbox" id="render_optimization_checkbox" checked onchange="render_optimization_checkbox_click()"> Render Optimization
+				<select id="dither_mode_list" onchange="ditherModeUpdate()">
+					<option>No Dithering</option>
+					<option>Dither Matrix (4³)</option>
+					<option>Blue Noise (4³)</option>
+					<option>Blue Noise (8³)</option>
+					<option>Blue Noise (16³)</option>
+				</select>
+				<input type="checkbox" id="border_advection_checkbox" checked onchange="border_advection_checkbox_click()"> Boundary Advection
+				<input type="checkbox" id="controls_checkbox" onchange="controls_checkbox_click()"> Show controls
+			</form>
 			<div id="ambient_occ_div">
 				<table>
 					<h3>Ambient Occlusion</h3>
@@ -104,6 +110,20 @@
 			<div id="iso_div"></div>
 			<input type="checkbox" id="interpolation_checkbox" checked onchange="interpolation_checkbox_click()"> Interpolation
 			<input id="step" size="4"><input type="button" value="Change step" id="step_button" onclick="step_button_click()"><br/>
+			<input id="seed_points" size="4"><input type="button" value="Change number of seed points" id="seed_points_button" onclick="seed_points_button_click()"><br/>
+			<span>Advection step factor: </span>
+			<input type="range" min="-1" max="1" value="1" step="0.01" id="advection_step" oninput="this.nextElementSibling.value = parseFloat(this.value).toFixed(2)" onchange="advection_step_changed()">
+			<output id="advection_step_text" value=""></output><br/>
+			<span>Advection weight: </span>
+			<input type="range" min="0" max="1" value="1" step="0.01" id="advection_weight" oninput="this.nextElementSibling.value = parseFloat(this.value).toFixed(2)" onchange="advection_weight_changed()">
+			<output id="advection_weight_text" value=""></output><br/>
+			<span>Seeding period: </span>
+			<input type="range" min="1" max="100" value="1" step="1" id="advection_seeding_period" oninput="this.nextElementSibling.value = parseInt(this.value)" onchange="advection_seeding_period_changed()">
+			<output id="advection_seeding_period_text" value=""></output><br/>
+			<span>Seeding duration: </span>
+			<input type="range" min="1" max="100" value="1" step="1" id="advection_seeding_duration" oninput="this.nextElementSibling.value = parseInt(this.value)" onchange="advection_seeding_duration_changed()">
+			<output id="advection_seeding_duration_text" value=""></output><br/>
+			<input type="checkbox" id="advection_on_pause_checkbox" checked onchange="advection_on_pause_checkbox_click()"> Advection during pause<br/>
 			<div id="clipping_add_div">
 				<b>Clipping planes:</b><br/>
 				<span> Position: </span><input type="text"   value="0" size="4" id="clip_px"><input type="text"   value="0" size="4" id="clip_py"><input type="text"   value="0" size="4" id="clip_pz">

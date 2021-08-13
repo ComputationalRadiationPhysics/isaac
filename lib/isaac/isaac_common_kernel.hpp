@@ -15,9 +15,11 @@
 
 #pragma once
 
+#include "isaac_dither_kernel.hpp"
 #include "isaac_functor_chain.hpp"
 #include "isaac_fusion_extension.hpp"
 #include "isaac_macros.hpp"
+#include "isaac_texture.hpp"
 
 #include <limits>
 
@@ -203,10 +205,10 @@ namespace isaac
                 return;
 
             bgColor.w = 0;
-            setColor(gBuffer.color[pixel.x + pixel.y * gBuffer.size.x], bgColor);
-            gBuffer.normal[pixel.x + pixel.y * gBuffer.size.x] = isaac_float3(0, 0, 0);
-            gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x] = std::numeric_limits<isaac_float>::max();
-            gBuffer.aoStrength[pixel.x + pixel.y * gBuffer.size.x] = 0;
+            gBuffer.color[pixel] = transformColor(bgColor);
+            gBuffer.normal[pixel] = isaac_float3(0, 0, 0);
+            gBuffer.depth[pixel] = std::numeric_limits<isaac_float>::max();
+            gBuffer.aoStrength[pixel] = 0;
         }
     };
 
@@ -234,12 +236,17 @@ namespace isaac
             if(pixel.x >= gBuffer.size.x || pixel.y >= gBuffer.size.y)
                 return;
 
-            isaac_float4 color = getColor(gBuffer.color[pixel.x + pixel.y * gBuffer.size.x]);
-            isaac_float3 normal = gBuffer.normal[pixel.x + pixel.y * gBuffer.size.x];
-            isaac_float aoStrength = isaac_float(1) - gBuffer.aoStrength[pixel.x + pixel.y * gBuffer.size.x];
+            isaac_float4 color = transformColor(gBuffer.color[pixel]);
+            isaac_float3 normal = gBuffer.normal[pixel];
+            isaac_float aoStrength = isaac_float(1) - gBuffer.aoStrength[pixel];
+            // rank information color coded for debug
+            if(mode == 7)
+            {
+                color = getHSVA(halton(rank, 3) * isaac_float(2 * M_PI), 1, 1, color.a);
+            }
 
             // normal blinn-phong shading
-            if(mode < 3)
+            if(mode < 3 || mode == 7)
             {
                 Ray ray = pixelToRay(isaac_float2(pixel), isaac_float2(gBuffer.size));
                 isaac_float3 lightDir = -ray.dir;
@@ -265,144 +272,481 @@ namespace isaac
 
 
                 isaac_float3 shadedColor = glm::min(color * lightFactor + specular, isaac_float(1));
-                setColor(gBuffer.color[pixel.x + pixel.y * gBuffer.size.x], isaac_float4(shadedColor, color.a));
+                gBuffer.color[pixel] = transformColor(isaac_float4(shadedColor, color.a));
 
                 // render only solid
-                if(mode == 2)
-                    gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x] = isaac_float(0);
+                if(mode == 2 || mode == 7)
+                    gBuffer.depth[pixel] = isaac_float(0);
             }
             // render only volume
             else if(mode == 3)
             {
                 backgroundColor.a = color.a;
-                setColor(gBuffer.color[pixel.x + pixel.y * gBuffer.size.x], backgroundColor);
+                gBuffer.color[pixel] = transformColor(backgroundColor);
             }
             // normal as color for debug
             else if(mode == 4)
             {
                 normal = normal * isaac_float(0.5) + isaac_float(0.5);
-                setColor(gBuffer.color[pixel.x + pixel.y * gBuffer.size.x], isaac_float4(normal, color.a));
-                gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x] = isaac_float(0);
+                gBuffer.color[pixel] = transformColor(isaac_float4(normal, color.a));
+                gBuffer.depth[pixel] = isaac_float(0);
             }
             // depth as color for debug
             else if(mode == 5)
             {
-                isaac_float depth = gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x]
-                    / isaac_float(SimulationSize.maxGlobalSizeScaled);
-                setColor(
-                    gBuffer.color[pixel.x + pixel.y * gBuffer.size.x],
-                    isaac_float4(isaac_float3(depth), color.a));
-                gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x] = isaac_float(0);
+                isaac_float depth = gBuffer.depth[pixel] / isaac_float(SimulationSize.maxGlobalSizeScaled);
+                gBuffer.color[pixel] = transformColor(isaac_float4(isaac_float3(depth), color.a));
+                gBuffer.depth[pixel] = isaac_float(0);
             }
             // ambient occlusion as color for debug
             else if(mode == 6)
             {
                 isaac_float weight = aoProperties.weight;
                 isaac_float aoFactor = ((1.0f - weight) + weight * aoStrength);
-                setColor(
-                    gBuffer.color[pixel.x + pixel.y * gBuffer.size.x],
-                    isaac_float4(isaac_float3(aoFactor), color.a));
-                gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x] = isaac_float(0);
-            }
-            // rank information color coded for debug
-            else if(mode == 7)
-            {
-                const isaac_float3 colorArray[6]
-                    = {isaac_float3(1, 0, 0),
-                       isaac_float3(0, 1, 0),
-                       isaac_float3(0, 0, 1),
-                       isaac_float3(0, 1, 1),
-                       isaac_float3(1, 1, 0),
-                       isaac_float3(1, 0, 1)};
-                setColor(
-                    gBuffer.color[pixel.x + pixel.y * gBuffer.size.x],
-                    isaac_float4(colorArray[rank % 6], color.a));
-                gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x] = isaac_float(0);
+                gBuffer.color[pixel] = transformColor(isaac_float4(isaac_float3(aoFactor), color.a));
+                gBuffer.depth[pixel] = isaac_float(0);
             }
             // full buffer rank information color coded for debug
             else if(mode == 8)
             {
-                const isaac_float3 colorArray[6]
-                    = {isaac_float3(1, 0, 0),
-                       isaac_float3(0, 1, 0),
-                       isaac_float3(0, 0, 1),
-                       isaac_float3(0, 1, 1),
-                       isaac_float3(1, 1, 0),
-                       isaac_float3(1, 0, 1)};
-                setColor(
-                    gBuffer.color[pixel.x + pixel.y * gBuffer.size.x],
-                    isaac_float4(colorArray[rank % 6], isaac_float(1)));
-                gBuffer.depth[pixel.x + pixel.y * gBuffer.size.x] = isaac_float(0);
+                gBuffer.color[pixel] = transformColor(getHSVA(halton(rank, 3) * isaac_float(2 * M_PI), 1, 1, 1));
+                gBuffer.depth[pixel] = isaac_float(0);
             }
         }
     };
 
 
-    template<typename T_Filter>
+    template<typename T_Filter, int T_offset>
     struct CheckNoSourceIterator
     {
         template<typename T_NR, typename T_Source, typename T_Result>
         ISAAC_HOST_DEVICE_INLINE void operator()(const T_NR& nr, const T_Source& source, T_Result& result) const
         {
-            result |= boost::mpl::at_c<T_Filter, T_NR::value>::type::value;
+            result |= boost::mpl::at_c<T_Filter, T_NR::value + T_offset>::type::value;
         }
     };
 
+    // kernel to apply halton seeding to texture
+    struct HaltonSeedingKernel
+    {
+        template<typename T_Acc>
+        ISAAC_DEVICE void operator()(T_Acc const& acc, Tex3D<isaac_float> texture, isaac_uint count) const
+        {
+            for(isaac_uint i = 1; i <= count; ++i)
+            {
+                isaac_float3 unitPosition;
+                unitPosition.x = halton(i, 3);
+                unitPosition.y = halton(i, 5);
+                unitPosition.z = halton(i, 7);
+                texture[isaac_int3(isaac_float3(texture.getSize()) * unitPosition)] = isaac_float(1);
+            }
+        }
+    };
 
-    template<typename T_Source>
-    struct UpdateBufferKernel
+    // separable gaussian blur kernel for all directions as parameter with radius 2.5
+    struct GaussBlur5Kernel
     {
         template<typename T_Acc>
         ISAAC_DEVICE void operator()(
             T_Acc const& acc,
+            Tex3D<isaac_float> srcTex,
+            Tex3D<isaac_float> dstTex,
+            isaac_float3 scale,
+            isaac_float3 mask) const
+        {
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            isaac_int3 coord = {isaac_int(alpThreadIdx[2]), isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[0])};
+            if(!isInUpperBounds(coord, srcTex.getSize()))
+                return;
+
+            const isaac_float gauss5[3] = {6, 4, 1};
+            Sampler<FilterType::LINEAR, BorderType::REPEAT> sampler;
+
+            isaac_float result(0);
+            for(isaac_int i = -2; i < 3; i++)
+            {
+                isaac_float3 sampleCoord(
+                    coord.x + mask.x * i / isaac_float(scale.x),
+                    coord.y + mask.y * i / isaac_float(scale.y),
+                    coord.z + mask.z * i / isaac_float(scale.z));
+                result += sampler.sample(srcTex, sampleCoord) * gauss5[glm::abs(i)];
+            }
+            dstTex[coord] = result / isaac_float(16);
+        }
+    };
+
+    // separable gaussian blur kernel for all directions as parameter with radius 3.5
+    struct GaussBlur7Kernel
+    {
+        template<typename T_Acc>
+        ISAAC_DEVICE void operator()(
+            T_Acc const& acc,
+            Tex3D<isaac_float> srcTex,
+            Tex3D<isaac_float> dstTex,
+            isaac_float3 scale,
+            isaac_float3 mask) const
+        {
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            isaac_int3 coord = {isaac_int(alpThreadIdx[2]), isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[0])};
+            if(!isInUpperBounds(coord, dstTex.getSize()))
+                return;
+
+            const isaac_float gauss7[4] = {64, 40.5, 10, 1};
+            Sampler<FilterType::LINEAR, BorderType::REPEAT> sampler;
+            isaac_float result(0);
+            for(isaac_int i = -3; i < 4; i++)
+            {
+                isaac_float3 sampleCoord(
+                    coord.x + mask.x * i / isaac_float(scale.x),
+                    coord.y + mask.y * i / isaac_float(scale.y),
+                    coord.z + mask.z * i / isaac_float(scale.z));
+                result += sampler.sample(srcTex, sampleCoord) * gauss7[glm::abs(i)];
+            }
+            dstTex[coord] = result / isaac_float(167);
+        }
+    };
+
+    struct MultiplyClampKernel
+    {
+        template<typename T_Acc>
+        ISAAC_DEVICE void operator()(
+            T_Acc const& acc,
+            Tex3D<isaac_float> srcTex,
+            Tex3D<isaac_float> dstTex,
+            isaac_float value,
+            isaac_float min,
+            isaac_float max) const
+        {
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            isaac_int3 coord = {isaac_int(alpThreadIdx[2]), isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[0])};
+            if(!isInUpperBounds(coord, dstTex.getSize()))
+                return;
+            dstTex[coord] = glm::clamp(srcTex[coord] * value, min, max);
+        }
+    };
+
+    template<typename T_Source>
+    struct UpdatePersistendTextureKernel
+    {
+        template<typename T_Acc>
+        ISAAC_DEVICE void operator()(
+            T_Acc const& acc,
+            const int nr,
             const T_Source source,
-            void* const pointer,
+            Tex3D<isaac_float> texture,
             const isaac_int3 localSize) const
         {
             auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
-            isaac_int3 dest = {isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[2]), 0};
-            isaac_int3 coord = dest;
-            coord.x -= ISAAC_GUARD_SIZE;
-            coord.y -= ISAAC_GUARD_SIZE;
-            if(!isInUpperBounds(dest, localSize + isaac_int3(2 * ISAAC_GUARD_SIZE)))
+            isaac_int3 coord = {isaac_int(alpThreadIdx[2]), isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[0])};
+            if(!isInUpperBounds(coord, localSize + isaac_int3(2 * T_Source::guardSize)))
                 return;
-            isaac_float_dim<T_Source::featureDim>* ptr = (isaac_float_dim<T_Source::featureDim>*) (pointer);
-            if(T_Source::hasGuard)
+            coord -= T_Source::guardSize;
+            isaac_float_dim<T_Source::featureDim> value = source[coord];
+            texture[coord] = applyFunctorChain(value, nr);
+        }
+    };
+
+    // sync kernel for guard areas and the necessary coordinate transformation depending on direction
+    struct SyncToOwnGuard
+    {
+        template<typename T_Acc, typename T_SrcTexture, typename T_DstTexture>
+        ISAAC_DEVICE void operator()(
+            T_Acc const& acc,
+            const isaac_int3 direction,
+            const T_SrcTexture srcTexture,
+            T_DstTexture guardTexture) const
+        {
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            isaac_int3 coord = {isaac_int(alpThreadIdx[2]), isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[0])};
+            if(!isInUpperBounds(coord, isaac_int3(guardTexture.getSize())))
+                return;
+
+            isaac_int3 srcCoord = glm::max(direction, isaac_int(0))
+                * (isaac_int3(srcTexture.getSize()) - isaac_int3(guardTexture.getSize()) - isaac_int(1));
+            srcCoord += glm::abs(direction) * isaac_int3(coord);
+            srcCoord += (isaac_int(1) - glm::abs(direction)) * coord;
+            guardTexture[coord] = srcTexture[srcCoord];
+        }
+    };
+
+    // sync kernel for guard areas and the necessary coordinate transformation depending on direction
+    struct SyncFromNeighbourGuard
+    {
+        template<typename T_Acc, typename T_SrcTexture, typename T_DstTexture>
+        ISAAC_DEVICE void operator()(
+            T_Acc const& acc,
+            const isaac_int3 direction,
+            const T_SrcTexture guardTexture,
+            T_DstTexture mainTexture) const
+        {
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            isaac_int3 coord = {isaac_int(alpThreadIdx[2]), isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[0])};
+            if(!isInUpperBounds(coord, isaac_int3(guardTexture.getSize())))
+                return;
+
+            isaac_int3 dstCoord
+                = glm::max(direction, isaac_int(0)) * (isaac_int3(mainTexture.getSize()) - isaac_int(1));
+            dstCoord += glm::min(direction, isaac_int(0)) * isaac_int3(guardTexture.getSize());
+            dstCoord += glm::abs(direction) * isaac_int3(coord);
+            dstCoord += (isaac_int(1) - glm::abs(direction)) * coord;
+            mainTexture[dstCoord] = guardTexture[coord];
+        }
+    };
+
+    template<typename T_Source>
+    struct GenerateAdvectionTextureKernel
+    {
+        template<typename T_Acc>
+        ISAAC_DEVICE void operator()(
+            T_Acc const& acc,
+            const int nr,
+            const T_Source source,
+            Tex3D<isaac_byte> advectionTexture,
+            Tex3D<isaac_byte> advectionTextureBackBuffer,
+            const Tex3D<isaac_float> noiseTexture,
+            const isaac_int3 localSize,
+            const isaac_float3 scale,
+            const isaac_float stepSize,
+            const isaac_float historyWeight,
+            const isaac_int advectionSeedingPeriod,
+            const isaac_int advectionSeedingTime,
+            isaac_int timeStep) const
+        {
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            isaac_int3 coord = {isaac_int(alpThreadIdx[2]), isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[0])};
+            if(!isInUpperBounds(coord, localSize))
+                return;
+
+            Sampler<FilterType::LINEAR, BorderType::VALUE> sampler;
+
+            isaac_float3 vector = source[coord];
+
+            // Prevent division by 0;
+            isaac_float vectorLength = glm::max(glm::length(vector), std::numeric_limits<isaac_float>::min());
+            vector /= vectorLength;
+
+            isaac_float3 offset = vector * stepSize / scale;
+            // Center coord to voxel and add the vector offset
+            isaac_float3 offsetCoord = isaac_float3(coord) + isaac_float(0.5) - offset;
+            // Get the interpolated sample with the offset coordinates from the previous frame
+            isaac_float historyValue = sampler.sample(advectionTextureBackBuffer, offsetCoord) / isaac_float(255);
+            // Sample the noise value
+            isaac_float noiseValue = noiseTexture[coord];
+            if(timeStep % advectionSeedingPeriod >= advectionSeedingTime)
+                noiseValue = 0;
+
+            // Blend everything together with a falloff weight
+            advectionTexture[coord]
+                = applyDither3D(
+                      5,
+                      coord,
+                      isaac_vec_dim<1, isaac_float>(noiseValue + historyValue * historyWeight * (1 - noiseValue)))
+                      .x;
+        }
+    };
+
+    // merge all non vector field sources to the optimization buffers
+    template<ISAAC_IDX_TYPE T_transferSize>
+    struct MergeToCombinedTextureIterator
+    {
+        template<
+            typename T_NR,
+            typename T_Source,
+            typename T_PersistentArray,
+            typename T_TransferArray,
+            typename T_SourceWeight,
+            typename T_IsoThreshold>
+        ISAAC_DEVICE void operator()(
+            const T_NR& nr,
+            const T_Source& source,
+            const T_PersistentArray& persistentTextureArray,
+            const isaac_int3& coord,
+            const T_TransferArray& transferArray,
+            const T_SourceWeight& sourceWeight,
+            const T_IsoThreshold& sourceIsoThreshold,
+            isaac_float4& volumeColor,
+            isaac_float4& isoColor) const
+        {
+            const isaac_float volumeWeight = sourceWeight.value[T_NR::value];
+            const isaac_float isoThreshold = sourceIsoThreshold.value[T_NR::value];
+            if(volumeWeight + isoThreshold > 0)
             {
-                coord.z = -ISAAC_GUARD_SIZE;
-                for(; dest.z < localSize.z + 2 * ISAAC_GUARD_SIZE; dest.z++)
+                // check if functor chain is already applied
+                isaac_float texValue;
+                if(T_Source::persistent)
                 {
-                    ptr[dest.x + dest.y * (localSize.x + 2 * ISAAC_GUARD_SIZE)
-                        + dest.z * ((localSize.x + 2 * ISAAC_GUARD_SIZE) * (localSize.y + 2 * ISAAC_GUARD_SIZE))]
-                        = source[coord];
-                    coord.z++;
+                    isaac_float_dim<T_Source::featureDim> value = source[coord];
+                    texValue = applyFunctorChain(value, T_NR::value);
+                }
+                else
+                {
+                    texValue = persistentTextureArray.textures[T_NR::value][coord];
+                }
+                // apply transfer function
+                ISAAC_IDX_TYPE lookupValue = ISAAC_IDX_TYPE(glm::round(texValue * isaac_float(T_transferSize)));
+                lookupValue = glm::clamp(lookupValue, ISAAC_IDX_TYPE(0), T_transferSize - 1);
+                const isaac_float4 color = transferArray.pointer[T_NR::value][lookupValue];
+                if(volumeWeight > 0)
+                {
+                    // create alpha weighted sum for volume visualization if activated
+                    isaac_float4 volumeColorSource = color;
+                    volumeColorSource.a *= volumeWeight;
+                    volumeColorSource.r *= volumeColorSource.a;
+                    volumeColorSource.g *= volumeColorSource.a;
+                    volumeColorSource.b *= volumeColorSource.a;
+                    volumeColor += volumeColorSource;
+                }
+                if(isoThreshold > 0)
+                {
+                    // compare with iso value in voxel for the maximum
+                    isaac_float4 isoColorSource = color;
+                    isoColorSource.a = isoColorSource.a / isoThreshold * isaac_float(0.5);
+                    if(isoColor.a < isoColorSource.a)
+                        isoColor = isoColorSource;
                 }
             }
-            else
+        }
+    };
+
+    // merge all vector field sources to the optimization buffers
+    template<ISAAC_IDX_TYPE T_transferSize, int T_Offset>
+    struct MergeAdvectionToCombinedTextureIterator
+    {
+        template<
+            typename T_NR,
+            typename T_Source,
+            typename T_PersistentArray,
+            typename T_TransferArray,
+            typename T_SourceWeight,
+            typename T_IsoThreshold,
+            typename T_AdvectionArray>
+        ISAAC_DEVICE void operator()(
+            const T_NR& nr,
+            const T_Source& source,
+            const T_PersistentArray& persistentTextureArray,
+            const isaac_int3& coord,
+            const T_TransferArray& transferArray,
+            const T_SourceWeight& sourceWeight,
+            const T_IsoThreshold& sourceIsoThreshold,
+            const T_AdvectionArray& advectionTextures,
+            isaac_float4& volumeColor,
+            isaac_float4& isoColor) const
+        {
+            const isaac_float volumeWeight = sourceWeight.value[T_NR::value + T_Offset];
+            const isaac_float isoThreshold = sourceIsoThreshold.value[T_NR::value + T_Offset];
+            if(volumeWeight + isoThreshold > 0)
             {
-                coord.x = glm::clamp(coord.x, 0, localSize.x - 1);
-                coord.y = glm::clamp(coord.y, 0, localSize.y - 1);
-                coord.z = 0;
-                for(; dest.z < ISAAC_GUARD_SIZE; dest.z++)
+                // check if functor chain is already applied
+                isaac_float texValue;
+                if(T_Source::persistent)
                 {
-                    ptr[dest.x + dest.y * (localSize.x + 2 * ISAAC_GUARD_SIZE)
-                        + dest.z * ((localSize.x + 2 * ISAAC_GUARD_SIZE) * (localSize.y + 2 * ISAAC_GUARD_SIZE))]
-                        = source[coord];
+                    isaac_float_dim<T_Source::featureDim> value = source[coord];
+                    texValue = applyFunctorChain(value, T_NR::value + T_Offset);
                 }
-                for(; dest.z < localSize.z + ISAAC_GUARD_SIZE - 1; dest.z++)
+                else
                 {
-                    ptr[dest.x + dest.y * (localSize.x + 2 * ISAAC_GUARD_SIZE)
-                        + dest.z * ((localSize.x + 2 * ISAAC_GUARD_SIZE) * (localSize.y + 2 * ISAAC_GUARD_SIZE))]
-                        = source[coord];
-                    coord.z++;
+                    texValue = persistentTextureArray.textures[T_NR::value + T_Offset][coord];
                 }
-                for(; dest.z < localSize.z + 2 * ISAAC_GUARD_SIZE; dest.z++)
+                // texValue *= advectionTextures.textures[T_NR::value][coord];
+
+                // apply transfer function
+                ISAAC_IDX_TYPE lookupValue = ISAAC_IDX_TYPE(glm::round(texValue * isaac_float(T_transferSize)));
+                lookupValue = glm::clamp(lookupValue, ISAAC_IDX_TYPE(0), T_transferSize - 1);
+                isaac_float4 color = transferArray.pointer[T_NR::value + T_Offset][lookupValue];
+                // blend alpha channel with advection texture value
+                color.a *= (advectionTextures.textures[T_NR::value][coord] / isaac_float(255));
+                if(volumeWeight > 0)
                 {
-                    ptr[dest.x + dest.y * (localSize.x + 2 * ISAAC_GUARD_SIZE)
-                        + dest.z * ((localSize.x + 2 * ISAAC_GUARD_SIZE) * (localSize.y + 2 * ISAAC_GUARD_SIZE))]
-                        = source[coord];
+                    // create alpha weighted sum for volume visualization if activated
+                    isaac_float4 volumeColorSource = color;
+                    volumeColorSource.a *= volumeWeight;
+                    volumeColorSource.r *= volumeColorSource.a;
+                    volumeColorSource.g *= volumeColorSource.a;
+                    volumeColorSource.b *= volumeColorSource.a;
+                    volumeColor += volumeColorSource;
+                }
+                if(isoThreshold > 0)
+                {
+                    // compare with iso value in voxel for the maximum
+                    isaac_float4 isoColorSource = color;
+                    isoColorSource.a = isoColorSource.a / isoThreshold * isaac_float(0.5);
+                    if(isoColor.a < isoColorSource.a)
+                        isoColor = isoColorSource;
                 }
             }
+        }
+    };
+
+
+    // main kernel for the optimization buffer
+    template<ISAAC_IDX_TYPE T_transferSize>
+    struct MergeToCombinedTextureKernel
+    {
+        template<
+            typename T_Acc,
+            typename T_VolumeSourceList,
+            typename T_FieldSourceList,
+            typename T_PersistentArray,
+            typename T_TransferArray,
+            typename T_SourceWeight,
+            typename T_IsoThreshold,
+            typename T_AdvectionArray,
+            IndexType T_indexType>
+        ISAAC_DEVICE void operator()(
+            T_Acc const& acc,
+            const T_VolumeSourceList sources,
+            const T_FieldSourceList fieldSources,
+            const T_PersistentArray persistentTextureArray,
+            const isaac_int3 localSize,
+            const T_TransferArray transferArray,
+            const isaac_float totalWeight,
+            const T_SourceWeight sourceWeight,
+            const T_IsoThreshold sourceIsoThreshold,
+            const T_AdvectionArray advectionTextures,
+            const isaac_int ditherMode,
+            Tex3D<isaac_byte4, T_indexType> volumeTexture,
+            Tex3D<isaac_byte4, T_indexType> isoTexture) const
+        {
+            auto alpThreadIdx = alpaka::getIdx<alpaka::Grid, alpaka::Threads>(acc);
+            isaac_int3 coord = {isaac_int(alpThreadIdx[2]), isaac_int(alpThreadIdx[1]), isaac_int(alpThreadIdx[0])};
+            if(!isInUpperBounds(coord, localSize))
+                return;
+            isaac_float4 volumeColor = isaac_float4(0);
+            isaac_float4 isoColor = isaac_float4(0);
+
+            // iterate over all non vector field sources and add get volume and isosurface value
+            forEachWithMplParams(
+                sources,
+                MergeToCombinedTextureIterator<T_transferSize>(),
+                persistentTextureArray,
+                coord,
+                transferArray,
+                sourceWeight,
+                sourceIsoThreshold,
+                volumeColor,
+                isoColor);
+            // iterate over all vector field sources and add get volume and isosurface value
+            forEachWithMplParams(
+                fieldSources,
+                MergeAdvectionToCombinedTextureIterator<
+                    T_transferSize,
+                    boost::mpl::size<T_VolumeSourceList>::type::value>(),
+                persistentTextureArray,
+                coord,
+                transferArray,
+                sourceWeight,
+                sourceIsoThreshold,
+                advectionTextures,
+                volumeColor,
+                isoColor);
+
+            // normalize volume with the total weight (total number of source weights)
+            volumeColor /= totalWeight;
+            volumeTexture[coord] = applyDither3D(ditherMode, coord, volumeColor);
+
+            // set iso value
+            isoColor = clamp(isoColor, isaac_float(0), isaac_float(1));
+            isoTexture[coord] = isaac_byte4(glm::round(isoColor * isaac_float(255)));
         }
     };
 } // namespace isaac
