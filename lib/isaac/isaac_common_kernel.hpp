@@ -120,8 +120,12 @@ namespace isaac
         }
 
         // clip ray on volume bounding box
-        isaac_float3 bbIntersectionMin = -ray.start / ray.dir;
-        isaac_float3 bbIntersectionMax = (isaac_float3(SimulationSize.localSizeScaled) - ray.start) / ray.dir;
+        isaac_int3 bbMinLocal = glm::max(isaac_int3(0), -SimulationSize.positionScaled);
+        isaac_int3 bbMaxLocal = glm::min(
+            isaac_int3(SimulationSize.localSizeScaled),
+            isaac_int3(SimulationSize.globalSizeScaled) - SimulationSize.positionScaled);
+        isaac_float3 bbIntersectionMin = (isaac_float3(bbMinLocal) - ray.start) / ray.dir;
+        isaac_float3 bbIntersectionMax = (isaac_float3(bbMaxLocal) - ray.start) / ray.dir;
 
         // bbIntersectionMin shall have the smaller values
         swapIfSmaller(bbIntersectionMax.x, bbIntersectionMin.x);

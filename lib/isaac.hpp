@@ -574,7 +574,7 @@ namespace isaac
             const isaac_size3 globalSize,
             const isaac_size3 localSize,
             const isaac_size3 localParticleSize,
-            const isaac_size3 position,
+            const isaac_int3 position,
             T_VolumeSourceList& volumeSources,
             T_FieldSourceList& fieldSources,
             T_ParticleList& particleSources,
@@ -1053,7 +1053,7 @@ namespace isaac
         }
 
 
-        void updatePosition(const isaac_size3 position)
+        void updatePosition(const isaac_int3 position)
         {
             ISAAC_WAIT_VISUALIZATION
             this->position = position;
@@ -2932,10 +2932,10 @@ namespace isaac
         isaac_size3 globalSize;
         isaac_size3 localSize;
         isaac_size3 localParticleSize;
-        isaac_size3 position;
+        isaac_int3 position;
         isaac_size3 globalSizeScaled;
         isaac_size3 localSizeScaled;
-        isaac_size3 positionScaled;
+        isaac_int3 positionScaled;
         MPI_Comm mpiWorld;
         std::vector<isaac_dmat4> projections;
         isaac_dmat4 modelview; // modelview matrix

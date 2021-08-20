@@ -121,12 +121,12 @@ namespace isaac
         isaac_size3 globalSize; // size of volume
         ISAAC_IDX_TYPE
         maxGlobalSize; // each dimension has a size and this value contains the value of the greatest dimension
-        isaac_size3 position; // local position of subvolume
+        isaac_int3 position; // local position of subvolume
         isaac_size3 localSize; // size of local volume grid
         isaac_size3 localParticleSize; // size of local particle grid
         isaac_size3 globalSizeScaled; // scaled version of global size with cells = scale * cells
         ISAAC_IDX_TYPE maxGlobalSizeScaled; // same as globalSizeScaled
-        isaac_size3 positionScaled; // scaled position of local subvolume
+        isaac_int3 positionScaled; // scaled position of local subvolume
         isaac_size3 localSizeScaled; // same as globalSizeScaled
     };
 
