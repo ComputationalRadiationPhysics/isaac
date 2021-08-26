@@ -13,53 +13,72 @@
  * You should have received a copy of the GNU General Lesser Public
  * License along with ISAAC.  If not, see <www.gnu.org/licenses/>. */
 
-#include <alpaka/alpaka.hpp>
 #include <fstream>
+#include <isaac.hpp>
 #include <sstream>
 #include <string>
 
 typedef float float3_t[3];
 
 
-template<typename T_Stream, typename THost3, typename TDev3, typename TSize>
-void update_particles(T_Stream stream, THost3 hostBuffer3, TDev3 deviceBuffer3, TSize particle_count, float pos)
+template<typename T_Stream, typename T_Host3, typename T_Dev3, typename T_Size>
+void updateParticles(T_Stream stream, T_Host3 hostBuffer, T_Dev3 deviceBuffer, T_Size particle_count, float pos)
 {
     for(ISAAC_IDX_TYPE i = 0; i < particle_count[0]; i++)
     {
-        alpaka::getPtrNative(hostBuffer3)[i].x = float((int(i * 29.6f)) % 64) / 64.0f;
-        alpaka::getPtrNative(hostBuffer3)[i].y = float((int(i * 23.1f)) % 64) / 64.0f;
-        alpaka::getPtrNative(hostBuffer3)[i].z
+        alpaka::getPtrNative(hostBuffer)[i].x = float((int(i * 29.6f)) % 64) / 64.0f;
+        alpaka::getPtrNative(hostBuffer)[i].y = float((int(i * 23.1f)) % 64) / 64.0f;
+        alpaka::getPtrNative(hostBuffer)[i].z
             = float((int((i * 7.9f + pos * (i % 20 + 1)) * 1000)) % 64000) / 1000.0f / 64.0f;
     }
-    /*
-    const alpaka::Vec <alpaka::DimInt< 1 >, ISAAC_IDX_TYPE>
-        data_size( ISAAC_IDX_TYPE( particle_count )
-    );
-     */
-    alpaka::memcpy(stream, deviceBuffer3, hostBuffer3, particle_count);
+    alpaka::memcpy(stream, deviceBuffer, hostBuffer, particle_count);
+}
+
+template<typename T_Stream, typename T_Host, typename T_Dev>
+void updateVectorField(
+    T_Stream stream,
+    T_Host hostBuffer,
+    T_Dev deviceBuffer,
+    float pos,
+    const isaac::isaac_size3& localSize,
+    const isaac::isaac_size3& position,
+    const isaac::isaac_size3& globalSize)
+{
+    using namespace isaac;
+    float s = sin(pos * 10);
+    for(ISAAC_IDX_TYPE x = 0; x < localSize.x; x++)
+    {
+        for(ISAAC_IDX_TYPE y = 0; y < localSize.y; y++)
+        {
+            for(ISAAC_IDX_TYPE z = 0; z < localSize.z; z++)
+            {
+                ISAAC_IDX_TYPE pos = x + y * localSize.x + z * localSize.x * localSize.y;
+                isaac_size3 coord(x, y, z);
+                isaac_float3 vector(
+                    -(position.y + coord.y - globalSize.y * 0.5f) * s / isaac_float(globalSize.y),
+                    (position.x + coord.x - globalSize.x * 0.5f) * s / isaac_float(globalSize.x),
+                    0.3f);
+                alpaka::getPtrNative(hostBuffer)[pos] = vector;
+            }
+        }
+    }
+    const alpaka::Vec<alpaka::DimInt<1>, ISAAC_IDX_TYPE> dataSize(localSize.x * localSize.y * localSize.z);
+    alpaka::memcpy(stream, deviceBuffer, hostBuffer, dataSize);
 }
 
 
-template<
-    typename T_Stream,
-    typename THost1,
-    typename TDev1,
-    typename THost2,
-    typename TDev2,
-    typename TLoc,
-    typename TPos,
-    typename TGlo>
-void update_data(
+template<typename T_Stream, typename T_Host1, typename T_Dev1, typename T_Host2, typename T_Dev2>
+void updateData(
     T_Stream stream,
-    THost1 hostBuffer1,
-    TDev1 deviceBuffer1,
-    THost2 hostBuffer2,
-    TDev2 deviceBuffer2,
+    T_Host1 hostBuffer1,
+    T_Dev1 deviceBuffer1,
+    T_Host2 hostBuffer2,
+    T_Dev2 deviceBuffer2,
     size_t prod,
     float pos,
-    TLoc& localSize,
-    TPos& position,
-    TGlo& globalSize)
+    const isaac::isaac_size3& localSize,
+    const isaac::isaac_size3& position,
+    const isaac::isaac_size3& globalSize)
 {
     srand(0);
     float s = sin(pos);
@@ -93,14 +112,14 @@ void update_data(
             }
         }
     }
-    const alpaka::Vec<alpaka::DimInt<1>, ISAAC_IDX_TYPE> data_size(
+    const alpaka::Vec<alpaka::DimInt<1>, ISAAC_IDX_TYPE> dataSize(
         ISAAC_IDX_TYPE(localSize[0]) * ISAAC_IDX_TYPE(localSize[1]) * ISAAC_IDX_TYPE(localSize[2]));
-    alpaka::memcpy(stream, deviceBuffer1, hostBuffer1, data_size);
-    alpaka::memcpy(stream, deviceBuffer2, hostBuffer2, data_size);
+    alpaka::memcpy(stream, deviceBuffer1, hostBuffer1, dataSize);
+    alpaka::memcpy(stream, deviceBuffer2, hostBuffer2, dataSize);
 }
 
 
-void mul_to_smallest_d(ISAAC_IDX_TYPE* d, int nr)
+void mulToSmallestD(ISAAC_IDX_TYPE* d, int nr)
 {
     if(d[0] < d[1]) // 0 < 1
     {
@@ -135,14 +154,14 @@ void recursive_kgv(ISAAC_IDX_TYPE* d, int number, int test)
     }
     if(number == test)
     {
-        mul_to_smallest_d(d, test);
+        mulToSmallestD(d, test);
         return;
     }
     if(number % test == 0)
     {
         number /= test;
         recursive_kgv(d, number, test);
-        mul_to_smallest_d(d, test);
+        mulToSmallestD(d, test);
     }
     else
     {
@@ -153,31 +172,31 @@ void recursive_kgv(ISAAC_IDX_TYPE* d, int number, int test)
 
 template<
     typename T_Stream,
-    typename THost1,
-    typename TDev1,
-    typename THost2,
-    typename TDev2,
-    typename TLoc,
-    typename TPos,
-    typename TGlo>
+    typename T_Host1,
+    typename T_Dev1,
+    typename T_Host2,
+    typename T_Dev2,
+    typename T_Loc,
+    typename T_Pos,
+    typename T_Glo>
 void read_vtk_to_memory(
     char* filename,
     T_Stream stream,
-    THost1 hostBuffer1,
-    TDev1 deviceBuffer1,
-    THost2 hostBuffer2,
-    TDev2 deviceBuffer2,
+    T_Host1 hostBuffer1,
+    T_Dev1 deviceBuffer1,
+    T_Host2 hostBuffer2,
+    T_Dev2 deviceBuffer2,
     size_t prod,
     float pos,
-    TLoc& localSize,
-    TPos& position,
-    TGlo& globalSize,
+    T_Loc& localSize,
+    T_Pos& position,
+    T_Glo& globalSize,
     int& s_x,
     int& s_y,
     int& s_z)
 {
     // Set first default values
-    update_data(
+    updateData(
         stream,
         hostBuffer1,
         deviceBuffer1,
@@ -300,7 +319,7 @@ void read_vtk_to_memory(
         }
     }
 
-    const alpaka::Vec<alpaka::DimInt<1>, ISAAC_IDX_TYPE> data_size(
+    const alpaka::Vec<alpaka::DimInt<1>, ISAAC_IDX_TYPE> dataSize(
         ISAAC_IDX_TYPE(localSize[0]) * ISAAC_IDX_TYPE(localSize[1]) * ISAAC_IDX_TYPE(localSize[2]));
-    alpaka::memcpy(stream, deviceBuffer2, hostBuffer2, data_size);
+    alpaka::memcpy(stream, deviceBuffer2, hostBuffer2, dataSize);
 }

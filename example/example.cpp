@@ -40,7 +40,7 @@ class TestSource1
 {
 public:
     static const ISAAC_IDX_TYPE featureDim = 3;
-    static const bool hasGuard = false;
+    static const ISAAC_IDX_TYPE guardSize = 0;
     static const bool persistent = true;
 
 
@@ -78,7 +78,7 @@ class TestSource2
 {
 public:
     static const ISAAC_IDX_TYPE featureDim = 1;
-    static const bool hasGuard = false;
+    static const ISAAC_IDX_TYPE guardSize = 0;
     static const bool persistent = false;
 
 
@@ -105,6 +105,40 @@ public:
     {
         isaac_float value = ptr[nIndex.x + nIndex.y * VOLUME_X + nIndex.z * VOLUME_X * VOLUME_Y];
         return isaac_float_dim<featureDim>(value);
+    }
+};
+
+ISAAC_NO_HOST_DEVICE_WARNING
+class TestVectorFieldSource1
+{
+public:
+    static const ISAAC_IDX_TYPE featureDim = 3;
+    static const ISAAC_IDX_TYPE guardSize = 0;
+    static const bool persistent = true;
+
+
+    ISAAC_NO_HOST_DEVICE_WARNING TestVectorFieldSource1(isaac_float3* ptr) : ptr(ptr)
+    {
+    }
+
+
+    ISAAC_HOST_INLINE static std::string getName()
+    {
+        return std::string("Test Vector Field Source");
+    }
+
+
+    ISAAC_HOST_INLINE void update(bool enabled, void* pointer)
+    {
+    }
+
+
+    isaac_float3* ptr;
+
+    ISAAC_NO_HOST_DEVICE_WARNING ISAAC_HOST_DEVICE_INLINE isaac_float3 operator[](const isaac_int3& nIndex) const
+    {
+        isaac_float3 value = ptr[nIndex.x + nIndex.y * VOLUME_X + nIndex.z * VOLUME_X * VOLUME_Y];
+        return value;
     }
 };
 
@@ -250,10 +284,8 @@ int main(int argc, char** argv)
 
     using Acc = alpaka::AccGpuCudaRt<AccDim, ISAAC_IDX_TYPE>;
 
-    // using Acc = alpaka::AccCpuOmp2Blocks<
-    //    AccDim,
-    //    ISAAC_IDX_TYPE
-    //>;
+    // using Acc = alpaka::AccCpuOmp2Blocks<AccDim, ISAAC_IDX_TYPE>;
+
     using Stream = alpaka::Queue<Acc, alpaka::Blocking>;
 
     using DevAcc = alpaka::Dev<Acc>;
@@ -265,14 +297,11 @@ int main(int argc, char** argv)
     DevHost devHost(alpaka::getDevByIdx<PltfHost>(0u));
     Stream stream(devAcc);
 
-    const isaac_size_dim<SimDim::value> globalSize(d[0] * VOLUME_X, d[1] * VOLUME_Y, d[2] * VOLUME_Z);
-    const isaac_size_dim<SimDim::value> localSize(
-        ISAAC_IDX_TYPE(VOLUME_X),
-        ISAAC_IDX_TYPE(VOLUME_Y),
-        ISAAC_IDX_TYPE(VOLUME_Z));
+    const isaac_size3 globalSize(d[0] * VOLUME_X, d[1] * VOLUME_Y, d[2] * VOLUME_Z);
+    const isaac_size3 localSize(ISAAC_IDX_TYPE(VOLUME_X), ISAAC_IDX_TYPE(VOLUME_Y), ISAAC_IDX_TYPE(VOLUME_Z));
+    const isaac_size3 position(p[0] * VOLUME_X, p[1] * VOLUME_Y, p[2] * VOLUME_Z);
     const alpaka::Vec<DatDim, ISAAC_IDX_TYPE> dataSize(
         ISAAC_IDX_TYPE(VOLUME_X) * ISAAC_IDX_TYPE(VOLUME_Y) * ISAAC_IDX_TYPE(VOLUME_Z));
-    const isaac_size_dim<SimDim::value> position(p[0] * VOLUME_X, p[1] * VOLUME_Y, p[2] * VOLUME_Z);
     const alpaka::Vec<alpaka::DimInt<1>, ISAAC_IDX_TYPE> particleCount(ISAAC_IDX_TYPE(PARTICLE_COUNT));
 
     // The whole size of the rendered sub volumes
@@ -282,29 +311,39 @@ int main(int argc, char** argv)
 
     auto hostBuffer1 = alpaka::allocBuf<isaac_float3, ISAAC_IDX_TYPE>(devHost, dataSize);
     auto deviceBuffer1 = alpaka::allocBuf<isaac_float3, ISAAC_IDX_TYPE>(devAcc, dataSize);
+
     auto hostBuffer2 = alpaka::allocBuf<isaac_float, ISAAC_IDX_TYPE>(devHost, dataSize);
     auto deviceBuffer2 = alpaka::allocBuf<isaac_float, ISAAC_IDX_TYPE>(devAcc, dataSize);
-    auto hostBuffer3 = alpaka::allocBuf<isaac_float3, ISAAC_IDX_TYPE>(devHost, particleCount);
-    auto deviceBuffer3 = alpaka::allocBuf<isaac_float3, ISAAC_IDX_TYPE>(devAcc, particleCount);
+
+    auto hostBuffer3 = alpaka::allocBuf<isaac_float3, ISAAC_IDX_TYPE>(devHost, dataSize);
+    auto deviceBuffer3 = alpaka::allocBuf<isaac_float3, ISAAC_IDX_TYPE>(devAcc, dataSize);
+
+    auto hostBuffer4 = alpaka::allocBuf<isaac_float3, ISAAC_IDX_TYPE>(devHost, particleCount);
+    auto deviceBuffer4 = alpaka::allocBuf<isaac_float3, ISAAC_IDX_TYPE>(devAcc, particleCount);
 
     // Creating source list
 
     TestSource1 testSource1(alpaka::getPtrNative(deviceBuffer1));
     TestSource2 testSource2(alpaka::getPtrNative(deviceBuffer2));
 
-    ParticleSource1 particleTestSource1(alpaka::getPtrNative(deviceBuffer3), PARTICLE_COUNT);
+    TestVectorFieldSource1 fieldSource(alpaka::getPtrNative(deviceBuffer3));
 
-    using SourceList = boost::fusion::list<TestSource1, TestSource2>;
+    ParticleSource1 particleTestSource1(alpaka::getPtrNative(deviceBuffer4), PARTICLE_COUNT);
+
+    using VolumeSourceList = boost::fusion::list<TestSource1, TestSource2, TestVectorFieldSource1>;
+
+    using FieldSourceList = boost::fusion::list<TestVectorFieldSource1>;
 
     using ParticleList = boost::fusion::list<ParticleSource1>;
 
+    VolumeSourceList volumeSources(testSource1, testSource2, fieldSource);
+    FieldSourceList fieldSources(fieldSource);
     ParticleList particleSources(particleTestSource1);
-    SourceList sources(testSource1, testSource2);
 
 #if ISAAC_NO_SIMULATION == 1
     if(!filename)
     {
-        update_data(
+        updateData(
             stream,
             hostBuffer1,
             deviceBuffer1,
@@ -317,7 +356,7 @@ int main(int argc, char** argv)
             globalSize);
     }
 
-    update_particles(stream, hostBuffer3, deviceBuffer3, particleCount, 0.0f);
+    updateParticles(stream, hostBuffer4, deviceBuffer4, particleCount, 0.0f);
 
 
 #endif
@@ -349,8 +388,9 @@ int main(int argc, char** argv)
         Acc, // Alpaka specific Accelerator Dev Type
         Stream, // Alpaka specific Stream Type
         AccDim, // Alpaka specific Acceleration Dimension Type
+        VolumeSourceList, // The boost::fusion list of Source Types
+        FieldSourceList,
         ParticleList,
-        decltype(sources), // The boost::fusion list of Source Types
         1024, // Size of the transfer functions
 #if(ISAAC_STEREO == 0)
         isaac::DefaultController,
@@ -377,8 +417,9 @@ int main(int argc, char** argv)
         localSize, // Local size of the subvolume
         {PARTICLE_VOLUME_X, PARTICLE_VOLUME_Y, PARTICLE_VOLUME_Z},
         position, // Position of the subvolume in the globale volume
+        volumeSources, // instances of the volumeSources to render
+        fieldSources,
         particleSources,
-        sources, // instances of the sources to render
         scaling);
 
     // Setting up the metadata description (only master, but however slaves could then add metadata, too, it would be
@@ -407,7 +448,7 @@ int main(int argc, char** argv)
     // Program flow and time mesaurment variables
     float a = 0.0f;
     volatile int forceExit = 0;
-    int start = visualization->getTicksUs();
+    int start = getTicksUs();
     int count = 0;
     int drawingTime = 0;
     int simulationTime = 0;
@@ -419,6 +460,9 @@ int main(int argc, char** argv)
     int copyTime = 0;
     int videoSendTime = 0;
     int bufferTime = 0;
+    int advectionTime = 0;
+    int advectionBorderTime = 0;
+    int optimizationBufferTime = 0;
     bool pause = false;
     // How often should the visualization be updated?
     int interval = 1;
@@ -427,7 +471,14 @@ int main(int argc, char** argv)
     {
         json_object_set_new(visualization->getJsonMetaRoot(), "interval", json_integer(interval));
     }
+    isaac::Neighbours<isaac_int> neighbourIds;
+    for(int i = 0; i < 27; i++)
+    {
+        neighbourIds.array[i] = -1;
+    }
 
+    visualization->updateNeighbours(neighbourIds);
+    // pause = true;
     // Main loop
     while(!forceExit)
     {
@@ -435,11 +486,11 @@ int main(int argc, char** argv)
         if(!pause)
         {
             a += 0.01f;
-            int startSimulation = visualization->getTicksUs();
+            int startSimulation = getTicksUs();
 #if ISAAC_NO_SIMULATION == 0
             if(!filename)
             {
-                update_data(
+                updateData(
                     stream,
                     hostBuffer1,
                     deviceBuffer1,
@@ -452,12 +503,14 @@ int main(int argc, char** argv)
                     globalSize);
             }
 
-            update_particles(stream, hostBuffer3, deviceBuffer3, particleCount, a);
+            updateVectorField(stream, hostBuffer3, deviceBuffer3, a, localSize, position, globalSize);
+
+            updateParticles(stream, hostBuffer4, deviceBuffer4, particleCount, a);
 
 #endif
 
 
-            simulationTime += visualization->getTicksUs() - startSimulation;
+            simulationTime += getTicksUs() - startSimulation;
         }
         step++;
         if(step >= interval)
@@ -502,20 +555,17 @@ int main(int argc, char** argv)
                 copyTime += visualization->copyTime;
                 videoSendTime += visualization->videoSendTime;
                 bufferTime += visualization->bufferTime;
+                advectionTime += visualization->advectionTime;
+                advectionBorderTime += visualization->advectionBorderTime;
+                optimizationBufferTime += visualization->optimizationBufferTime;
                 drawingTime = 0;
                 simulationTime = 0;
-                visualization->sortingTime = 0;
-                visualization->mergeTime = 0;
-                visualization->kernelTime = 0;
-                visualization->copyTime = 0;
-                visualization->videoSendTime = 0;
-                visualization->bufferTime = 0;
             }
 
             // Visualization
-            int start_drawing = visualization->getTicksUs();
+            int start_drawing = getTicksUs();
             json_t* meta = visualization->doVisualization(META_MASTER, NULL, !pause);
-            drawingTime += visualization->getTicksUs() - start_drawing;
+            drawingTime += getTicksUs() - start_drawing;
 
             // Message check
             if(meta)
@@ -552,17 +602,17 @@ int main(int argc, char** argv)
             // Debug output
             if(rank == 0)
             {
-                int end = visualization->getTicksUs();
+                int end = getTicksUs();
                 int diff = end - start;
                 if(diff >= 1000000)
                 {
-                    mergeTime -= kernelTime + copyTime;
                     printf(
                         "FPS: %.1f \n\tSimulation: %.1f ms\n\t"
                         "Drawing: %.1f ms\n\t\tSorting: %.1f ms\n\t\t"
                         "Merge: %.1f ms\n\t\tKernel: %.1f ms\n\t\t"
                         "Copy: %.1f ms\n\t\tVideo: %.1f ms\n\t\t"
-                        "Buffer: %.1f ms\n",
+                        "Buffer: %.1f ms\n\t\tAdvection: %.1f ms\n\t\t"
+                        "Advection Border: %.1f ms\n\t\tOptimization Buffer: %.1f ms\n",
                         (float) count * 1000000.0f / (float) diff,
                         (float) fullSimulationTime / 1000.0f / (float) count,
                         (float) fullDrawingTime / 1000.0f / (float) count,
@@ -571,13 +621,19 @@ int main(int argc, char** argv)
                         (float) kernelTime / 1000.0f / (float) count,
                         (float) copyTime / 1000.0f / (float) count,
                         (float) videoSendTime / 1000.0f / (float) count,
-                        (float) bufferTime / 1000.0f / (float) count);
+                        (float) bufferTime / 1000.0f / (float) count,
+                        (float) advectionTime / 1000.0f / (float) count,
+                        (float) advectionBorderTime / 1000.0f / (float) count,
+                        (float) optimizationBufferTime / 1000.0f / (float) count);
                     sortingTime = 0;
                     mergeTime = 0;
                     kernelTime = 0;
                     copyTime = 0;
                     videoSendTime = 0;
                     bufferTime = 0;
+                    advectionTime = 0;
+                    advectionBorderTime = 0;
+                    optimizationBufferTime = 0;
                     fullDrawingTime = 0;
                     fullSimulationTime = 0;
                     start = end;
