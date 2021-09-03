@@ -194,7 +194,7 @@ set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} "alpaka::alpaka")
 ################################################################################
 # GLM LIB
 ################################################################################
-find_package(glm REQUIRED)
+find_package(glm REQUIRED PATH_SUFFIXES "lib64/cmake/glm/" "lib/cmake/glm/")
 set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} glm::glm)
 
 
