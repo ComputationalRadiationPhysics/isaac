@@ -1904,7 +1904,7 @@ namespace isaac
                                 }
                             }
                             // wait for all mpi communications to be finished
-                            MPI_Waitall(mpiRequests.size(), &mpiRequests[0], NULL);
+                            MPI_Waitall(mpiRequests.size(), &mpiRequests[0], MPI_STATUSES_IGNORE);
 
                             // sync the received neighbour guard information with the main guards in the texture
                             syncNeighbourGuardTextures<T_Acc>(stream, advectionTextureAllocator, neighbourNodeIds);
