@@ -2257,6 +2257,8 @@ namespace isaac
                    ISAAC_IDX_TYPE((readbackViewport[3] + blockSize.y - 1) / blockSize.y)};
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
             if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuCudaRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
+#elif ALPAKA_ACC_GPU_HIP_ENABLED == 1
+            if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuHipRt<T_AccDim, ISAAC_IDX_TYPE>>>::value)
 #endif
             {
                 gridSize.x = ISAAC_IDX_TYPE(readbackViewport[2]);
