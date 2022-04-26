@@ -53,6 +53,8 @@ namespace isaac
 
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
         if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuCudaRt<Dim, ISAAC_IDX_TYPE>>>::value)
+#elif ALPAKA_ACC_GPU_HIP_ENABLED == 1
+        if(boost::mpl::not_<boost::is_same<T_Acc, alpaka::AccGpuHipRt<Dim, ISAAC_IDX_TYPE>>>::value)
 #endif
         {
             blockSize = isaac_size3(1);
