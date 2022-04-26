@@ -146,7 +146,7 @@ find_package (Threads MODULE QUIET)
 if (NOT Threads_FOUND)
     set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   pThreads")
 endif()
-set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} Threads::Threads)
 
 
 ################################################################################
@@ -234,7 +234,6 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(ISAAC
                                         ISAAC_INCLUDE_DIRS
                                         JANSSON_LIBRARIES
                                         JANSSON_INCLUDE_DIRS
-                                        CMAKE_THREAD_LIBS_INIT
                                         ISAAC_MPI_FOUND
                                         ICET_CORE_LIBS
                                         ICET_MPI_LIBS
