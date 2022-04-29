@@ -22,6 +22,22 @@
 #include <boost/mpl/int.hpp>
 #include <boost/mpl/size.hpp>
 
+namespace std
+{
+    /* @bug ISAAC is working with boost fusion lists, e.g. boost::fusion::cons<>
+     * these types are not trivially copyable but are passed as parameters to the kernel.
+     * Since alpaka 0.9.0 the requirement to be trivially copyable is correct enforced,
+     * with the result that these types can not be used as kernel parameter.
+     * This trait specialization is a temporary and risky workaround until boost fusion is
+     * removed from ISAAC.
+     * @attention This workaround can have bad effects on other libraries which using boost fusion and ISAAC.
+     */
+    template<typename... T>
+    struct is_trivially_copyable<boost::fusion::cons<T...>> : public integral_constant<bool, true>
+    {
+    };
+} // namespace std
+
 namespace isaac
 {
     template<int T_n, int T_i>
