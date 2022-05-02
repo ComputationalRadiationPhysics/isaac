@@ -1,5 +1,19 @@
 # Changelog
 
+## [v1.6.0] - 2022-05-19
+
+alpaka 0.9.0 is required if you enabled alpaka support.
+
+* Library
+  - remove native CUDA support #121
+  - Simplification of the code by using glm and reducing templates #130
+  - Major rework of ISAAC #132 #136
+  - CMake: increase ISAAC compatibility #134 #156
+  - Prevent compiler error if no source is provided and arrays get initialized with 0 #138
+  - Added texture implementation and vector field visualization to lib #143
+  - Added vector field functionality to the isaac example #149
+  - add HIP support #158
+
 ## [v1.5.2] - 2021-01-22
 
 alpaka 0.6.0 is required if you enabled alpaka support.
