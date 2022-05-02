@@ -582,7 +582,7 @@ namespace isaac
                     T_transferSize,
                     FilterType::LINEAR>
                     kernel;
-                auto const instance(alpaka::createTaskKernel<T_Acc>(
+                auto const instance = alpaka::createTaskKernel<T_Acc>(
                     workdiv,
                     kernel,
                     gBuffer,
@@ -594,7 +594,7 @@ namespace isaac
                     persistentArray,
                     advectionTextureArray,
                     scale,
-                    clipping));
+                    clipping);
                 alpaka::enqueue(stream, instance);
             }
             else
@@ -610,7 +610,7 @@ namespace isaac
                     T_transferSize,
                     FilterType::NEAREST>
                     kernel;
-                auto const instance(alpaka::createTaskKernel<T_Acc>(
+                auto const instance = alpaka::createTaskKernel<T_Acc>(
                     workdiv,
                     kernel,
                     gBuffer,
@@ -622,7 +622,7 @@ namespace isaac
                     persistentArray,
                     advectionTextureArray,
                     scale,
-                    clipping));
+                    clipping);
                 alpaka::enqueue(stream, instance);
             }
         }

@@ -358,9 +358,9 @@ namespace isaac
                 T_transferSize,
                 T_sourceOffset>
                 kernel;
-            auto const instance(
+            auto const instance =
                 alpaka::createTaskKernel<
-                    T_Acc>(workdiv, kernel, gBuffer, particleSources, transferArray, sourceWeight, scale, clipping));
+                    T_Acc>(workdiv, kernel, gBuffer, particleSources, transferArray, sourceWeight, scale, clipping);
             alpaka::enqueue(stream, instance);
         }
     };
