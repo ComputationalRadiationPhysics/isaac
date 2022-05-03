@@ -94,10 +94,10 @@ be built yourself nevertheless or the distribution versions are outdated.
 The ISAACConfig.cmake searches for these requirements. See
 `example/CMakeLists.txt` for an easy to adopt example.
 
-* __Alpaka__ for the abstraction of the acceleration device. If only CUDA
+* __alpaka__ (version 0.6.0) for the abstraction of the acceleration device. If only CUDA
   is used, this library is __not needed__:
   * _From Source_:
-    * `git clone https://github.com/ComputationalRadiationPhysics/alpaka.git`
+    * `git clone https://github.com/alpaka-group/alpaka.git`
     * It is a header only library and doesn't need to be installed. However
       the root directory of the libary has to be added to the CMake variable
       `CMAKE_MODULE_PATH`, e.g. with
