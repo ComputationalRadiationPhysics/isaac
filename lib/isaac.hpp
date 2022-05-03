@@ -710,10 +710,10 @@ namespace isaac
                 ISAAC_IDX_TYPE(1),
                 ISAAC_IDX_TYPE(1));
             const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> grid(ISAAC_IDX_TYPE(1), ISAAC_IDX_TYPE(1), ISAAC_IDX_TYPE(1));
-            auto const workdiv(alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>(grid, blocks, threads));
+            auto const workdiv = alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>(grid, blocks, threads);
             FillFunctorChainPointerKernel kernel;
-            auto const instance(
-                alpaka::createTaskKernel<T_Acc>(workdiv, kernel, alpaka::getPtrNative(functor_chain_d)));
+            auto const instance
+                = alpaka::createTaskKernel<T_Acc>(workdiv, kernel, alpaka::getPtrNative(functor_chain_d));
             alpaka::enqueue(stream, instance);
             alpaka::wait(stream);
             // Init functions:
@@ -933,14 +933,14 @@ namespace isaac
             // copy ssao kernel to constant memory
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const ssaoKernelDeviceExtent(ISAAC_IDX_TYPE(64));
 
-            auto ssaoKernelDeviceView(
-                alpaka::createStaticDevMemView(&SSAOKernelArray[0u], acc, ssaoKernelDeviceExtent));
+            auto ssaoKernelDeviceView
+                = alpaka::createStaticDevMemView(&SSAOKernelArray[0u], acc, ssaoKernelDeviceExtent);
             alpaka::memcpy(stream, ssaoKernelDeviceView, ssaoKernelHostBuf, ISAAC_IDX_TYPE(64));
 
             // copy ssao noise kernel to constant memory
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const ssaoNoiseDeviceExtent(ISAAC_IDX_TYPE(16));
 
-            auto ssaoNoiseDeviceView(alpaka::createStaticDevMemView(&SSAONoiseArray[0u], acc, ssaoNoiseDeviceExtent));
+            auto ssaoNoiseDeviceView = alpaka::createStaticDevMemView(&SSAONoiseArray[0u], acc, ssaoNoiseDeviceExtent);
             alpaka::memcpy(stream, ssaoNoiseDeviceView, ssaoNoiseHostBuf, ISAAC_IDX_TYPE(16));
         }
 
@@ -1201,8 +1201,8 @@ namespace isaac
                 alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(ISAAC_MAX_FUNCTORS * combinedSourceListSize)));
 
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const parameterDeviceExtent(ISAAC_IDX_TYPE(16));
-            auto parameterDeviceView(
-                alpaka::createStaticDevMemView(&FunctorParameter[0u], acc, parameterDeviceExtent));
+            auto parameterDeviceView
+                = alpaka::createStaticDevMemView(&FunctorParameter[0u], acc, parameterDeviceExtent);
             alpaka::memcpy(
                 stream,
                 parameterDeviceView,
@@ -1218,21 +1218,21 @@ namespace isaac
                 ISAAC_IDX_TYPE(1),
                 ISAAC_IDX_TYPE(1));
             const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> grid(ISAAC_IDX_TYPE(1), ISAAC_IDX_TYPE(1), ISAAC_IDX_TYPE(1));
-            auto const workdiv(alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>(grid, blocks, threads));
+            auto const workdiv = alpaka::WorkDivMembers<T_AccDim, ISAAC_IDX_TYPE>(grid, blocks, threads);
             UpdateFunctorChainPointerKernel<combinedSourceListSize, DestArrayStruct<combinedSourceListSize>> kernel;
-            auto const instance(alpaka::createTaskKernel<T_Acc>(
+            auto const instance = alpaka::createTaskKernel<T_Acc>(
                 workdiv,
                 kernel,
                 alpaka::getPtrNative(functorChainChooseDevice),
                 alpaka::getPtrNative(functor_chain_d),
-                dest));
+                dest);
             alpaka::enqueue(stream, instance);
             alpaka::wait(stream);
 
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const functionChainDeviceExtent(
                 ISAAC_IDX_TYPE(ISAAC_MAX_SOURCES));
-            auto functionChainDeviceView(
-                alpaka::createStaticDevMemView(&FunctionChain[0u], acc, functionChainDeviceExtent));
+            auto functionChainDeviceView
+                = alpaka::createStaticDevMemView(&FunctionChain[0u], acc, functionChainDeviceExtent);
             alpaka::memcpy(
                 stream,
                 functionChainDeviceView,
@@ -2209,16 +2209,16 @@ namespace isaac
             // inverse matrix
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const inverseMVPDeviceEextent(ISAAC_IDX_TYPE(1));
             // get view
-            auto inverseMVPDeviceView(
-                alpaka::createStaticDevMemView(&InverseMVPMatrix, myself->acc, inverseMVPDeviceEextent));
+            auto inverseMVPDeviceView
+                = alpaka::createStaticDevMemView(&InverseMVPMatrix, myself->acc, inverseMVPDeviceEextent);
             // copy to constant memory
             alpaka::memcpy(myself->stream, inverseMVPDeviceView, inverseMVPHostBuf, ISAAC_IDX_TYPE(1));
 
             // modelview matrix
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const modelviewDeviceExtent(ISAAC_IDX_TYPE(1));
             // get view
-            auto modelviewDeviceView(
-                alpaka::createStaticDevMemView(&ModelViewMatrix, myself->acc, modelviewDeviceExtent));
+            auto modelviewDeviceView
+                = alpaka::createStaticDevMemView(&ModelViewMatrix, myself->acc, modelviewDeviceExtent);
             // copy to constant memory
             alpaka::memcpy(myself->stream, modelviewDeviceView, modelviewHostBuf, ISAAC_IDX_TYPE(1));
 
@@ -2226,13 +2226,13 @@ namespace isaac
             // projection matrix
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const projectionDeviceExtent(ISAAC_IDX_TYPE(1));
             // get view
-            auto projectionDeviceView(
-                alpaka::createStaticDevMemView(&ProjectionMatrix, myself->acc, projectionDeviceExtent));
+            auto projectionDeviceView
+                = alpaka::createStaticDevMemView(&ProjectionMatrix, myself->acc, projectionDeviceExtent);
             // copy to constant memory
             alpaka::memcpy(myself->stream, projectionDeviceView, projectionHostBuf, ISAAC_IDX_TYPE(1));
 
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const sizeDeviceExtent(ISAAC_IDX_TYPE(1));
-            auto sizeDeviceView(alpaka::createStaticDevMemView(&SimulationSize, myself->acc, sizeDeviceExtent));
+            auto sizeDeviceView = alpaka::createStaticDevMemView(&SimulationSize, myself->acc, sizeDeviceExtent);
             alpaka::memcpy(myself->stream, sizeDeviceView, sizeHostBuf, ISAAC_IDX_TYPE(1));
 
             // get pixel pointer from image as unsigned byte
@@ -2285,7 +2285,7 @@ namespace isaac
             // reset the GBuffer to default values
             {
                 ClearBufferKernel kernel;
-                auto const instance(alpaka::createTaskKernel<T_Acc>(workdiv, kernel, gBuffer, bgColor));
+                auto const instance = alpaka::createTaskKernel<T_Acc>(workdiv, kernel, gBuffer, bgColor);
                 alpaka::enqueue(myself->stream, instance);
                 alpaka::wait(myself->stream);
             }
@@ -2330,27 +2330,27 @@ namespace isaac
                     if(myself->interpolation)
                     {
                         CombinedIsoRenderKernel<FilterType::LINEAR> kernel;
-                        auto const instance(alpaka::createTaskKernel<T_Acc>(
+                        auto const instance = alpaka::createTaskKernel<T_Acc>(
                             workdiv,
                             kernel,
                             gBuffer,
                             myself->combinedIsoTextureAllocator.getTexture(),
                             myself->step,
                             isaac_scale,
-                            myself->clipping));
+                            myself->clipping);
                         alpaka::enqueue(myself->stream, instance);
                     }
                     else
                     {
                         CombinedIsoRenderKernel<FilterType::NEAREST> kernel;
-                        auto const instance(alpaka::createTaskKernel<T_Acc>(
+                        auto const instance = alpaka::createTaskKernel<T_Acc>(
                             workdiv,
                             kernel,
                             gBuffer,
                             myself->combinedIsoTextureAllocator.getTexture(),
                             myself->step,
                             isaac_scale,
-                            myself->clipping));
+                            myself->clipping);
                         alpaka::enqueue(myself->stream, instance);
                     }
                     alpaka::wait(myself->stream);
@@ -2398,8 +2398,8 @@ namespace isaac
             {
                 {
                     SSAOKernel kernel;
-                    auto const instance(
-                        alpaka::createTaskKernel<T_Acc>(workdiv, kernel, gBuffer, myself->ambientOcclusion));
+                    auto const instance
+                        = alpaka::createTaskKernel<T_Acc>(workdiv, kernel, gBuffer, myself->ambientOcclusion);
                     alpaka::enqueue(myself->stream, instance);
                 }
 
@@ -2410,8 +2410,8 @@ namespace isaac
 #if 0
                 {
                     SSAOFilterKernel kernel;
-                    auto const instance
-                    (
+                    auto const instance =
+
                         alpaka::createTaskKernel<T_Acc>
                         (
                             workdiv,
@@ -2419,7 +2419,7 @@ namespace isaac
                             gBuffer,
                             myself->ambientOcclusion
                         )
-                    );
+                    ;
                     alpaka::enqueue(myself->stream, instance);
                 }
 
@@ -2431,14 +2431,14 @@ namespace isaac
             // shade pixels
             {
                 ShadingKernel kernel;
-                auto const instance(alpaka::createTaskKernel<T_Acc>(
+                auto const instance = alpaka::createTaskKernel<T_Acc>(
                     workdiv,
                     kernel,
                     gBuffer,
                     myself->ambientOcclusion,
                     bgColor,
                     myself->rank,
-                    myself->renderMode));
+                    myself->renderMode);
                 alpaka::enqueue(myself->stream, instance);
                 alpaka::wait(myself->stream);
             }
@@ -2457,7 +2457,7 @@ namespace isaac
                     if(myself->interpolation)
                     {
                         CombinedVolumeRenderKernel<FilterType::LINEAR, volumeFieldSourceListSize> kernel;
-                        auto const instance(alpaka::createTaskKernel<T_Acc>(
+                        auto const instance = alpaka::createTaskKernel<T_Acc>(
                             workdiv,
                             kernel,
                             gBuffer,
@@ -2465,13 +2465,13 @@ namespace isaac
                             myself->step,
                             totalWeight,
                             isaac_scale,
-                            myself->clipping));
+                            myself->clipping);
                         alpaka::enqueue(myself->stream, instance);
                     }
                     else
                     {
                         CombinedVolumeRenderKernel<FilterType::NEAREST, volumeFieldSourceListSize> kernel;
-                        auto const instance(alpaka::createTaskKernel<T_Acc>(
+                        auto const instance = alpaka::createTaskKernel<T_Acc>(
                             workdiv,
                             kernel,
                             gBuffer,
@@ -2479,7 +2479,7 @@ namespace isaac
                             myself->step,
                             totalWeight,
                             isaac_scale,
-                            myself->clipping));
+                            myself->clipping);
                         alpaka::enqueue(myself->stream, instance);
                     }
                     alpaka::wait(myself->stream);
