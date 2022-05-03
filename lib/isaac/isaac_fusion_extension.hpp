@@ -21,6 +21,7 @@
 #include <boost/mpl/begin_end.hpp>
 #include <boost/mpl/int.hpp>
 #include <boost/mpl/size.hpp>
+#include <type_traits>
 
 namespace std
 {
