@@ -163,7 +163,7 @@ namespace isaac
         template<int N>
         ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<1> call(const isaac_float_dim<N> v, const isaac_float4& p)
         {
-            isaac_float_dim<1> result;
+            isaac_float_dim<1> result(0.0);
 
             for(int i = 0; i < N; ++i)
             {
