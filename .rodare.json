@@ -29,6 +29,10 @@
         },
         {
             "name": "Kosukhin, Sergey"
+        },
+        {
+            "affiliation":"HZDR, TU Dresden",
+            "name":"Lebedev, Anton"
         }
     ],
     "title": "ISAAC - In Situ Animation of Accelerated Computations",
