@@ -2,7 +2,7 @@
 
 ## [v1.6.0] - 2022-05-19
 
-alpaka 0.9.0 is required if you enabled alpaka support.
+This release is compatible with alpaka 0.6.0 - 0.9.X.
 
 * Library
   - remove native CUDA support #121
