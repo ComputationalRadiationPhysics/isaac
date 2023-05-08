@@ -587,9 +587,11 @@ namespace isaac
                     texValue = persistentTextureArray.textures[T_NR::value][coord];
                 }
                 // apply transfer function
-                ISAAC_IDX_TYPE lookupValue = ISAAC_IDX_TYPE(glm::round(texValue * isaac_float(T_transferSize)));
-                lookupValue = glm::clamp(lookupValue, ISAAC_IDX_TYPE(0), T_transferSize - 1);
-                const isaac_float4 color = transferArray.pointer[T_NR::value][lookupValue];
+                isaac_float lookupValue = glm::round(texValue * isaac_float(T_transferSize));
+                ISAAC_IDX_TYPE lookupIdx
+                    = ISAAC_IDX_TYPE(glm::clamp(lookupValue, isaac_float(0), isaac_float(T_transferSize - 1)));
+
+                const isaac_float4 color = transferArray.pointer[T_NR::value][lookupIdx];
                 if(volumeWeight > 0)
                 {
                     // create alpha weighted sum for volume visualization if activated
@@ -654,9 +656,11 @@ namespace isaac
                 // texValue *= advectionTextures.textures[T_NR::value][coord];
 
                 // apply transfer function
-                ISAAC_IDX_TYPE lookupValue = ISAAC_IDX_TYPE(glm::round(texValue * isaac_float(T_transferSize)));
-                lookupValue = glm::clamp(lookupValue, ISAAC_IDX_TYPE(0), T_transferSize - 1);
-                isaac_float4 color = transferArray.pointer[T_NR::value + T_Offset][lookupValue];
+                isaac_float lookupValue = glm::round(texValue * isaac_float(T_transferSize));
+                ISAAC_IDX_TYPE lookupIdx
+                    = ISAAC_IDX_TYPE(glm::clamp(lookupValue, isaac_float(0), isaac_float(T_transferSize - 1)));
+
+                isaac_float4 color = transferArray.pointer[T_NR::value + T_Offset][lookupIdx];
                 // blend alpha channel with advection texture value
                 color.a *= (advectionTextures.textures[T_NR::value][coord] / isaac_float(255));
                 if(volumeWeight > 0)

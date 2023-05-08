@@ -84,10 +84,10 @@ namespace isaac
                             result = applyFunctorChain(data, sourceNumber);
 
                             // apply transferfunction
-                            ISAAC_IDX_TYPE lookupValue
-                                = ISAAC_IDX_TYPE(glm::round(result * isaac_float(T_transferSize)));
-                            lookupValue = glm::clamp(lookupValue, ISAAC_IDX_TYPE(0), T_transferSize - 1);
-                            isaac_float4 value = transferArray.pointer[sourceNumber][lookupValue];
+                            isaac_float lookupValue = glm::round(result * isaac_float(T_transferSize));
+                            ISAAC_IDX_TYPE lookupIdx = ISAAC_IDX_TYPE(
+                                glm::clamp(lookupValue, isaac_float(0), isaac_float(T_transferSize - 1)));
+                            isaac_float4 value = transferArray.pointer[sourceNumber][lookupIdx];
 
                             // check if the alpha value is greater or equal than 0.5
                             if(value.w >= 0.5f)
@@ -358,9 +358,8 @@ namespace isaac
                 T_transferSize,
                 T_sourceOffset>
                 kernel;
-            auto const instance =
-                alpaka::createTaskKernel<
-                    T_Acc>(workdiv, kernel, gBuffer, particleSources, transferArray, sourceWeight, scale, clipping);
+            auto const instance = alpaka::createTaskKernel<
+                T_Acc>(workdiv, kernel, gBuffer, particleSources, transferArray, sourceWeight, scale, clipping);
             alpaka::enqueue(stream, instance);
         }
     };
