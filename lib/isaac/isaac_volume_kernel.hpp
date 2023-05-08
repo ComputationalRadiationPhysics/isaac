@@ -161,9 +161,10 @@ namespace isaac
             result = sampler.sample(texture, pos);
         }
         // return isaac_float4(1, 0, 0, result);
-        ISAAC_IDX_TYPE lookupValue = ISAAC_IDX_TYPE(glm::round(result * isaac_float(T_transferSize)));
-        lookupValue = glm::clamp(lookupValue, ISAAC_IDX_TYPE(0), T_transferSize - 1);
-        return transferArray.pointer[T_nr + T_offset][lookupValue];
+        isaac_float lookupValue = glm::round(result * isaac_float(T_transferSize));
+        ISAAC_IDX_TYPE lookupIdx
+            = ISAAC_IDX_TYPE(glm::clamp(lookupValue, isaac_float(0), isaac_float(T_transferSize - 1)));
+        return transferArray.pointer[T_nr + T_offset][lookupIdx];
     }
 
     template<

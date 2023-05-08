@@ -270,9 +270,9 @@ namespace isaac
                 checkCoord<T_Source>(p1Unscaled, localSize);
                 isaac_float result1
                     = getValue<T_interpolation, T_NR::value>(source, p1Unscaled, persistentTextureArray, localSize);
-                ISAAC_IDX_TYPE lookupValue = ISAAC_IDX_TYPE(glm::round(result1 * isaac_float(T_transferSize)));
-                lookupValue = glm::clamp(lookupValue, ISAAC_IDX_TYPE(0), T_transferSize - 1);
-                isaac_float value1 = transferArray.pointer[T_NR::value][lookupValue].a;
+                isaac_float lookupValue = glm::round(result1 * isaac_float(T_transferSize));
+                ISAAC_IDX_TYPE lookupIdx = ISAAC_IDX_TYPE(glm::clamp(lookupValue, isaac_float(0),
+    isaac_float(T_transferSize - 1))); isaac_float value1 = transferArray.pointer[T_NR::value][lookupIdx].a;
                 oldValues[T_NR::value] = value1;
 
 
@@ -294,9 +294,9 @@ namespace isaac
                 // get color of hit
                 isaac_float result
                     = getValue<T_interpolation, T_NR::value>(source, posUnscaled, persistentTextureArray, localSize);
-                lookupValue = ISAAC_IDX_TYPE(glm::round(result * isaac_float(T_transferSize)));
-                lookupValue = glm::clamp(lookupValue, ISAAC_IDX_TYPE(0), T_transferSize - 1);
-                hitColor = transferArray.pointer[T_NR::value][lookupValue];
+                lookupValue = glm::round(result * isaac_float(T_transferSize));
+                lookupIdx = ISAAC_IDX_TYPE(glm::clamp(lookupValue, isaac_float(0), isaac_float(T_transferSize - 1)));
+                hitColor = transferArray.pointer[T_NR::value][lookupIdx];
                 hitColor.a = 1.0f;
                 isaac_float3 gradient = getGradient<T_interpolation, T_NR::value>(
                     source,
