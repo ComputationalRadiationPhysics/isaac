@@ -48,7 +48,8 @@ namespace isaac
         isaac_float3 clippingNormal;
     };
 
-    ISAAC_DEVICE_INLINE Ray pixelToRay(const isaac_float2 pixel, const isaac_float2 framebufferSize)
+    template<typename T_Acc>
+    ISAAC_DEVICE_INLINE Ray pixelToRay(T_Acc const&, const isaac_float2 pixel, const isaac_float2 framebufferSize)
     {
         // relative pixel position in framebuffer [-1.0 ... 1.0]
         // get normalized pixel position in framebuffer
@@ -70,8 +71,8 @@ namespace isaac
         endPos.w = isaac_float(1);
 
         // apply inverse modelview transform to ray start/end and get ray start/end as worldspace
-        startPos = InverseMVPMatrix * startPos;
-        endPos = InverseMVPMatrix * endPos;
+        startPos = InverseMVPMatrix<T_acc>.get() * startPos;
+        endPos = InverseMVPMatrix<T_acc>.get() * endPos;
 
         Ray ray;
         // apply the w-clip

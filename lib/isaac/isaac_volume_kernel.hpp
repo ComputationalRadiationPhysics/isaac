@@ -43,7 +43,7 @@ namespace isaac
             if(!isInUpperBounds(pixel, gBuffer.size))
                 return;
 
-            Ray ray = pixelToRay(isaac_float2(pixel), isaac_float2(gBuffer.size));
+            Ray ray = pixelToRay(acc, isaac_float2(pixel), isaac_float2(gBuffer.size));
 
             if(!clipRay(ray, inputClipping))
                 return;
@@ -335,7 +335,7 @@ namespace isaac
             if(!atLeastOne)
                 return;
 
-            Ray ray = pixelToRay(isaac_float2(pixel), isaac_float2(gBuffer.size));
+            Ray ray = pixelToRay(acc, isaac_float2(pixel), isaac_float2(gBuffer.size));
 
             if(!clipRay(ray, inputClipping))
                 return;
