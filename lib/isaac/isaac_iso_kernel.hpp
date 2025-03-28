@@ -46,7 +46,7 @@ namespace isaac
 
             Ray ray = pixelToRay(acc, isaac_float2(pixel), isaac_float2(gBuffer.size));
 
-            if(!clipRay(ray, inputClipping))
+            if(!clipRay(acc, ray, inputClipping))
                 return;
 
             ray.endDepth = glm::min(ray.endDepth, gBuffer.depth[pixel]);
@@ -55,8 +55,8 @@ namespace isaac
 
             // Starting the main loop
             isaac_float min_size = ISAAC_MIN(
-                int(SimulationSize.globalSize.x),
-                ISAAC_MIN(int(SimulationSize.globalSize.y), int(SimulationSize.globalSize.z)));
+                int(SimulationSize<T_Acc>.get().globalSize.x),
+                ISAAC_MIN(int(SimulationSize<T_Acc>.get().globalSize.y), int(SimulationSize<T_Acc>.get().globalSize.z)));
             isaac_float stepSizeUnscaled = stepSize * (glm::length(ray.dir) / glm::length(ray.dir / scale));
             isaac_int startSteps = glm::ceil(ray.startDepth / stepSizeUnscaled);
             isaac_int endSteps = glm::floor(ray.endDepth / stepSizeUnscaled);
@@ -354,7 +354,7 @@ namespace isaac
 
             Ray ray = pixelToRay(acc, isaac_float2(pixel), isaac_float2(gBuffer.size));
 
-            if(!clipRay(ray, inputClipping))
+            if(!clipRay(acc, ray, inputClipping))
                 return;
 
             ray.endDepth = glm::min(ray.endDepth, gBuffer.depth[pixel]);
@@ -371,7 +371,7 @@ namespace isaac
             isaac_uint3 currentCell = isaac_uint3(glm::clamp(
                 isaac_int3(currentPos / scale),
                 isaac_int3(0),
-                isaac_int3(SimulationSize.localSize - ISAAC_IDX_TYPE(1))));
+                isaac_int3(SimulationSize<T_Acc>.get().localSize - ISAAC_IDX_TYPE(1))));
 
             isaac_float testedLength = 0;
 
@@ -418,7 +418,7 @@ namespace isaac
                     oldValues,
                     p1,
                     t1,
-                    SimulationSize.localSize,
+                    SimulationSize<T_Acc>.get().localSize,
                     transferArray,
                     sourceIsoThreshold,
                     persistentTextureArray,
@@ -553,7 +553,7 @@ namespace isaac
                     T_transferSize,
                     T_Source,
                     T_TransferArray,
-                    T_PersistentArray>(source, transferArray, persistentTextureArray, SimulationSize.localSize);
+                    T_PersistentArray>(source, transferArray, persistentTextureArray, SimulationSize<T_Acc>.get().localSize);
 
                 IsoStepSource(
                     sourceAccessor,
@@ -614,7 +614,7 @@ namespace isaac
                     transferArray,
                     persistentTextureArray,
                     advectionTextureArray,
-                    SimulationSize.localSize);
+                    SimulationSize<T_Acc>.get().localSize);
 
                 IsoStepSource(
                     sourceAccessor,
@@ -681,7 +681,7 @@ namespace isaac
 
             Ray ray = pixelToRay(acc, isaac_float2(pixel), isaac_float2(gBuffer.size));
 
-            if(!clipRay(ray, inputClipping))
+            if(!clipRay(acc, ray, inputClipping))
                 return;
 
             ray.endDepth = glm::min(ray.endDepth, gBuffer.depth[pixel]);
@@ -690,8 +690,8 @@ namespace isaac
 
             // Starting the main loop
             isaac_float min_size = ISAAC_MIN(
-                int(SimulationSize.globalSize.x),
-                ISAAC_MIN(int(SimulationSize.globalSize.y), int(SimulationSize.globalSize.z)));
+                int(SimulationSize<T_Acc>.get().globalSize.x),
+                ISAAC_MIN(int(SimulationSize<T_Acc>.get().globalSize.y), int(SimulationSize<T_Acc>.get().globalSize.z)));
             isaac_float stepSizeUnscaled = stepSize * (glm::length(ray.dir) / glm::length(ray.dir / scale));
             isaac_int startSteps = glm::ceil(ray.startDepth / stepSizeUnscaled);
             isaac_int endSteps = glm::floor(ray.endDepth / stepSizeUnscaled);
@@ -701,14 +701,14 @@ namespace isaac
 
             // move startSteps and endSteps to valid positions in the volume
             isaac_float3 pos = startUnscaled + stepVec * isaac_float(startSteps);
-            while((!isInLowerBounds(pos, isaac_float3(0)) || !isInUpperBounds(pos, SimulationSize.localSize))
+            while((!isInLowerBounds(pos, isaac_float3(0)) || !isInUpperBounds(pos, SimulationSize<T_Acc>.get().localSize))
                   && startSteps <= endSteps)
             {
                 startSteps++;
                 pos = startUnscaled + stepVec * isaac_float(startSteps);
             }
             pos = startUnscaled + stepVec * isaac_float(endSteps);
-            while((!isInLowerBounds(pos, isaac_float3(0)) || !isInUpperBounds(pos, SimulationSize.localSize))
+            while((!isInLowerBounds(pos, isaac_float3(0)) || !isInUpperBounds(pos, SimulationSize<T_Acc>.get().localSize))
                   && startSteps <= endSteps)
             {
                 endSteps--;
@@ -737,7 +737,7 @@ namespace isaac
                     t,
                     pos,
                     stepSizeUnscaled,
-                    SimulationSize.localSize,
+                    SimulationSize<T_Acc>.get().localSize,
                     transferArray,
                     sourceIsoThreshold,
                     persistentTextureArray,
@@ -757,7 +757,7 @@ namespace isaac
                     t,
                     pos,
                     stepSizeUnscaled,
-                    SimulationSize.localSize,
+                    SimulationSize<T_Acc>.get().localSize,
                     transferArray,
                     sourceIsoThreshold,
                     persistentTextureArray,

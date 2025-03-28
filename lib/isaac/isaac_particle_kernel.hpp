@@ -149,9 +149,9 @@ namespace isaac
             if(!atLeastOne)
                 return;
 
-            Ray ray = pixelToRay(isaac_float2(pixel), isaac_float2(gBuffer.size));
+            Ray ray = pixelToRay(acc, isaac_float2(pixel), isaac_float2(gBuffer.size));
 
-            if(!clipRay(ray, inputClipping))
+            if(!clipRay(acc, ray, inputClipping))
                 return;
 
             ray.endDepth = glm::min(ray.endDepth, gBuffer.depth[pixel]);
@@ -170,7 +170,7 @@ namespace isaac
             isaac_uint3 currentCell = isaac_uint3(glm::clamp(
                 isaac_int3(currentPos / scale),
                 isaac_int3(0),
-                isaac_int3(SimulationSize.localParticleSize - ISAAC_IDX_TYPE(1))));
+                isaac_int3(SimulationSize<T_Acc>.get().localParticleSize - ISAAC_IDX_TYPE(1))));
 
             isaac_float rayLength = ray.endDepth - ray.startDepth;
             isaac_float testedLength = 0;
@@ -201,7 +201,7 @@ namespace isaac
 
             // iterate over all cells on the ray path
             // check if the ray leaves the local volume, has a particle hit or exceeds the max ray distance
-            while(isInUpperBounds(currentCell, SimulationSize.localParticleSize) && particleHit == false
+            while(isInUpperBounds(currentCell, SimulationSize<T_Acc>.get().localParticleSize) && particleHit == false
                   && testedLength <= rayLength)
             {
                 // calculate particle intersections for each particle source

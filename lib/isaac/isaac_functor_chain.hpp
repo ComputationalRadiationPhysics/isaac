@@ -49,28 +49,32 @@ namespace isaac
         isaac_int nr[ZeroCheck<T_n>::value];
     };
 
-    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(isaac_float_dim<1>& data, const int nr)
+    template<typename T_Acc>
+    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(T_Acc const &acc, isaac_float_dim<1>& data, const int nr)
     {
         return reinterpret_cast<FunctorChainPointer1>(
-            FunctionChain[nr])(*(reinterpret_cast<isaac_float_dim<1>*>(&data)), nr);
+            FunctionChain<T_Acc>.get()[nr])(*(reinterpret_cast<isaac_float_dim<1>*>(&data)), nr);
     }
 
-    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(isaac_float_dim<2>& data, const int nr)
+    template<typename T_Acc>
+    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(T_Acc const &acc, isaac_float_dim<2>& data, const int nr)
     {
         return reinterpret_cast<FunctorChainPointer2>(
-            FunctionChain[nr])(*(reinterpret_cast<isaac_float_dim<2>*>(&data)), nr);
+            FunctionChain<T_Acc>.get()[nr])(*(reinterpret_cast<isaac_float_dim<2>*>(&data)), nr);
     }
 
-    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(isaac_float_dim<3>& data, const int nr)
+    template<typename T_Acc>
+    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(T_Acc const &acc, isaac_float_dim<3>& data, const int nr)
     {
         return reinterpret_cast<FunctorChainPointer3>(
-            FunctionChain[nr])(*(reinterpret_cast<isaac_float_dim<3>*>(&data)), nr);
+            FunctionChain<T_Acc>.get()[nr])(*(reinterpret_cast<isaac_float_dim<3>*>(&data)), nr);
     }
 
-    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(isaac_float_dim<4>& data, const int nr)
+    template<typename T_Acc>
+    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(T_Acc const &acc, isaac_float_dim<4>& data, const int nr)
     {
         return reinterpret_cast<FunctorChainPointer4>(
-            FunctionChain[nr])(*(reinterpret_cast<isaac_float_dim<4>*>(&data)), nr);
+            FunctionChain<T_Acc>.get()[nr])(*(reinterpret_cast<isaac_float_dim<4>*>(&data)), nr);
     }
 
     template<typename T_FunctorVector, int T_featureDim, int T_nr>
@@ -91,12 +95,11 @@ namespace isaac
         }
     };
 
-
-    template<typename T_FunctorVector, int T_featureDim>
-    ISAAC_DEVICE isaac_float generateFunctorChain(isaac_float_dim<T_featureDim> const value, isaac_int const srcID)
+    template<typename T_Acc, typename T_FunctorVector, int T_featureDim>
+    ISAAC_DEVICE isaac_float generateFunctorChain(T_Acc const &acc, isaac_float_dim<T_featureDim> const value, isaac_int const srcID)
     {
-#define ISAAC_LEFT_DEF(Z, I, U) boost::mpl::at_c< T_FunctorVector, ISAAC_MAX_FUNCTORS - I - 1 >::type::call(
-#define ISAAC_RIGHT_DEF(Z, I, U) , FunctorParameter[ srcID * ISAAC_MAX_FUNCTORS + I ] )
+#define ISAAC_LEFT_DEF(Z, I, U) boost::mpl::at_c< T_FunctorVector, ISAAC_MAX_FUNCTORS - I - 1 >::type::call(acc,
+#define ISAAC_RIGHT_DEF(Z, I, U) , FunctorParameter<T_Acc>.get()[ srcID * ISAAC_MAX_FUNCTORS + I ] )
 #define ISAAC_LEFT BOOST_PP_REPEAT(ISAAC_MAX_FUNCTORS, ISAAC_LEFT_DEF, ~)
 #define ISAAC_RIGHT BOOST_PP_REPEAT(ISAAC_MAX_FUNCTORS, ISAAC_RIGHT_DEF, ~)
         // expands to: funcN( ... func1( func0( data, p[0] ), p[1] ) ... p[T_n] );
@@ -115,9 +118,10 @@ namespace isaac
         0 //<- Specialization
         >
     {
-        ISAAC_DEVICE static FunctorChainPointerN call(isaac_int const* const bytecode)
+	template<typename T_Acc>
+        ISAAC_DEVICE static FunctorChainPointerN call(T_Acc const &acc, isaac_int const* const bytecode)
         {
-            return reinterpret_cast<FunctorChainPointerN>(generateFunctorChain<T_FunctorVector, T_featureDim>);
+            return reinterpret_cast<FunctorChainPointerN>(generateFunctorChain<T_Acc, T_FunctorVector, T_featureDim>);
         }
     };
 

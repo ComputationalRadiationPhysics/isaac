@@ -181,7 +181,7 @@ set(ISAAC_PRIVATE_FOUND true)
 
 # alpaka target is already provided by another project
 if(NOT TARGET alpaka::alpaka)
-    set(isaac_MIN_ALPAKA_VERSION 0.6.0)
+    set(isaac_MIN_ALPAKA_VERSION 2.0.0)
     find_package(alpaka ${isaac_MIN_ALPAKA_VERSION})
     if (NOT alpaka_FOUND)
         set(ISAAC_PRIVATE_FOUND false)

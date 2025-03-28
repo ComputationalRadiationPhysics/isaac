@@ -49,7 +49,7 @@ namespace isaac
     };
 
     template<typename T_Acc>
-    ISAAC_DEVICE_INLINE Ray pixelToRay(T_Acc const&, const isaac_float2 pixel, const isaac_float2 framebufferSize)
+    ISAAC_DEVICE_INLINE Ray pixelToRay(T_Acc const& acc, const isaac_float2 pixel, const isaac_float2 framebufferSize)
     {
         // relative pixel position in framebuffer [-1.0 ... 1.0]
         // get normalized pixel position in framebuffer
@@ -71,15 +71,15 @@ namespace isaac
         endPos.w = isaac_float(1);
 
         // apply inverse modelview transform to ray start/end and get ray start/end as worldspace
-        startPos = InverseMVPMatrix<T_acc>.get() * startPos;
-        endPos = InverseMVPMatrix<T_acc>.get() * endPos;
+        startPos = InverseMVPMatrix<T_Acc>.get() * startPos;
+        endPos = InverseMVPMatrix<T_Acc>.get() * endPos;
 
         Ray ray;
         // apply the w-clip
         ray.start = startPos / startPos.w;
         ray.end = endPos / endPos.w;
 
-        isaac_float maxSize = SimulationSize.maxGlobalSizeScaled * isaac_float(0.5);
+        isaac_float maxSize = SimulationSize<T_Acc>.get().maxGlobalSizeScaled * isaac_float(0.5);
 
         // scale to globale grid size
         ray.start = ray.start * maxSize;
@@ -92,7 +92,8 @@ namespace isaac
         return ray;
     }
 
-    ISAAC_DEVICE_INLINE bool clipRay(Ray& ray, const ClippingStruct& inputClipping)
+    template<typename T_Acc>
+    ISAAC_DEVICE_INLINE bool clipRay(T_Acc const& acc, Ray& ray, const ClippingStruct& inputClipping)
     {
         // clipping planes with transformed positions
         ClippingStruct clipping;
@@ -101,14 +102,14 @@ namespace isaac
         for(isaac_uint i = 0; i < inputClipping.count; i++)
         {
             clipping.elem[i].position
-                = inputClipping.elem[i].position * isaac_float3(SimulationSize.globalSizeScaled) * isaac_float(0.5);
+                = inputClipping.elem[i].position * isaac_float3(SimulationSize<T_Acc>.get().globalSizeScaled) * isaac_float(0.5);
             clipping.elem[i].normal = inputClipping.elem[i].normal;
         }
 
         // move to local (scaled) grid
         // get offset of subvolume in global volume
         isaac_float3 position_offset = isaac_float3(
-            isaac_int3(SimulationSize.globalSizeScaled) / 2 - isaac_int3(SimulationSize.positionScaled));
+            isaac_int3(SimulationSize<T_Acc>.get().globalSizeScaled) / 2 - isaac_int3(SimulationSize<T_Acc>.get().positionScaled));
 
         // apply subvolume offset to start and end
         ray.start = ray.start + position_offset;
@@ -121,10 +122,10 @@ namespace isaac
         }
 
         // clip ray on volume bounding box
-        isaac_int3 bbMinLocal = glm::max(isaac_int3(0), -SimulationSize.positionScaled);
+        isaac_int3 bbMinLocal = glm::max(isaac_int3(0), -SimulationSize<T_Acc>.get().positionScaled);
         isaac_int3 bbMaxLocal = glm::min(
-            isaac_int3(SimulationSize.localSizeScaled),
-            isaac_int3(SimulationSize.globalSizeScaled) - SimulationSize.positionScaled);
+            isaac_int3(SimulationSize<T_Acc>.get().localSizeScaled),
+            isaac_int3(SimulationSize<T_Acc>.get().globalSizeScaled) - SimulationSize<T_Acc>.get().positionScaled);
         isaac_float3 bbIntersectionMin = (isaac_float3(bbMinLocal) - ray.start) / ray.dir;
         isaac_float3 bbIntersectionMax = (isaac_float3(bbMaxLocal) - ray.start) / ray.dir;
 
@@ -142,8 +143,8 @@ namespace isaac
             float sign = glm::sign(ray.dir[i]);
             // only clip if it is an outer edge of the simulation volume
             if(bbIntersectionMin[i] == ray.startDepth
-               && ((SimulationSize.position[i] == 0 && sign + 1)
-                   || (SimulationSize.position[i] + SimulationSize.localSize[i] == SimulationSize.globalSize[i]
+               && ((SimulationSize<T_Acc>.get().position[i] == 0 && sign + 1)
+                   || (SimulationSize<T_Acc>.get().position[i] + SimulationSize<T_Acc>.get().localSize[i] == SimulationSize<T_Acc>.get().globalSize[i]
                        && sign - 1)))
             {
                 ray.isClipped = true;
@@ -253,7 +254,7 @@ namespace isaac
             // normal blinn-phong shading
             if(mode < 3 || mode == 7)
             {
-                Ray ray = pixelToRay(isaac_float2(pixel), isaac_float2(gBuffer.size));
+                Ray ray = pixelToRay(acc, isaac_float2(pixel), isaac_float2(gBuffer.size));
                 isaac_float3 lightDir = -ray.dir;
                 isaac_float lightFactor = glm::abs(glm::dot(normal, lightDir));
 
@@ -299,7 +300,7 @@ namespace isaac
             // depth as color for debug
             else if(mode == 5)
             {
-                isaac_float depth = gBuffer.depth[pixel] / isaac_float(SimulationSize.maxGlobalSizeScaled);
+                isaac_float depth = gBuffer.depth[pixel] / isaac_float(SimulationSize<T_Acc>.get().maxGlobalSizeScaled);
                 gBuffer.color[pixel] = transformColor(isaac_float4(isaac_float3(depth), color.a));
                 gBuffer.depth[pixel] = isaac_float(0);
             }
@@ -447,7 +448,7 @@ namespace isaac
                 return;
             coord -= T_Source::guardSize;
             isaac_float_dim<T_Source::featureDim> value = source[coord];
-            texture[coord] = applyFunctorChain(value, nr);
+            texture[coord] = applyFunctorChain(acc,value, nr);
         }
     };
 
