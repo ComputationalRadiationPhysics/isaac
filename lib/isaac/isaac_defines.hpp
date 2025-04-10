@@ -65,9 +65,9 @@
 #define ISAAC_DEVICE_INLINE ISAAC_HOST_DEVICE_INLINE
 
 #if(BOOST_LANG_CUDA || BOOST_LANG_HIP)
-#    define ISAAC_DEVICE __device__ __host__
+#    define ISAAC_DEVICE ALPAKA_FN_HOST_ACC
 #else
-#    define ISAAC_DEVICE
+#    define ISAAC_DEVICE ALPAKA_FN_HOST_ACC
 #endif
 
 #ifdef __CUDACC__

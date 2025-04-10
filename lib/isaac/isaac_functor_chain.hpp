@@ -39,8 +39,18 @@ namespace isaac
 
     typedef isaac_float (*FunctorChainPointerN)(void*, isaac_int);
 
-    ISAAC_CONSTANT isaac_float4 FunctorParameter[ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS];
+    using ParamArray = isaac::isaac_float4[ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS];
+    //struct ParamArray {
+    //    isaac::isaac_float4 data[ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS];
+    //};
+    static_assert(std::is_trivially_copyable<ParamArray>::value, "ParamArray is trivially copyable");
+    static_assert(std::is_standard_layout<ParamArray>::value, "ParamArray not standard layout");
+    //using ParamArray = std::array<isaac::isaac_float4, ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS>;
+    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, const ParamArray> FunctorParameter;
+    //ALPAKA_STATIC_ACC_MEM_CONSTANT ParamArray FunctorParameter;    
+    //ISAAC_CONSTANT isaac_float4 FunctorParameter[ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS];
 
+//    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, FunctorChainPointerN[ISAAC_MAX_SOURCES]> FunctionChain;
     ISAAC_CONSTANT FunctorChainPointerN FunctionChain[ISAAC_MAX_SOURCES];
 
     template<int T_n>
@@ -80,7 +90,8 @@ namespace isaac
     template<typename T_FunctorVector, int T_featureDim, int T_nr>
     struct FillFunctorChainPointerKernelStruct
     {
-        ISAAC_DEVICE static FunctorChainPointerN call(isaac_int const* const bytecode)
+	template<typename T_Acc>
+        ISAAC_DEVICE static FunctorChainPointerN call(T_Acc const &acc, isaac_int const* const bytecode)
         {
 #define ISAAC_SUB_CALL(Z, I, U)                                                                                       \
     if(bytecode[ISAAC_MAX_FUNCTORS - T_nr] == I)                                                                      \
@@ -88,7 +99,7 @@ namespace isaac
             typename boost::mpl::push_back<T_FunctorVector, typename boost::mpl::at_c<IsaacFunctorPool, I>::type>::   \
                 type,                                                                                                 \
             T_featureDim,                                                                                             \
-            T_nr - 1>::call(bytecode);
+            T_nr - 1>::call(acc,bytecode);
             BOOST_PP_REPEAT(ISAAC_FUNCTOR_COUNT, ISAAC_SUB_CALL, ~)
 #undef ISAAC_SUB_CALL
             return NULL; // Should never be reached anyway
@@ -139,13 +150,13 @@ namespace isaac
             for(int i = 0; i < ISAAC_FUNCTOR_COMPLEX; i++)
             {
                 functorChain[i * 4 + 0]
-                    = FillFunctorChainPointerKernelStruct<boost::mpl::vector<>, 1, ISAAC_MAX_FUNCTORS>::call(bytecode);
+                    = FillFunctorChainPointerKernelStruct<boost::mpl::vector<>, 1, ISAAC_MAX_FUNCTORS>::call(acc,bytecode);
                 functorChain[i * 4 + 1]
-                    = FillFunctorChainPointerKernelStruct<boost::mpl::vector<>, 2, ISAAC_MAX_FUNCTORS>::call(bytecode);
+                    = FillFunctorChainPointerKernelStruct<boost::mpl::vector<>, 2, ISAAC_MAX_FUNCTORS>::call(acc,bytecode);
                 functorChain[i * 4 + 2]
-                    = FillFunctorChainPointerKernelStruct<boost::mpl::vector<>, 3, ISAAC_MAX_FUNCTORS>::call(bytecode);
+                    = FillFunctorChainPointerKernelStruct<boost::mpl::vector<>, 3, ISAAC_MAX_FUNCTORS>::call(acc,bytecode);
                 functorChain[i * 4 + 3]
-                    = FillFunctorChainPointerKernelStruct<boost::mpl::vector<>, 4, ISAAC_MAX_FUNCTORS>::call(bytecode);
+                    = FillFunctorChainPointerKernelStruct<boost::mpl::vector<>, 4, ISAAC_MAX_FUNCTORS>::call(acc,bytecode);
                 for(int j = ISAAC_MAX_FUNCTORS - 1; j >= 0; j--)
                 {
                     if(bytecode[j] < ISAAC_FUNCTOR_COUNT - 1)
