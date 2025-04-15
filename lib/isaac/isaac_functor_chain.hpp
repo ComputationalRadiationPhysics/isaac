@@ -40,18 +40,8 @@ namespace isaac
     typedef isaac_float (*FunctorChainPointerN)(void*, isaac_int);
 
     using ParamArray = isaac::isaac_float4[ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS];
-    //struct ParamArray {
-    //    isaac::isaac_float4 data[ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS];
-    //};
-    static_assert(std::is_trivially_copyable<ParamArray>::value, "ParamArray is trivially copyable");
-    static_assert(std::is_standard_layout<ParamArray>::value, "ParamArray not standard layout");
-    //using ParamArray = std::array<isaac::isaac_float4, ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS>;
     ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, ParamArray> FunctorParameter;
-    //ALPAKA_STATIC_ACC_MEM_CONSTANT ParamArray FunctorParameter;    
-    //ISAAC_CONSTANT isaac_float4 FunctorParameter[ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS];
-
-//    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, FunctorChainPointerN[ISAAC_MAX_SOURCES]> FunctionChain;
-    ISAAC_CONSTANT FunctorChainPointerN FunctionChain[ISAAC_MAX_SOURCES];
+    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, FunctorChainPointerN[ISAAC_MAX_SOURCES]> FunctionChain;
 
     template<int T_n>
     struct DestArrayStruct

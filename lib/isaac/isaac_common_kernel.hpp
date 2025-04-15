@@ -26,16 +26,16 @@
 namespace isaac
 {
     // inverse mvp matrix
-    ISAAC_CONSTANT isaac_mat4 InverseMVPMatrix;
+    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, isaac_mat4> InverseMVPMatrix;
 
     // modelview matrix
-    ISAAC_CONSTANT isaac_mat4 ModelViewMatrix;
+    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, isaac_mat4> ModelViewMatrix;
 
     // projection matrix
-    ISAAC_CONSTANT isaac_mat4 ProjectionMatrix;
+    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, isaac_mat4> ProjectionMatrix;
 
     // simulation size properties
-    ISAAC_CONSTANT SimulationSizeStruct SimulationSize;
+    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, SimulationSizeStruct> SimulationSize;
 
     struct Ray
     {
