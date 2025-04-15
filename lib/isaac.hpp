@@ -1201,18 +1201,8 @@ namespace isaac
                 alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(ISAAC_MAX_FUNCTORS * combinedSourceListSize)));
 
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const parameterDeviceExtent(ISAAC_IDX_TYPE(16));
-            auto parameterDeviceView
-                = alpaka::createView(acc, FunctorParameter<T_Acc>.get() parameterDeviceExtent);
-            //alpaka::ViewPlainPtr<DevAcc, isaac_float4, FraDim, ISAAC_IDX_TYPE> parameterDeviceView(
-            //     FunctorParameter,
-            //     acc,
-            //     alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(16)));
 
-            alpaka::memcpy(
-                stream,
-                parameterDeviceView,
-                parameterBuffer);//,
-                // alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(ISAAC_MAX_FUNCTORS * combinedSourceListSize)));
+            alpaka::memcpy(stream, FunctorParameter<T_Acc>, parameterBuffer, parameterDeviceExtent);
 
             const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> threads(
                 ISAAC_IDX_TYPE(1),

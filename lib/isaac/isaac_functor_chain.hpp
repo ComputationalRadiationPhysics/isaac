@@ -46,7 +46,7 @@ namespace isaac
     static_assert(std::is_trivially_copyable<ParamArray>::value, "ParamArray is trivially copyable");
     static_assert(std::is_standard_layout<ParamArray>::value, "ParamArray not standard layout");
     //using ParamArray = std::array<isaac::isaac_float4, ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS>;
-    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, const ParamArray> FunctorParameter;
+    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, ParamArray> FunctorParameter;
     //ALPAKA_STATIC_ACC_MEM_CONSTANT ParamArray FunctorParameter;    
     //ISAAC_CONSTANT isaac_float4 FunctorParameter[ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS];
 
