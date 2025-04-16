@@ -25,10 +25,10 @@ namespace isaac
      */
 
     // filter kernel
-    ISAAC_CONSTANT isaac_float3 SSAOKernelArray[64];
+    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, isaac_float3[64]> SSAOKernelArray;
 
     // vector rotation noise kernel
-    ISAAC_CONSTANT isaac_float3 SSAONoiseArray[16];
+    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, isaac_float3[16]> SSAONoiseArray;
 
     /**
      * @brief Calculate SSAO factor

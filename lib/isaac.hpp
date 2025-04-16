@@ -932,16 +932,11 @@ namespace isaac
             // move ssao kernel to device
             // copy ssao kernel to constant memory
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const ssaoKernelDeviceExtent(ISAAC_IDX_TYPE(64));
-
-            //auto ssaoKernelDeviceView
-                //= alpaka::createStaticDevMemView(&SSAOKernelArray[0u], acc, ssaoKernelDeviceExtent);
-            alpaka::memcpy(stream, SSAOKernelArray<DevAcc>, ssaoKernelHostBuf);//, ISAAC_IDX_TYPE(64));
+            alpaka::memcpy(stream, SSAOKernelArray<T_Acc>, ssaoKernelHostBuf, ssaoKernelDeviceExtent);
 
             // copy ssao noise kernel to constant memory
             alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const ssaoNoiseDeviceExtent(ISAAC_IDX_TYPE(16));
-
-            //auto ssaoNoiseDeviceView = alpaka::createStaticDevMemView(&SSAONoiseArray[0u], acc, ssaoNoiseDeviceExtent);
-            alpaka::memcpy(stream, SSAONoiseArray<DevAcc>, ssaoNoiseHostBuf);//, ISAAC_IDX_TYPE(16));
+            alpaka::memcpy(stream, SSAONoiseArray<T_Acc>, ssaoNoiseHostBuf, ssaoNoiseDeviceExtent);
         }
 
 
