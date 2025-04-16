@@ -52,6 +52,15 @@
 #include <math.h>
 #include <stdio.h>
 
+namespace alpaka {
+
+    template<typename... T>
+    struct IsKernelArgumentTriviallyCopyable<boost::fusion::list<T...>>
+        : std::true_type
+    {
+    };
+
+}
 
 namespace isaac
 {
