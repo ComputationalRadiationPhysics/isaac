@@ -448,7 +448,7 @@ namespace isaac
                 return;
             coord -= T_Source::guardSize;
             isaac_float_dim<T_Source::featureDim> value = source[coord];
-            texture[coord] = applyFunctorChain(acc,value, nr);
+            texture[coord] = applyFunctorChain(acc, value, nr);
         }
     };
 
@@ -565,6 +565,7 @@ namespace isaac
         ISAAC_DEVICE void operator()(
             const T_NR& nr,
             const T_Source& source,
+            const auto& acc,
             const T_PersistentArray& persistentTextureArray,
             const isaac_int3& coord,
             const T_TransferArray& transferArray,
@@ -582,7 +583,7 @@ namespace isaac
                 if(T_Source::persistent)
                 {
                     isaac_float_dim<T_Source::featureDim> value = source[coord];
-                    texValue = applyFunctorChain(value, T_NR::value);
+                    texValue = applyFunctorChain(acc, value, T_NR::value);
                 }
                 else
                 {
@@ -631,6 +632,7 @@ namespace isaac
         ISAAC_DEVICE void operator()(
             const T_NR& nr,
             const T_Source& source,
+            const auto& acc,
             const T_PersistentArray& persistentTextureArray,
             const isaac_int3& coord,
             const T_TransferArray& transferArray,
@@ -649,7 +651,7 @@ namespace isaac
                 if(T_Source::persistent)
                 {
                     isaac_float_dim<T_Source::featureDim> value = source[coord];
-                    texValue = applyFunctorChain(value, T_NR::value + T_Offset);
+                    texValue = applyFunctorChain(acc, value, T_NR::value + T_Offset);
                 }
                 else
                 {
@@ -728,6 +730,7 @@ namespace isaac
             forEachWithMplParams(
                 sources,
                 MergeToCombinedTextureIterator<T_transferSize>(),
+                acc,
                 persistentTextureArray,
                 coord,
                 transferArray,
@@ -741,6 +744,7 @@ namespace isaac
                 MergeAdvectionToCombinedTextureIterator<
                     T_transferSize,
                     boost::mpl::size<T_VolumeSourceList>::type::value>(),
+                acc,
                 persistentTextureArray,
                 coord,
                 transferArray,

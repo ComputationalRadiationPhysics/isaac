@@ -36,6 +36,7 @@ namespace isaac
         ISAAC_DEVICE_INLINE void operator()(
             const T_NR& nr,
             const T_Source& source, // particle source
+            const auto& acc,
             const isaac_float3& start, // ray start position in local volume
             const isaac_float3& dir,
             const isaac_uint3& cellPos, // cell to test in local volume
@@ -81,7 +82,7 @@ namespace isaac
                             isaac_float result = isaac_float(0);
 
                             // apply functorchain
-                            result = applyFunctorChain(data, sourceNumber);
+                            result = applyFunctorChain(acc, data, sourceNumber);
 
                             // apply transferfunction
                             isaac_float lookupValue = glm::round(result * isaac_float(T_transferSize));
@@ -208,6 +209,7 @@ namespace isaac
                 forEachWithMplParams(
                     particleSources,
                     MergeParticleSourceIterator<T_transferSize, T_sourceOffset, T_Filter>(),
+                    acc,
                     currentPos,
                     ray.dir,
                     currentCell,
