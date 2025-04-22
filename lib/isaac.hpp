@@ -938,14 +938,9 @@ namespace isaac
                 ssaoNoiseHost[i] = noise;
             }
 
-            // move ssao kernel to device
             // copy ssao kernel to constant memory
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const ssaoKernelDeviceExtent(ISAAC_IDX_TYPE(64));
-            alpaka::memcpy(stream, SSAOKernelArray<T_Acc>, ssaoKernelHostBuf, ssaoKernelDeviceExtent);
-
-            // copy ssao noise kernel to constant memory
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const ssaoNoiseDeviceExtent(ISAAC_IDX_TYPE(16));
-            alpaka::memcpy(stream, SSAONoiseArray<T_Acc>, ssaoNoiseHostBuf, ssaoNoiseDeviceExtent);
+            alpaka::memcpy(stream, SSAOKernelArray<T_Acc>, ssaoKernelHostBuf);
+            alpaka::memcpy(stream, SSAONoiseArray<T_Acc>, ssaoNoiseHostBuf);
         }
 
 
@@ -1204,9 +1199,7 @@ namespace isaac
                 host,
                 alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(ISAAC_MAX_FUNCTORS * combinedSourceListSize)));
 
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const parameterDeviceExtent(ISAAC_IDX_TYPE(16));
-
-            alpaka::memcpy(stream, FunctorParameter<T_Acc>, parameterBuffer, parameterDeviceExtent);
+            alpaka::memcpy(stream, FunctorParameter<T_Acc>, parameterBuffer);
 
             const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> threads(
                 ISAAC_IDX_TYPE(1),
@@ -1228,13 +1221,7 @@ namespace isaac
             alpaka::enqueue(stream, instance);
             alpaka::wait(stream);
 
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const functionChainDeviceExtent(
-                ISAAC_IDX_TYPE(ISAAC_MAX_SOURCES));
-            alpaka::memcpy(
-                stream,
-                FunctionChain<T_Acc>,
-                functorChainChooseDevice,
-                functionChainDeviceExtent);
+            alpaka::memcpy(stream, FunctionChain<T_Acc>, functorChainChooseDevice);
         }
 
 
@@ -2204,11 +2191,10 @@ namespace isaac
             // copy matrices and simulation size properties to constant memory
 
             // inverse matrix
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const extent(ISAAC_IDX_TYPE(1));
-            alpaka::memcpy(myself->stream, InverseMVPMatrix<T_Acc>, inverseMVPHostBuf, extent);
-            alpaka::memcpy(myself->stream, ModelViewMatrix<T_Acc>, modelviewHostBuf, extent);
-            alpaka::memcpy(myself->stream, ProjectionMatrix<T_Acc>, projectionHostBuf, extent);
-            alpaka::memcpy(myself->stream, SimulationSize<T_Acc>, sizeHostBuf, extent);
+            alpaka::memcpy(myself->stream, InverseMVPMatrix<T_Acc>, inverseMVPHostBuf);
+            alpaka::memcpy(myself->stream, ModelViewMatrix<T_Acc>, modelviewHostBuf);
+            alpaka::memcpy(myself->stream, ProjectionMatrix<T_Acc>, projectionHostBuf);
+            alpaka::memcpy(myself->stream, SimulationSize<T_Acc>, sizeHostBuf);
 
             // get pixel pointer from image as unsigned byte
             IceTUByte* pixels = icetImageGetColorub(result);
