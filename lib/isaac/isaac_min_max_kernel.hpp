@@ -44,7 +44,7 @@ namespace isaac
                 if(T_Source::persistent)
                 {
                     isaac_float_dim<T_Source::featureDim> data = source[coord];
-                    value = applyFunctorChain(data, nr);
+                    value = applyFunctorChain(acc, data, nr);
                 }
                 else
                 {
@@ -86,7 +86,7 @@ namespace isaac
 
                     data = particleIterator.getAttribute();
 
-                    isaac_float value = applyFunctorChain(data, nr);
+                    isaac_float value = applyFunctorChain(acc, data, nr);
                     min = glm::min(min, value);
                     max = glm::max(max, value);
                 }

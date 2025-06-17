@@ -290,11 +290,11 @@ int main(int argc, char** argv)
 
     using DevAcc = alpaka::Dev<Acc>;
     using DevHost = alpaka::DevCpu;
-    using PltfHost = alpaka::Pltf<DevHost>;
-    using PltfAcc = alpaka::Pltf<DevAcc>;
+    auto const platformHost = alpaka::Platform<DevHost>{};
+    auto const platformAcc = alpaka::Platform<DevAcc>{};
 
-    DevAcc devAcc(alpaka::getDevByIdx<PltfAcc>(rank % alpaka::getDevCount<PltfAcc>()));
-    DevHost devHost(alpaka::getDevByIdx<PltfHost>(0u));
+    DevAcc devAcc(alpaka::getDevByIdx(platformAcc,rank % alpaka::getDevCount(platformAcc)));
+    DevHost devHost(alpaka::getDevByIdx(platformHost,0u));
     Stream stream(devAcc);
 
     const isaac_size3 globalSize(d[0] * VOLUME_X, d[1] * VOLUME_Y, d[2] * VOLUME_Z);

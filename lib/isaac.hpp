@@ -52,6 +52,15 @@
 #include <math.h>
 #include <stdio.h>
 
+namespace alpaka {
+
+    template<typename... T>
+    struct IsKernelArgumentTriviallyCopyable<boost::fusion::list<T...>>
+        : std::true_type
+    {
+    };
+
+}
 
 namespace isaac
 {
@@ -929,19 +938,9 @@ namespace isaac
                 ssaoNoiseHost[i] = noise;
             }
 
-            // move ssao kernel to device
             // copy ssao kernel to constant memory
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const ssaoKernelDeviceExtent(ISAAC_IDX_TYPE(64));
-
-            auto ssaoKernelDeviceView
-                = alpaka::createStaticDevMemView(&SSAOKernelArray[0u], acc, ssaoKernelDeviceExtent);
-            alpaka::memcpy(stream, ssaoKernelDeviceView, ssaoKernelHostBuf, ISAAC_IDX_TYPE(64));
-
-            // copy ssao noise kernel to constant memory
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const ssaoNoiseDeviceExtent(ISAAC_IDX_TYPE(16));
-
-            auto ssaoNoiseDeviceView = alpaka::createStaticDevMemView(&SSAONoiseArray[0u], acc, ssaoNoiseDeviceExtent);
-            alpaka::memcpy(stream, ssaoNoiseDeviceView, ssaoNoiseHostBuf, ISAAC_IDX_TYPE(16));
+            alpaka::memcpy(stream, SSAOKernelArray<T_Acc>, ssaoKernelHostBuf);
+            alpaka::memcpy(stream, SSAONoiseArray<T_Acc>, ssaoNoiseHostBuf);
         }
 
 
@@ -1200,14 +1199,7 @@ namespace isaac
                 host,
                 alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(ISAAC_MAX_FUNCTORS * combinedSourceListSize)));
 
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const parameterDeviceExtent(ISAAC_IDX_TYPE(16));
-            auto parameterDeviceView
-                = alpaka::createStaticDevMemView(&FunctorParameter[0u], acc, parameterDeviceExtent);
-            alpaka::memcpy(
-                stream,
-                parameterDeviceView,
-                parameterBuffer,
-                alpaka::Vec<FraDim, ISAAC_IDX_TYPE>(ISAAC_IDX_TYPE(ISAAC_MAX_FUNCTORS * combinedSourceListSize)));
+            alpaka::memcpy(stream, FunctorParameter<T_Acc>, parameterBuffer);
 
             const alpaka::Vec<T_AccDim, ISAAC_IDX_TYPE> threads(
                 ISAAC_IDX_TYPE(1),
@@ -1229,15 +1221,7 @@ namespace isaac
             alpaka::enqueue(stream, instance);
             alpaka::wait(stream);
 
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const functionChainDeviceExtent(
-                ISAAC_IDX_TYPE(ISAAC_MAX_SOURCES));
-            auto functionChainDeviceView
-                = alpaka::createStaticDevMemView(&FunctionChain[0u], acc, functionChainDeviceExtent);
-            alpaka::memcpy(
-                stream,
-                functionChainDeviceView,
-                functorChainChooseDevice,
-                ISAAC_IDX_TYPE(combinedSourceListSize));
+            alpaka::memcpy(stream, FunctionChain<T_Acc>, functorChainChooseDevice);
         }
 
 
@@ -2207,33 +2191,10 @@ namespace isaac
             // copy matrices and simulation size properties to constant memory
 
             // inverse matrix
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const inverseMVPDeviceEextent(ISAAC_IDX_TYPE(1));
-            // get view
-            auto inverseMVPDeviceView
-                = alpaka::createStaticDevMemView(&InverseMVPMatrix, myself->acc, inverseMVPDeviceEextent);
-            // copy to constant memory
-            alpaka::memcpy(myself->stream, inverseMVPDeviceView, inverseMVPHostBuf, ISAAC_IDX_TYPE(1));
-
-            // modelview matrix
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const modelviewDeviceExtent(ISAAC_IDX_TYPE(1));
-            // get view
-            auto modelviewDeviceView
-                = alpaka::createStaticDevMemView(&ModelViewMatrix, myself->acc, modelviewDeviceExtent);
-            // copy to constant memory
-            alpaka::memcpy(myself->stream, modelviewDeviceView, modelviewHostBuf, ISAAC_IDX_TYPE(1));
-
-
-            // projection matrix
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const projectionDeviceExtent(ISAAC_IDX_TYPE(1));
-            // get view
-            auto projectionDeviceView
-                = alpaka::createStaticDevMemView(&ProjectionMatrix, myself->acc, projectionDeviceExtent);
-            // copy to constant memory
-            alpaka::memcpy(myself->stream, projectionDeviceView, projectionHostBuf, ISAAC_IDX_TYPE(1));
-
-            alpaka::Vec<alpaka::DimInt<1u>, ISAAC_IDX_TYPE> const sizeDeviceExtent(ISAAC_IDX_TYPE(1));
-            auto sizeDeviceView = alpaka::createStaticDevMemView(&SimulationSize, myself->acc, sizeDeviceExtent);
-            alpaka::memcpy(myself->stream, sizeDeviceView, sizeHostBuf, ISAAC_IDX_TYPE(1));
+            alpaka::memcpy(myself->stream, InverseMVPMatrix<T_Acc>, inverseMVPHostBuf);
+            alpaka::memcpy(myself->stream, ModelViewMatrix<T_Acc>, modelviewHostBuf);
+            alpaka::memcpy(myself->stream, ProjectionMatrix<T_Acc>, projectionHostBuf);
+            alpaka::memcpy(myself->stream, SimulationSize<T_Acc>, sizeHostBuf);
 
             // get pixel pointer from image as unsigned byte
             IceTUByte* pixels = icetImageGetColorub(result);

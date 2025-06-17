@@ -45,8 +45,8 @@ namespace isaac
         static const std::string name;
         static const std::string description;
 
-        template<int N>
-        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<N> call(const isaac_float_dim<N> v, const isaac_float4& p)
+        template<typename T_Acc, int N>
+        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<N> call(T_Acc const &acc, const isaac_float_dim<N> v, const isaac_float4& p)
         {
             return v;
         }
@@ -67,8 +67,8 @@ namespace isaac
         static const std::string name;
         static const std::string description;
 
-        template<int N>
-        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<1> call(const isaac_float_dim<N> v, const isaac_float4& p)
+        template<typename T_Acc, int N>
+        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<1> call(T_Acc const &acc, const isaac_float_dim<N> v, const isaac_float4& p)
         {
             return isaac_float_dim<1>(glm::length(v));
         }
@@ -90,8 +90,8 @@ namespace isaac
         static const std::string name;
         static const std::string description;
 
-        template<int N>
-        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<N> call(const isaac_float_dim<N> v, const isaac_float4& p)
+        template<typename T_Acc, int N>
+        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<N> call(T_Acc const &acc, const isaac_float_dim<N> v, const isaac_float4& p)
         {
             return v * isaac_float_dim<N>(p);
         }
@@ -113,8 +113,8 @@ namespace isaac
         static const std::string name;
         static const std::string description;
 
-        template<int N>
-        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<N> call(const isaac_float_dim<N> v, const isaac_float4& p)
+        template<typename T_Acc, int N>
+        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<N> call(T_Acc const &acc, const isaac_float_dim<N> v, const isaac_float4& p)
         {
             return v + isaac_float_dim<N>(p);
         }
@@ -136,8 +136,8 @@ namespace isaac
         static const std::string name;
         static const std::string description;
 
-        template<int N>
-        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<N> call(const isaac_float_dim<N> v, const isaac_float4& p)
+        template<typename T_Acc, int N>
+        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<N> call(T_Acc const &acc, const isaac_float_dim<N> v, const isaac_float4& p)
         {
             return glm::pow(v, isaac_float_dim<N>(p));
         }
@@ -160,8 +160,8 @@ namespace isaac
         static const std::string name;
         static const std::string description;
 
-        template<int N>
-        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<1> call(const isaac_float_dim<N> v, const isaac_float4& p)
+        template<typename T_Acc, int N>
+        ISAAC_HOST_DEVICE_INLINE static isaac_float_dim<1> call(T_Acc const &acc, const isaac_float_dim<N> v, const isaac_float4& p)
         {
             isaac_float_dim<1> result(0.0);
 
