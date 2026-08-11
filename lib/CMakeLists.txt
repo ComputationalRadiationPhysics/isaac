@@ -23,4 +23,3 @@ install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/isaac" DESTINATION "include" PAT
 install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/ISAACConfig.cmake" DESTINATION "lib/cmake/ISAAC" )
 install( FILES "${PROJECT_BINARY_DIR}/ISAACConfigVersion.cmake" DESTINATION "lib/cmake/ISAAC" )
 install( FILES "${PROJECT_BINARY_DIR}/ISAACBaseDir.cmake" DESTINATION "lib/cmake/ISAAC" )
-install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Modules" DESTINATION "lib/cmake/ISAAC")

@@ -100,8 +100,6 @@ add_definitions(-std=c++11 -march=native -mtune=native)
 
 add_executable(isaac ${HDRS} ${SRCS})
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules")
-
 find_package (Jansson CONFIG QUIET)
 if (Jansson_FOUND)
 	set(LIBS ${LIBS} ${JANSSON_LIBRARIES})

@@ -3,8 +3,3 @@
 ###############################################################################
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}")
 set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} "${ISAAC_DIR}/isaac")
-
-###############################################################################
-# MODULES
-###############################################################################
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ISAAC_DIR}/../Modules")
