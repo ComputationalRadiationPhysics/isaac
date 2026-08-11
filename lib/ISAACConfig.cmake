@@ -160,7 +160,7 @@ set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${ICET_INCLUDE_DIRS})
 ################################################################################
 # BOOST LIB
 ################################################################################
-find_package(Boost 1.56.0 MODULE QUIET)
+find_package(Boost 1.70.0 CONFIG QUIET)
 if (NOT Boost_FOUND)
     set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Boost")
 endif()

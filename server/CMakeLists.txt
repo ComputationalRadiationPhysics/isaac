@@ -124,7 +124,7 @@ set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIRS})
 find_package (Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
-find_package(Boost MODULE REQUIRED)
+find_package(Boost 1.70.0 CONFIG REQUIRED)
 set(INCLUDE ${INCLUDE} ${Boost_INCLUDE_DIR})
 add_definitions(-DBOOST_ALL_NO_LIB)
 
