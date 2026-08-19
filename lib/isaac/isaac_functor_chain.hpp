@@ -29,19 +29,12 @@
 
 namespace isaac
 {
-    typedef isaac_float (*FunctorChainPointer4)(isaac_float_dim<4>, isaac_int);
-
-    typedef isaac_float (*FunctorChainPointer3)(isaac_float_dim<3>, isaac_int);
-
-    typedef isaac_float (*FunctorChainPointer2)(isaac_float_dim<2>, isaac_int);
-
-    typedef isaac_float (*FunctorChainPointer1)(isaac_float_dim<1>, isaac_int);
-
-    typedef isaac_float (*FunctorChainPointerN)(void*, isaac_int);
+    template<typename T_Acc>
+    using FunctorChainPointerN = isaac_float (*)(T_Acc const&, void const*, isaac_int);
 
     using ParamArray = isaac::isaac_float4[ISAAC_MAX_SOURCES * ISAAC_MAX_FUNCTORS];
     ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, ParamArray> FunctorParameter;
-    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, FunctorChainPointerN[ISAAC_MAX_SOURCES]> FunctionChain;
+    ALPAKA_STATIC_ACC_MEM_GLOBAL alpaka::DevGlobal<TAcc, FunctorChainPointerN<TAcc>[ISAAC_MAX_SOURCES]> FunctionChain;
 
     template<int T_n>
     struct DestArrayStruct
@@ -49,39 +42,20 @@ namespace isaac
         isaac_int nr[ZeroCheck<T_n>::value];
     };
 
-    template<typename T_Acc>
-    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(T_Acc const &acc, isaac_float_dim<1>& data, const int nr)
+    template<typename T_Acc, int T_featureDim>
+    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(
+        T_Acc const& acc,
+        isaac_float_dim<T_featureDim> const& data,
+        const int nr)
     {
-        return reinterpret_cast<FunctorChainPointer1>(
-            FunctionChain<T_Acc>.get()[nr])(*(reinterpret_cast<isaac_float_dim<1>*>(&data)), nr);
-    }
-
-    template<typename T_Acc>
-    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(T_Acc const &acc, isaac_float_dim<2>& data, const int nr)
-    {
-        return reinterpret_cast<FunctorChainPointer2>(
-            FunctionChain<T_Acc>.get()[nr])(*(reinterpret_cast<isaac_float_dim<2>*>(&data)), nr);
-    }
-
-    template<typename T_Acc>
-    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(T_Acc const &acc, isaac_float_dim<3>& data, const int nr)
-    {
-        return reinterpret_cast<FunctorChainPointer3>(
-            FunctionChain<T_Acc>.get()[nr])(*(reinterpret_cast<isaac_float_dim<3>*>(&data)), nr);
-    }
-
-    template<typename T_Acc>
-    ISAAC_DEVICE_INLINE isaac_float applyFunctorChain(T_Acc const &acc, isaac_float_dim<4>& data, const int nr)
-    {
-        return reinterpret_cast<FunctorChainPointer4>(
-            FunctionChain<T_Acc>.get()[nr])(*(reinterpret_cast<isaac_float_dim<4>*>(&data)), nr);
+        return FunctionChain<T_Acc>.get()[nr](acc, &data, nr);
     }
 
     template<typename T_FunctorVector, int T_featureDim, int T_nr>
     struct FillFunctorChainPointerKernelStruct
     {
 	template<typename T_Acc>
-        ISAAC_DEVICE static FunctorChainPointerN call(T_Acc const &acc, isaac_int const* const bytecode)
+        ISAAC_DEVICE static FunctorChainPointerN<T_Acc> call(T_Acc const& acc, isaac_int const* const bytecode)
         {
 #define ISAAC_SUB_CALL(Z, I, U)                                                                                       \
     if(bytecode[ISAAC_MAX_FUNCTORS - T_nr] == I)                                                                      \
@@ -89,7 +63,7 @@ namespace isaac
             typename boost::mpl::push_back<T_FunctorVector, typename boost::mpl::at_c<IsaacFunctorPool, I>::type>::   \
                 type,                                                                                                 \
             T_featureDim,                                                                                             \
-            T_nr - 1>::call(acc,bytecode);
+            T_nr - 1>::call(acc, bytecode);
             BOOST_PP_REPEAT(ISAAC_FUNCTOR_COUNT, ISAAC_SUB_CALL, ~)
 #undef ISAAC_SUB_CALL
             return NULL; // Should never be reached anyway
@@ -97,13 +71,14 @@ namespace isaac
     };
 
     template<typename T_Acc, typename T_FunctorVector, int T_featureDim>
-    ISAAC_DEVICE isaac_float generateFunctorChain(T_Acc const &acc, isaac_float_dim<T_featureDim> const value, isaac_int const srcID)
+    ISAAC_DEVICE isaac_float generateFunctorChain(T_Acc const& acc, void const* const data, isaac_int const srcID)
     {
 #define ISAAC_LEFT_DEF(Z, I, U) boost::mpl::at_c< T_FunctorVector, ISAAC_MAX_FUNCTORS - I - 1 >::type::call(acc,
 #define ISAAC_RIGHT_DEF(Z, I, U) , FunctorParameter<T_Acc>.get()[ srcID * ISAAC_MAX_FUNCTORS + I ] )
 #define ISAAC_LEFT BOOST_PP_REPEAT(ISAAC_MAX_FUNCTORS, ISAAC_LEFT_DEF, ~)
 #define ISAAC_RIGHT BOOST_PP_REPEAT(ISAAC_MAX_FUNCTORS, ISAAC_RIGHT_DEF, ~)
-        // expands to: funcN( ... func1( func0( data, p[0] ), p[1] ) ... p[T_n] );
+        auto const value = *reinterpret_cast<isaac_float_dim<T_featureDim> const*>(data);
+        // expands to: funcN( ... func1( func0( value, p[0] ), p[1] ) ... p[T_n] );
         return ISAAC_LEFT value ISAAC_RIGHT.x;
 #undef ISAAC_LEFT_DEF
 #undef ISAAC_LEFT
@@ -120,9 +95,9 @@ namespace isaac
         >
     {
 	template<typename T_Acc>
-        ISAAC_DEVICE static FunctorChainPointerN call(T_Acc const &acc, isaac_int const* const bytecode)
+        ISAAC_DEVICE static FunctorChainPointerN<T_Acc> call(T_Acc const& acc, isaac_int const* const bytecode)
         {
-            return reinterpret_cast<FunctorChainPointerN>(generateFunctorChain<T_Acc, T_FunctorVector, T_featureDim>);
+            return generateFunctorChain<T_Acc, T_FunctorVector, T_featureDim>;
         }
     };
 
@@ -130,7 +105,7 @@ namespace isaac
     struct FillFunctorChainPointerKernel
     {
         template<typename T_Acc>
-        ISAAC_DEVICE void operator()(T_Acc const& acc, FunctorChainPointerN* const functorChain) const
+        ISAAC_DEVICE void operator()(T_Acc const& acc, FunctorChainPointerN<T_Acc>* const functorChain) const
         {
             isaac_int bytecode[ISAAC_MAX_FUNCTORS];
             for(int i = 0; i < ISAAC_MAX_FUNCTORS; i++)
@@ -169,8 +144,8 @@ namespace isaac
         template<typename T_Acc>
         ISAAC_DEVICE void operator()(
             T_Acc const& acc,
-            FunctorChainPointerN* const functorChainChooseDevice,
-            FunctorChainPointerN const* const functorChain,
+            FunctorChainPointerN<T_Acc>* const functorChainChooseDevice,
+            FunctorChainPointerN<T_Acc> const* const functorChain,
             T_Dest dest) const
         {
             for(int i = 0; i < T_count; i++)

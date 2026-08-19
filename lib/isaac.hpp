@@ -623,13 +623,13 @@ namespace isaac
             , particleSources(particleSources)
             , scale(scale)
             , icetBoundingBox(true)
-            , functor_chain_d(alpaka::allocBuf<FunctorChainPointerN, ISAAC_IDX_TYPE>(
+            , functor_chain_d(alpaka::allocBuf<FunctorChainPointerN<T_Acc>, ISAAC_IDX_TYPE>(
                   acc,
                   ISAAC_IDX_TYPE(ISAAC_FUNCTOR_COMPLEX * 4)))
             ,
 
             functorChainChooseDevice(
-                alpaka::allocBuf<FunctorChainPointerN, ISAAC_IDX_TYPE>(acc, ISAAC_IDX_TYPE(combinedSourceListSize)))
+                alpaka::allocBuf<FunctorChainPointerN<T_Acc>, ISAAC_IDX_TYPE>(acc, ISAAC_IDX_TYPE(combinedSourceListSize)))
             ,
 
             localMinMaxArrayDevice(
@@ -2886,8 +2886,8 @@ namespace isaac
 #endif
 
 
-        alpaka::Buf<DevAcc, FunctorChainPointerN, FraDim, ISAAC_IDX_TYPE> functor_chain_d;
-        alpaka::Buf<DevAcc, FunctorChainPointerN, FraDim, ISAAC_IDX_TYPE> functorChainChooseDevice;
+        alpaka::Buf<DevAcc, FunctorChainPointerN<T_Acc>, FraDim, ISAAC_IDX_TYPE> functor_chain_d;
+        alpaka::Buf<DevAcc, FunctorChainPointerN<T_Acc>, FraDim, ISAAC_IDX_TYPE> functorChainChooseDevice;
         alpaka::Buf<DevAcc, MinMax, FraDim, ISAAC_IDX_TYPE> localMinMaxArrayDevice;
         alpaka::Buf<DevAcc, MinMax, FraDim, ISAAC_IDX_TYPE> localParticleMinMaxArrayDevice;
 
