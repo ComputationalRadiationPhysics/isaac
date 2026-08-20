@@ -98,28 +98,42 @@ class IsaacClient {
 
 
     connect(url, port) {
+        if(this.socket && (this.socket.readyState == WebSocket.CONNECTING || this.socket.readyState == WebSocket.OPEN)) {
+            return false;
+        }
+
         //connecto to websocket server
         url = "ws://" + url + ":" + port;
         let protocol = "isaac-json-protocol";
-        this.socket = new WebSocket(url, protocol);
+        const socket = new WebSocket(url, protocol);
+        this.socket = socket;
 
         //set websocket callbacks to class functions
         //set callbacks for outside use
-        this.socket.onopen = (function(e) {
-            this.onOpen(e);
+        socket.onopen = (function(e) {
+            if(this.socket == socket) {
+                this.onOpen(e);
+            }
         }).bind(this);
 
-        this.socket.onmessage = (function(e) {
-            this.onMessage(e);
+        socket.onmessage = (function(e) {
+            if(this.socket == socket) {
+                this.onMessage(e);
+            }
         }).bind(this);
 
-        this.socket.onerror = (function(e) {
-            this.onError(e);
+        socket.onerror = (function(e) {
+            if(this.socket == socket) {
+                this.onError(e);
+            }
         }).bind(this);
 
-        this.socket.onclose = (function(e) {
-            this.onClose(e);
+        socket.onclose = (function(e) {
+            if(this.socket == socket) {
+                this.onClose(e);
+            }
         }).bind(this);
+        return true;
     }
 
     /**

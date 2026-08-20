@@ -414,8 +414,8 @@ document.getElementById("connect").onclick = function () {
 	if (!client.isConnected()) {
 		let url = document.getElementById("server_url").value;
 		let port = document.getElementById("server_port").value;
-		client.connect(url, port);
-		console.log("Connect to " + url + ":" + port);
+		if (client.connect(url, port))
+			console.log("Connect to " + url + ":" + port);
 	}
 	else {
 		client.close();
@@ -441,8 +441,14 @@ function onClientMessage(response) {
 		document.getElementById("list_td").style.display = 'initial';
 	}
 	if (response["type"] == IsaacResponseTypes.register) {
+		plugins = plugins.filter(function (plugin) { return plugin["id"] != response["id"] && plugin["name"] != response["name"]; });
 		plugins.push(response);
 		var table = document.getElementById("list_table");
+		for (var c = 1; c < table.rows.length; c++)
+			if (table.rows[c].id == response["id"] || table.rows[c].cells[0].innerHTML == response["name"]) {
+				table.deleteRow(c);
+				break;
+			}
 		var row = table.insertRow(-1);
 		row.id = response["id"];
 		row.insertCell(0).innerHTML = response["name"];
@@ -596,7 +602,7 @@ function onClientMessage(response) {
 	if (response["type"] == IsaacResponseTypes.exit) {
 		var table = document.getElementById("list_table");
 		for (var c = 1; c < table.rows.length; c++)
-			if (table.rows[c].id == response["id"]) {
+			if (table.rows[c].id == response["id"] || table.rows[c].cells[0].innerHTML == response["name"]) {
 				table.deleteRow(c);
 				break;
 			}
