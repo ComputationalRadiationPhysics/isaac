@@ -151,16 +151,23 @@ static int callback_isaac(struct lws* wsi, enum lws_callback_reasons reason, voi
             } while(l > 1 && !lws_send_pipe_choked(wsi));
         }
         break;
-    // case LWS_CALLBACK_CLOSED:
-    //	pss->client->clientSendMessage(new MessageContainer(CLOSED));
-    //	return -1;
+    case LWS_CALLBACK_CLOSED:
+        if(pss->client)
+        {
+            pss->client->clientSendMessage(new MessageContainer(CLOSED));
+            pss->client = NULL;
+        }
+        break;
     case LWS_CALLBACK_RECEIVE:
         if(pss->client)
         {
             json_error_t error;
             json_t* input = json_loadb((const char*) in, len, 0, &error);
             if(!input)
+            {
                 printf("JSON ERROR: %s", error.text);
+                break;
+            }
             MessageContainer* message = new MessageContainer(NONE, input);
             int finish = (message->type == CLOSED);
             json_object_set_new(message->json_root, "url", json_string(pss->url));
