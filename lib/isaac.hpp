@@ -1888,7 +1888,13 @@ namespace isaac
                                 }
                             }
                             // wait for all mpi communications to be finished
-                            MPI_Waitall(mpiRequests.size(), &mpiRequests[0], MPI_STATUSES_IGNORE);
+                            if(!mpiRequests.empty())
+                            {
+                                MPI_Waitall(
+                                    static_cast<int>(mpiRequests.size()),
+                                    mpiRequests.data(),
+                                    MPI_STATUSES_IGNORE);
+                            }
 
                             // sync the received neighbour guard information with the main guards in the texture
                             syncNeighbourGuardTextures<T_Acc>(stream, advectionTextureAllocator, neighbourNodeIds);
@@ -2011,8 +2017,8 @@ namespace isaac
 
                     float pointDistance = glm::length(modelview * point);
                     // Allgather of the distances
-                    float receiveBuffer[numProc];
-                    MPI_Allgather(&pointDistance, 1, MPI_FLOAT, receiveBuffer, 1, MPI_FLOAT, mpiWorld);
+                    std::vector<float> receiveBuffer(numProc);
+                    MPI_Allgather(&pointDistance, 1, MPI_FLOAT, receiveBuffer.data(), 1, MPI_FLOAT, mpiWorld);
                     // Putting to a std::multimap of {rank, distance}
                     std::multimap<float, isaac_int, std::less<float>> distanceMap;
                     for(isaac_int i = 0; i < numProc; i++)
@@ -2020,7 +2026,7 @@ namespace isaac
                         distanceMap.insert(std::pair<float, isaac_int>(receiveBuffer[i], i));
                     }
                     // Putting in an array for IceT
-                    IceTInt icetOrderArray[numProc];
+                    std::vector<IceTInt> icetOrderArray(numProc);
                     {
                         isaac_int i = 0;
                         for(auto it = distanceMap.begin(); it != distanceMap.end(); it++)
@@ -2029,7 +2035,7 @@ namespace isaac
                             i++;
                         }
                     }
-                    icetCompositeOrder(icetOrderArray);
+                    icetCompositeOrder(icetOrderArray.data());
                     ISAAC_STOP_TIME_MEASUREMENT(sortingTime, +=, sorting, getTicksUs())
 
                     // Drawing
@@ -2046,18 +2052,19 @@ namespace isaac
 
             // Message merging
             char* buffer = json_dumps(jsonRoot, 0);
-            strcpy(messageBuffer, buffer);
+            strncpy(messageBuffer, buffer, ISAAC_MAX_RECEIVE - 1);
+            messageBuffer[ISAAC_MAX_RECEIVE - 1] = 0;
             free(buffer);
             if(metaTargets == META_MERGE)
             {
                 if(rank == master)
                 {
-                    char receiveBuffer[numProc][ISAAC_MAX_RECEIVE];
+                    std::vector<char> receiveBuffer(numProc * ISAAC_MAX_RECEIVE);
                     MPI_Gather(
                         messageBuffer,
                         ISAAC_MAX_RECEIVE,
                         MPI_CHAR,
-                        receiveBuffer,
+                        receiveBuffer.data(),
                         ISAAC_MAX_RECEIVE,
                         MPI_CHAR,
                         master,
@@ -2068,7 +2075,7 @@ namespace isaac
                         {
                             continue;
                         }
-                        json_t* js = json_loads(receiveBuffer[i], 0, NULL);
+                        json_t* js = json_loads(&receiveBuffer[i * ISAAC_MAX_RECEIVE], 0, NULL);
                         mergeJSON(jsonRoot, js);
                         json_decref(js);
                     }
