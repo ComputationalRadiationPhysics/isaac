@@ -6,8 +6,8 @@ ISAAC Install Guide
 Requirements
 ------------
 
-Most dependencies are part of most distributions. However some need to
-be built yourself nevertheless or the distribution versions are outdated.
+Most dependencies are part of most distributions. However, some need to
+be built yourself nevertheless, or the distribution versions are outdated.
 
 ### Requirements for the server and the in situ library
 
@@ -54,7 +54,7 @@ be built yourself nevertheless or the distribution versions are outdated.
       * `cmake .. -DCMAKE_INSTALL_PREFIX=$LIBJPEG_INSTALL_DIR`
       * `make install`
 * __Jansson__ 2.12+ for the de- and encryption of the JSON messages transfered
-  between server and client.
+  between server and client:
   * _Debian/Ubuntu_:
     * `sudo apt-get install libjansson-dev`
   * _From Source_:
@@ -74,8 +74,8 @@ be built yourself nevertheless or the distribution versions are outdated.
         `-Djansson_DIR=$JANSSON_INSTALL_DIR/lib/cmake/jansson`, where
         `$JANSSON_INSTALL_DIR` is the path of the Jansson install directory
         used above.
-* __Boost__ 1.70+ is needed, but only template libraries, so no
-  system wide installation or static linking is needed here:
+* __Boost__ 1.70+ is needed, but only template libraries, so no system wide
+  installation or static linking is needed here:
   * _Debian/Ubuntu_:
     * `sudo apt-get install libboost-dev`
   * _From Source_:
@@ -121,7 +121,7 @@ The ISAACConfig.cmake searches for these requirements. See
       examples), add `-Dalpaka_DIR=$ALPAKA_INSTALL_DIR`, where
       `$ALPAKA_INSTALL_DIR` is the path of the alpaka install directory used
       above.
-* __IceT__ for combining the visualization created by the in situ plugin.
+* __IceT__ for combining the visualization created by the in situ plugin:
   * _Debian/Ubuntu_ (as part of Paraview):
     * `sudo apt-get install paraview-dev`
   * _From Source_:
@@ -139,9 +139,9 @@ The ISAACConfig.cmake searches for these requirements. See
         directory. Later, while compiling an application using ISAAC (including
         the examples), add `-DIceT_DIR=$ICET_INSTALL_DIR`, where
         `$ICET_INSTALL_DIR` is the path of the IceT install directory used above.
-* __MPI__ for the communication on the cluster. This should be available on
-  all clusters these days. However for a local testsystem OpenMPI is a commonly used
-  version:
+* __MPI__ for the communication on the cluster. This should be available on all
+  clusters these days. However, for a local test system, OpenMPI is a commonly
+  used version:
   * _Debian/Ubuntu_:
     * `sudo apt-get install libopenmpi-dev`
   * _From Source_:
@@ -162,7 +162,7 @@ The ISAACConfig.cmake searches for these requirements. See
         directory. Later while compiling an application using MPI (including the
         ISAAC examples) add `$MPI_INSTALL_DIR` to the CMake variable
         `CMAKE_MODULE_PATH` to use this version.
-* __glm__ 1.0.0+ for the internal math types and functions
+* __glm__ 1.0.0+ for the internal math types and functions:
   * _From Source_:
     * `git clone https://github.com/g-truc/glm.git --depth 1 --branch 1.0.3`
     * `cd glm`
@@ -175,7 +175,7 @@ The ISAACConfig.cmake searches for these requirements. See
 
 ### Requirements for the server only
 
-* __libwebsockets__ 2.1.1+ for the connection between server and an HTML5 client.
+* __libwebsockets__ 2.1.1+ for the connection between server and an HTML5 client:
   * _From Source_:
     * `git clone https://github.com/warmcat/libwebsockets.git --depth 1 --branch v4.5-stable`
     * `cd libwebsockets`
