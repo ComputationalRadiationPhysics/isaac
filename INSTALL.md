@@ -28,16 +28,15 @@ be built yourself nevertheless or the distribution versions are outdated.
       * `make`
       * `sudo make install`
     * Otherwise:
-      * `mkdir install`
-      * `./configure --prefix=$CMAKE/install`, where where `$CMAKE` is
-        the full (!) path of the cmake-3.28.6 directory.
+      * `./configure --prefix=$CMAKE_INSTALL_DIR`, where `$CMAKE_INSTALL_DIR`
+      is the full path to the directory where cmake-3.28.6 should be installed.
       * `make install`
-      * Now a local version of CMake is installed in the install directory in
-        the cmake-3.28.6 folder. Later while compiling an application using
-        CMake (including the ISAAC server and the ISAAC examples) use
-        `$CMAKE/install/bin/cmake` instead of `cmake` and
-        `$CMAKE/install/bin/ccmake` instead of `ccmake`, where `$CMAKE` is
-        the path of the cmake-3.28.6 directory used above.
+      * Now, a local version of CMake is installed in the specified install
+        directory. Later, while compiling an application using CMake (including
+        the ISAAC server and the ISAAC examples), use `$CMAKE_INSTALL_DIR/bin/cmake`
+        instead of `cmake` and `$CMAKE_INSTALL_DIR/bin/ccmake` instead of
+        `ccmake`, where `$CMAKE_INSTALL_DIR` is the path of the cmake-3.28.6
+        install directory used above.
 * __libjpeg-turbo__ for (de)compressing the rendered image of the transmission:
   * _Debian/Ubuntu_:
     * `sudo apt-get install libjpeg-dev`
@@ -61,22 +60,20 @@ be built yourself nevertheless or the distribution versions are outdated.
   * _From Source_:
     * `git clone https://github.com/akheron/jansson.git`
     * `cd jansson`
-    * `mkdir build`
-    * With admin rights and no other version of libjpeg installed:
-      * `cd build`
+    * `mkdir build && cd build`
+    * With admin rights and no other version of jansson installed:
       * `cmake ..`
       * `make`
       * `sudo make install`
     * Otherwise:
-      * `mkdir install`
-      * `cd build`
-      * `cmake .. -DCMAKE_INSTALL_PREFIX=../install`
+      * `cmake .. -DCMAKE_INSTALL_PREFIX=$JANSSON_INSTALL_DIR`
       * `make install`
-      * Now a local version of Jansson is installed in the install directory in
-        the Jansson root folder. Later while compiling an application using
-        Jansson (including the ISAAC server and the ISAAC examples) add
-        `-DJansson_DIR=$JANSSON/install/lib/cmake/jansson`, where `$JANSSON` is
-        the root folder of the Jansson source (the directory `git clone …` created).
+      * Now, a local version of Jansson is installed in the specified install
+        directory. Later, while compiling an application using Jansson
+        (including the ISAAC server and the ISAAC examples), add
+        `-Djansson_DIR=$JANSSON_INSTALL_DIR/lib/cmake/jansson`, where
+        `$JANSSON_INSTALL_DIR` is the path of the Jansson install directory
+        used above.
 * __Boost__ 1.70+ is needed, but only template libraries, so no
   system wide installation or static linking is needed here:
   * _Debian/Ubuntu_:
@@ -91,15 +88,14 @@ be built yourself nevertheless or the distribution versions are outdated.
       * `./b2`
       * `sudo ./b2 install`
     * Otherwise:
-      * `mkdir install`
-      * `./bootstrap.sh --prefix=$BOOST/install`, where where `$BOOST` is
-        the full (!) path of the boost_1_87_0 directory.
+      * `./bootstrap.sh --prefix=$BOOST_INSTALL_DIR`, where `$BOOST_INSTALL_DIR`
+        is the full path to the directory where Boost should be installed.
       * `./b2 install`
-      * Now a local version of Boost is installed in the install directory in
-        the boost_1_87_0 folder. Later while compiling an application using
-        Boost (including the ISAAC server and the ISAAC examples) add
-        `-DBoost_DIR=$BOOST/install`, where `$BOOST` is
-        the path of the boost_1_87_0 directory.
+      * Now, a local version of Boost is installed in the specified install
+        directory. Later, while compiling an application using Boost (including
+        the ISAAC server and the ISAAC examples), add
+        `-DBoost_DIR=$BOOST_INSTALL_DIR`, where `$BOOST_INSTALL_DIR` is the path
+        of the Boost install directory used above.
 
 ### Requirements for the in situ library and the examples using it
 
@@ -115,8 +111,7 @@ The ISAACConfig.cmake searches for these requirements. See
       below).
     * `git clone https://github.com/alpaka-group/alpaka.git`
     * `cd alpaka`
-    * `mkdir build`
-    * `cd build`
+    * `mkdir build && cd build`
     * `cmake .. -DCMAKE_INSTALL_PREFIX=$ALPAKA_INSTALL_DIR -Dalpaka_ACC_GPU_CUDA_ENABLE=ON`.
       The last option only must be included if acceleration on Nvidia GPUs is
       wanted. Go to the [alpaka manual](https://alpaka.readthedocs.io/en/stable/advanced/cmake.html#arguments)
@@ -132,23 +127,18 @@ The ISAACConfig.cmake searches for these requirements. See
   * _From Source_:
     * `git clone https://gitlab.kitware.com/icet/icet.git`
     * `cd icet`
-    * `mkdir build`
+    * `mkdir build && cd build`
     * With admin rights and no other version of IceT installed:
-      * `cd build`
       * `cmake ..`
       * `make`
       * `sudo make install`
     * Otherwise:
-      * `mkdir install`
-      * `cd build`
-      * `cmake .. -DCMAKE_INSTALL_PREFIX=../install`
+      * `cmake .. -DCMAKE_INSTALL_PREFIX=$ICET_INSTALL_DIR`
       * `make install`
-      * Now a local version of IceT is installed in the install
-        directory in the IceT root folder. Later while compiling
-        an application using ISAAC (including the examples) add
-        `-DIceT_DIR=$ICET/install`, where
-        `$ICET` is the root folder of IceT (the directory
-        `git clone …` created).
+      * Now, a local version of IceT is installed in the specified install
+        directory. Later, while compiling an application using ISAAC (including
+        the examples), add `-DIceT_DIR=$ICET_INSTALL_DIR`, where
+        `$ICET_INSTALL_DIR` is the path of the IceT install directory used above.
 * __MPI__ for the communication on the cluster. This should be available on
   all clusters these days. However for a local testsystem OpenMPI is a commonly used
   version:
@@ -176,14 +166,12 @@ The ISAACConfig.cmake searches for these requirements. See
   * _From Source_:
     * `git clone https://github.com/g-truc/glm.git --depth 1 --branch 1.0.3`
     * `cd glm`
-    * `export GLM_ROOT=`pwd`/1.0.3`
-    * `mkdir $GLM_ROOT`
-    * `mkdir build`
-    * `cd build`
-    * `cmake ../ -DCMAKE_INSTALL_PREFIX=$GLM_ROOT -DGLM_TEST_ENABLE=OFF`
+    * `mkdir build && cd build`
+    * `cmake .. -DCMAKE_INSTALL_PREFIX=$GLM_INSTALL_DIR -DGLM_TEST_ENABLE=OFF`
     * `make install`
-    * export `GLM_ROOT` to your cmake prefix path (and add this to e.g. your profile)
-      * `export CMAKE_PREFIX_PATH=$GLM_ROOT:$CMAKE_PREFIX_PATH`
+    * export `GLM_INSTALL_DIR` to your cmake prefix path (and add this to e.g.
+      your profile)
+      * `export CMAKE_PREFIX_PATH=$GLM_INSTALL_DIR:$CMAKE_PREFIX_PATH`
 
 ### Requirements for the server only
 
@@ -191,30 +179,27 @@ The ISAACConfig.cmake searches for these requirements. See
   * _From Source_:
     * `git clone https://github.com/warmcat/libwebsockets.git --depth 1 --branch v4.5-stable`
     * `cd libwebsockets`
-    * `mkdir build`
+    * `mkdir build && cd build`
     * With admin rights and no other version of libwebsockets installed:
-      * `cd build`
       * `cmake ..`
-        * `cmake ..` may fail if OpenSSL is not available. ISAAC itself does
+        * This may fail if OpenSSL is not available. ISAAC itself does
           not support HTTPS connections at the moment anyway, thus it can be
           disabled with: `cmake -DLWS_WITH_SSL=OFF ..`
       * `make`
       * `sudo make install`
     * Otherwise:
-      * `mkdir install`
-      * `cd build`
-      * `cmake -DCMAKE_INSTALL_PREFIX=../install ..`
-        * `cmake -DCMAKE_INSTALL_PREFIX=../install ..` may fail if OpenSSL
-          is not available. ISAAC itself does not support HTTPS connections at
-          the moment anyway, thus it can be disabled with:
-          `cmake -DLWS_WITH_SSL=OFF -DCMAKE_INSTALL_PREFIX=../install ..`
+      * `cmake -DCMAKE_INSTALL_PREFIX=$LIBWEBSOCKETS_INSTALL_DIR ..`
+        * This may fail if OpenSSL is not available. ISAAC itself does
+          not support HTTPS connections at the moment anyway, thus it can be
+          disabled with:
+          `cmake -DLWS_WITH_SSL=OFF -DCMAKE_INSTALL_PREFIX=$LIBWEBSOCKETS_INSTALL_DIR ..`
       * `make install`
-      * Now a local version of libwebsockets is installed in the install
-        directory in the libwebsockets root folder. Later while compiling the
-        ISAAC server using libwebsockets add
-        `-DLibwebsockets_DIR=$LIBWEBSOCKETS/install/lib/cmake/libwebsockets`, where
-        `$LIBWEBSOCKETS` is the root folder of the libwebsockets source (the directory
-        `git clone …` created).
+      * Now, a local version of libwebsockets is installed in the specified
+        install directory. Later, while compiling the ISAAC server using
+        libwebsockets, add
+        `-DLibwebsockets_DIR=$LIBWEBSOCKETS_INSTALL_DIR/lib/cmake/libwebsockets`,
+        where `$LIBWEBSOCKETS_INSTALL_DIR` is the path of the libwebsockets 
+        install directory used above.
 * __gStreamer__ is only needed, if streaming over RTP or the Twitch plugin shall
   be used. It should be possible to build gStreamer yourself, but it
   is strongly adviced - even from the gStreamer team themself - to use
@@ -236,9 +221,8 @@ go to directory `lib` inside the isaac root folder, create a folder like
 * `git clone https://github.com/ComputationalRadiationPhysics/isaac.git`
 * `cd isaac`
 * `cd lib`
-* `mkdir build`
-* `cd build`
-* `cmake ..`
+* `mkdir build && cd build`
+* `cmake -DCMAKE_INSTALL_PREFIX=$ISAAC_LIB_DIR ..`
 * (`sudo`) ` make install`
 
 You don't need to call `make` before `make install` as the template library
@@ -251,12 +235,11 @@ the examples is the folder `example`, so after changing directory to
 isaac (`cd isaac`) do:
 
 * `cd example`
-* `mkdir build`
-* `cd build`
+* `mkdir build && cd build`
 * `cmake ..`
   * Don't forget the maybe needed `-DLIB_DIR=…` parameters
     needed for local installed libraries. E.g.
-    `cmake -DIceT_DIR=$ICET/install/lib ..`
+    `cmake -DIceT_DIR=$ICET_INSTALL_DIR/lib ..`
   * There are some options to (de)activate features of the library if they are
     not needed or not available on the system (like Cuda/HIP), which you can
     change with these lines before `..` (in `cmake ..`) or afterwards with
@@ -265,7 +248,7 @@ isaac (`cd isaac`) do:
       Activates the CUDA / HIP accelerator in Alpaka. The used accelerator of
       ISAAC can be changed inside the file `example.cpp`, where at default CUDA
       is used as accelerator.
-* `make`
+* `make install`
 
 Afterwards you get the executable `isaac_example`.
 For running these examples you need a running isaac server.
@@ -276,27 +259,28 @@ The server resides in the direcoty `server` and also uses CMake:
 
 * `cd isaac`
 * `cd server`
-* `mkdir build`
-* `cd build`
+* `mkdir build && cd build`
 * `cmake ..`
   * Don't forget the maybe needed `-DLIB_DIR=…` parameters
     needed for local installed libraries. E.g.
-    `cmake -DLibwebsockets_DIR=$LIBWEBSOCKETS/install/lib/cmake/libwebsockets ..`
-  * There are some options to (de)activate features of the server if they are not needed
-    or not available on the system (like Gstreamer), which you can change with
-    theese lines before `..` (in `cmake ..`) or afterwards with `ccmake` or `cmake-gui`:
+    `cmake -DLibwebsockets_DIR=$LIBWEBSOCKETS_INSTALL_DIR/lib/cmake/libwebsockets ..`
+  * There are some options to (de)activate features of the server if they are
+    not needed or not available on the system (like Gstreamer), which you can
+    change with these lines before `..` (in `cmake ..`) or afterwards with
+    `ccmake` or `cmake-gui`:
     * `-DISAAC_GST=OFF` → Deactivates GStreamer (Default if not found).
-    * `-DISAAC_JPEG=OFF` → Deactivates JPEG compression. As already mentioned: This is not advised
-      and will most probably leave ISAAC in an unusable state in the end.
-    * `-DISAAC_SDL=ON` → Activates a plugin for showing the oldest not yet finished
-      visualization in an extra window using `libSDL`. Of course this option does not
-      make much sense for most servers as they don't have a screen or even an
-      X server installed.
+    * `-DISAAC_JPEG=OFF` → Deactivates JPEG compression. As already mentioned:
+      This is not advised and will most probably leave ISAAC in an unusable
+      state in the end.
+    * `-DISAAC_SDL=ON` → Activates a plugin for showing the oldest not yet
+      finished visualization in an extra window using `libSDL`. Of course, this
+      option does not make much sense for most servers, as they don't have a
+      screen or even an X server installed.
 * `make`
 
 If you want to install the server type
 
-* `make install` (probably as root)
+* (`sudo`) `make install`
 
 Change the installation directory with adding
 
