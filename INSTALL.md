@@ -11,18 +11,18 @@ be built yourself nevertheless or the distribution versions are outdated.
 
 ### Requirements for the server and the in situ library
 
-* __gcc__ / __g++__ for compiling the program at all. Version 4.8 __should__
-  work, but 4.9 is recommended:
+* __gcc__ / __g++__ for compiling the program at all. At least version 10
+  should be used:
   * _Debian/Ubuntu_:
-    * `sudo apt-get install gcc-4.9 g++-4.9 build-essential`
-* __CMake__ for building everything:
+    * `sudo apt-get install gcc-10 g++-10 build-essential`
+* __CMake__ 3.25.2+ for building everything:
   * _Debian/Ubuntu_:
     * `sudo apt-get install cmake cmake-curses-gui`
-  * _From Source_ (As at least Version 3.3 is needed for the in-situ library):
-    * `wget https://cmake.org/files/v3.5/cmake-3.5.2.tar.gz`
-    * `tar -zxvf cmake-3.5.2.tar.gz`
-    * `rm cmake-3.5.2.tar.gz`
-    * `cd cmake-3.5.2`
+  * _From Source_:
+    * `wget https://cmake.org/files/v3.28/cmake-3.28.6.tar.gz`
+    * `tar -xzf cmake-3.28.6.tar.gz`
+    * `rm cmake-3.28.6.tar.gz`
+    * `cd cmake-3.28.6`
     * With admin rights and no other version of cmake installed:
       * `./configure`
       * `make`
@@ -30,19 +30,18 @@ be built yourself nevertheless or the distribution versions are outdated.
     * Otherwise:
       * `mkdir install`
       * `./configure --prefix=$CMAKE/install`, where where `$CMAKE` is
-        the full (!) path of the cmake-3.5.2 directory.
+        the full (!) path of the cmake-3.28.6 directory.
       * `make install`
       * Now a local version of CMake is installed in the install directory in
-        the cmake-3.5.2 folder. Later while compiling an application using
+        the cmake-3.28.6 folder. Later while compiling an application using
         CMake (including the ISAAC server and the ISAAC examples) use
         `$CMAKE/install/bin/cmake` instead of `cmake` and
         `$CMAKE/install/bin/ccmake` instead of `ccmake`, where `$CMAKE` is
-        the path of the cmake-3.5.2 directory used above.
-* __libjpeg__ or __libjpeg-turbo__ for (de)compressing the rendered image of the
-  transmission:
+        the path of the cmake-3.28.6 directory used above.
+* __libjpeg-turbo__ for (de)compressing the rendered image of the transmission:
   * _Debian/Ubuntu_:
     * `sudo apt-get install libjpeg-dev`
-* __Jansson__ for the de- and encryption of the JSON messages transfered
+* __Jansson__ 2.12+ for the de- and encryption of the JSON messages transfered
   between server and client.
   * _Debian/Ubuntu_:
     * `sudo apt-get install libjansson-dev`
@@ -65,15 +64,15 @@ be built yourself nevertheless or the distribution versions are outdated.
         Jansson (including the ISAAC server and the ISAAC examples) add
         `-DJansson_DIR=$JANSSON/install/lib/cmake/jansson`, where `$JANSSON` is
         the root folder of the Jansson source (the directory `git clone …` created).
-* __Boost__ (at least 1.56) is needed, but only template libraries, so no
+* __Boost__ 1.70+ is needed, but only template libraries, so no
   system wide installation or static linking is needed here:
   * _Debian/Ubuntu_:
     * `sudo apt-get install libboost-dev`
   * _From Source_:
-    * `wget http://sourceforge.net/projects/boost/files/boost/1.56.0/boost_1_56_0.tar.gz/download -O boost_1_56_0.tar.gz`
-    * `tar -zxvf boost_1_56_0.tar.gz`
-    * `rm boost_1_56_0.tar.gz`
-    * `cd boost_1_56_0`
+    * `wget https://archives.boost.io/release/1.87.0/source/boost_1_87_0.tar.gz`
+    * `tar -xzf boost_1_87_0.tar.gz`
+    * `rm boost_1_87_0.tar.gz`
+    * `cd boost_1_87_0`
     * With admin rights and no other version of boost installed:
       * `./bootstrap.sh`
       * `./b2`
@@ -81,20 +80,20 @@ be built yourself nevertheless or the distribution versions are outdated.
     * Otherwise:
       * `mkdir install`
       * `./bootstrap.sh --prefix=$BOOST/install`, where where `$BOOST` is
-        the full (!) path of the boost_1_56_0 directory.
+        the full (!) path of the boost_1_87_0 directory.
       * `./b2 install`
       * Now a local version of Boost is installed in the install directory in
-        the boost_1_56_0 folder. Later while compiling an application using
+        the boost_1_87_0 folder. Later while compiling an application using
         Boost (including the ISAAC server and the ISAAC examples) add
         `-DBoost_DIR=$BOOST/install`, where `$BOOST` is
-        the path of the boost_1_56_0 directory.
+        the path of the boost_1_87_0 directory.
 
 ### Requirements for the in situ library and the examples using it
 
 The ISAACConfig.cmake searches for these requirements. See
 `example/CMakeLists.txt` for an easy to adopt example.
 
-* __alpaka__ (version 0.9.0) for the abstraction of the acceleration device. If only CUDA
+* __alpaka__ 2.0.0+ for the abstraction of the acceleration device. If only CUDA
   is used, this library is __not needed__:
   * _From Source_:
     * `git clone https://github.com/alpaka-group/alpaka.git`
@@ -164,9 +163,9 @@ The ISAACConfig.cmake searches for these requirements. See
         CMake variable `CMAKE_MODULE_PATH` to use this version.
 * __glm__ 1.0.0+ for the internal math types and functions
   * _From Source_:
-    * `git clone https://github.com/g-truc/glm.git` --depth 1 --branch 1.0.1
+    * `git clone https://github.com/g-truc/glm.git --depth 1 --branch 1.0.3`
     * `cd glm`
-    * `export GLM_ROOT=`pwd`/1.0.1`
+    * `export GLM_ROOT=`pwd`/1.0.3`
     * `mkdir $GLM_ROOT`
     * `mkdir build`
     * `cd build`
@@ -177,10 +176,9 @@ The ISAACConfig.cmake searches for these requirements. See
 
 ### Requirements for the server only
 
-* __libwebsockets__ for the connection between server and an HTML5 client.
-  It is in steady development and the most recent version should be used:
+* __libwebsockets__ 2.1.1+ for the connection between server and an HTML5 client.
   * _From Source_:
-    * `git clone https://github.com/warmcat/libwebsockets.git`
+    * `git clone https://github.com/warmcat/libwebsockets.git --depth 1 --branch v4.5-stable`
     * `cd libwebsockets`
     * `mkdir build`
     * With admin rights and no other version of libwebsockets installed:
@@ -213,7 +211,7 @@ The ISAACConfig.cmake searches for these requirements. See
   streams of a server without gStreamer. If gStreamer is not found, it is
   deactivated by default.
   * _Debian/Ubuntu_:
-    * `sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base0.10-dev libgstreamer-plugins-good1.0-dev libgstreamer-plugins-bad1.0-dev`
+    * `sudo apt-get install libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libgstreamer-plugins-good1.0-0 libgstreamer-plugins-bad1.0-0`
 
 Building
 --------
