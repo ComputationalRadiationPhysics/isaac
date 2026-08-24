@@ -1,10 +1,10 @@
-cmake_minimum_required (VERSION 3.3)
+cmake_minimum_required (VERSION 3.25.2)
 project (isaac)
 
-# Search in <PackageName>_ROOT:
-#   https://cmake.org/cmake/help/v3.12/policy/CMP0074.html
-if(POLICY CMP0074)
-    cmake_policy(SET CMP0074 NEW)
+# Search in <PACKAGENAME>_ROOT:
+#   https://cmake.org/cmake/help/latest/policy/CMP0144.html
+if(POLICY CMP0144)
+    cmake_policy(SET CMP0144 NEW)
 endif()
 
 set(SRCS
@@ -100,22 +100,14 @@ add_definitions(-std=c++11 -march=native -mtune=native)
 
 add_executable(isaac ${HDRS} ${SRCS})
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/Modules")
-
-find_package (Jansson CONFIG QUIET)
-if (Jansson_FOUND)
-	set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
-	set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
-else()
-	find_package (jansson CONFIG REQUIRED)
-	# required since 2.12
-	# interfacing cmake tagets with the old cmake variables we use in ISAAC
-	# since ISSAC has no CMake target we can not use target_link_library
-	get_target_property(JANSSON_LIBRARIES jansson::jansson LOCATION)
-	set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
-	get_target_property(JANSSON_INCLUDE_DIRS jansson::jansson INTERFACE_INCLUDE_DIRECTORIES)
-	set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
-endif()
+find_package (jansson CONFIG REQUIRED)
+# required since 2.12
+# interfacing cmake tagets with the old cmake variables we use in ISAAC
+# since ISSAC has no CMake target we can not use target_link_library
+get_target_property(JANSSON_LIBRARIES jansson::jansson LOCATION)
+set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
+get_target_property(JANSSON_INCLUDE_DIRS jansson::jansson INTERFACE_INCLUDE_DIRECTORIES)
+set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
 
 find_package(Libwebsockets 2.1.1 CONFIG REQUIRED)
 set(LIBS ${LIBS} ${LIBWEBSOCKETS_LIBRARIES})
@@ -124,7 +116,7 @@ set(INCLUDE ${INCLUDE} ${LIBWEBSOCKETS_INCLUDE_DIRS})
 find_package (Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
-find_package(Boost MODULE REQUIRED)
+find_package(Boost 1.70.0 CONFIG REQUIRED)
 set(INCLUDE ${INCLUDE} ${Boost_INCLUDE_DIR})
 add_definitions(-DBOOST_ALL_NO_LIB)
 

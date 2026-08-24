@@ -1,10 +1,10 @@
-cmake_minimum_required (VERSION 3.3)
+cmake_minimum_required (VERSION 3.25.2)
 project (isaac)
 
-# Search in <PackageName>_ROOT:
-#   https://cmake.org/cmake/help/v3.12/policy/CMP0074.html
-if(POLICY CMP0074)
-    cmake_policy(SET CMP0074 NEW)
+# Search in <PACKAGENAME>_ROOT:
+#   https://cmake.org/cmake/help/latest/policy/CMP0144.html
+if(POLICY CMP0144)
+    cmake_policy(SET CMP0144 NEW)
 endif()
 
 configure_file (
@@ -23,4 +23,3 @@ install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/isaac" DESTINATION "include" PAT
 install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/ISAACConfig.cmake" DESTINATION "lib/cmake/ISAAC" )
 install( FILES "${PROJECT_BINARY_DIR}/ISAACConfigVersion.cmake" DESTINATION "lib/cmake/ISAAC" )
 install( FILES "${PROJECT_BINARY_DIR}/ISAACBaseDir.cmake" DESTINATION "lib/cmake/ISAAC" )
-install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Modules" DESTINATION "lib/cmake/ISAAC")

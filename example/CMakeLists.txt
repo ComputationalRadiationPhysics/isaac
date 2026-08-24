@@ -1,10 +1,10 @@
-cmake_minimum_required (VERSION 3.3)
+cmake_minimum_required (VERSION 3.25.2)
 project (example)
 
-# Search in <PackageName>_ROOT:
-#   https://cmake.org/cmake/help/v3.12/policy/CMP0074.html
-if(POLICY CMP0074)
-    cmake_policy(SET CMP0074 NEW)
+# Search in <PACKAGENAME>_ROOT:
+#   https://cmake.org/cmake/help/latest/policy/CMP0144.html
+if(POLICY CMP0144)
+    cmake_policy(SET CMP0144 NEW)
 endif()
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,10 +21,10 @@ set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_MAX_FUNCTORS=3")
 set(ISAAC_DEFINITIONS ${ISAAC_DEFINITIONS} "-DISAAC_FUNCTOR_POW_ENABLED=0")
 
 add_definitions(${ISAAC_DEFINITIONS})
-include_directories(example_cuda ${ISAAC_INCLUDE_DIRS})
+include_directories(${ISAAC_INCLUDE_DIRS})
 
-SET(ISAAC_STEREO "No" CACHE STRING "Using stereoscopy")
-SET_PROPERTY(CACHE ISAAC_STEREO PROPERTY STRINGS No SideBySide Anaglyph)
+set(ISAAC_STEREO "No" CACHE STRING "Using stereoscopy")
+set_property(CACHE ISAAC_STEREO PROPERTY STRINGS No SideBySide Anaglyph)
 
 if(${ISAAC_STEREO} STREQUAL "No")
 	add_definitions(-DISAAC_STEREO=0)

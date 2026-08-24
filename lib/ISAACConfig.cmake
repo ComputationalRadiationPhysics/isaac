@@ -3,7 +3,7 @@
 #  ISAAC_INCLUDE_DIRS     - include directories for FooBar
 #  ISAAC_LIBRARIES        - libraries to link against
 #  ISAAC_DEFINITIONS      - necessary definitions
-#  ISAAC_FOUND            - whether ISAAC was found and is useable
+#  ISAAC_PRIVATE_FOUND    - whether ISAAC was found and is useable
 #  ISAAC_DEPENDENCY_HINTS - hints about missing dependencies
 #
 # It defines the following options
@@ -18,23 +18,18 @@
 ###############################################################################
 # ISAAC
 ###############################################################################
-cmake_minimum_required (VERSION 3.3.0)
+cmake_minimum_required (VERSION 3.25.2)
 
 
 ################################################################################
 # CMake Policies
 ###############################################################################
-# TODO update our VERSION syntax in project
-#   https://cmake.org/cmake/help/v3.12/policy/CMP0048.html
-if(POLICY CMP0048)
-    cmake_policy(SET CMP0048 OLD)
+# Search in <PACKAGENAME>_ROOT:
+#   https://cmake.org/cmake/help/latest/policy/CMP0144.html
+if(POLICY CMP0144)
+    cmake_policy(SET CMP0144 NEW)
 endif()
 
-# Search in <PackageName>_ROOT:
-#   https://cmake.org/cmake/help/v3.12/policy/CMP0074.html
-if(POLICY CMP0074)
-    cmake_policy(SET CMP0074 NEW)
-endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/ISAACBaseDir.cmake")
 
@@ -119,25 +114,17 @@ set(ISAAC_DEPENDENCY_HINTS "missing dependencies:")
 ###############################################################################
 # JANSSON LIB
 ###############################################################################
-find_package (Jansson CONFIG QUIET)
-if (Jansson_FOUND)
-    set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
-    set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
-else()
-    find_package (jansson CONFIG QUIET)
-    if (TARGET jansson::jansson)
-        # required since 2.12
-        # interfacing cmake tagets with the old cmake variables we use in ISAAC
-        # since ISSAC has CMake no target we can not use target_link_library
-        get_target_property(JANSSON_LIBRARIES jansson::jansson LOCATION)
-        set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
-        get_target_property(JANSSON_INCLUDE_DIRS jansson::jansson INTERFACE_INCLUDE_DIRECTORIES)
-        set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
-    else()
-        # jansson not found
-        set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   jansson")
-    endif()
+find_package (jansson CONFIG QUIET)
+if (NOT Jansson_FOUND)
+    set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   jansson")
 endif()
+# required since 2.12
+# interfacing cmake tagets with the old cmake variables we use in ISAAC
+# since ISSAC has CMake no target we can not use target_link_library
+get_target_property(JANSSON_LIBRARIES jansson::jansson LOCATION)
+set(ISAAC_LIBRARIES ${ISAAC_LIBRARIES} ${JANSSON_LIBRARIES})
+get_target_property(JANSSON_INCLUDE_DIRS jansson::jansson INTERFACE_INCLUDE_DIRECTORIES)
+set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${JANSSON_INCLUDE_DIRS})
 
 ###############################################################################
 # PTHREADS
@@ -165,7 +152,7 @@ set(ISAAC_INCLUDE_DIRS ${ISAAC_INCLUDE_DIRS} ${ICET_INCLUDE_DIRS})
 ################################################################################
 # BOOST LIB
 ################################################################################
-find_package(Boost 1.56.0 MODULE QUIET)
+find_package(Boost 1.70.0 CONFIG QUIET)
 if (NOT Boost_FOUND)
     set(ISAAC_DEPENDENCY_HINTS ${ISAAC_DEPENDENCY_HINTS} "\n--   Boost")
 endif()
