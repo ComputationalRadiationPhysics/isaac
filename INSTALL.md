@@ -93,29 +93,26 @@ be built yourself nevertheless or the distribution versions are outdated.
 The ISAACConfig.cmake searches for these requirements. See
 `example/CMakeLists.txt` for an easy to adopt example.
 
-* __alpaka__ 2.0.0+ for the abstraction of the acceleration device. If only CUDA
-  is used, this library is __not needed__:
+* __alpaka__ 2.0.0+ for the abstraction of the acceleration device:
   * _From Source_:
+    * __Boost__ should be installed before this, as alpaka may use it as a
+      dependency.
+    * alpaka supports multiple accelerators. If one wants to run ISAAC on GPU,
+      __Cuda__ or __HIP__ should be installed beforehand and activated (see
+      below).
     * `git clone https://github.com/alpaka-group/alpaka.git`
-    * It is a header only library and doesn't need to be installed. However
-      the root directory of the libary has to be added to the CMake variable
-      `CMAKE_MODULE_PATH`, e.g. with
-      * `set(ALPAKA_ROOT "${CMAKE_SOURCE_DIR}/alpaka/" CACHE STRING  "The location of the alpaka library")`
-      * `set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${ALPAKA_ROOT}")`
-* __CUDA__ for Nvidia accelerators. At least version 7.0 is needed for ISAAC (if
-  CUDA acceleration is needed at all). If only OpenMP or TBB via Alpaka are used,
-  CUDA is __not needed__.
-  * _Debian/Ubuntu_ (official repositories, at least Ubuntu 16.04 for CUDA 7.0):
-    * `sudo apt-get install nvidia-cuda-dev`
-  * _Debian/Ubuntu_ (directly from NVidia):
-    * Download the most recent CUDA toolkit from here
-      `https://developer.nvidia.com/cuda-downloads`. Choose `deb (network)`
-      to download a package, which installs the NVidia repository.
-    * In the download folder of the package above do:
-      * `sudo dpkg -i cuda-repo-ubuntu1404_7.5-18_amd64.deb` (the name may differ,
-        check what you downloaded)
-      * `sudo apt-get update`
-      * `sudo apt-get install cuda`
+    * `cd alpaka`
+    * `mkdir build`
+    * `cd build`
+    * `cmake .. -DCMAKE_INSTALL_PREFIX=$ALPAKA_INSTALL_DIR -Dalpaka_ACC_GPU_CUDA_ENABLE=ON`.
+      The last option only must be included if acceleration on Nvidia GPUs is
+      wanted. Go to the [alpaka manual](https://alpaka.readthedocs.io/en/stable/advanced/cmake.html#arguments)
+      for infos on how to use other accelerators.
+    * `cmake --install .`
+    * Later, while compiling an application using alpaka (including the ISAAC
+      examples), add `-Dalpaka_DIR=$ALPAKA_INSTALL_DIR`, where
+      `$ALPAKA_INSTALL_DIR` is the path of the alpaka install directory used
+      above.
 * __IceT__ for combining the visualization created by the in situ plugin.
   * _Debian/Ubuntu_ (as part of Paraview):
     * `sudo apt-get install paraview-dev`
@@ -246,16 +243,17 @@ isaac (`cd isaac`) do:
   * Don't forget the maybe needed `-DLIB_DIR=…` parameters
     needed for local installed libraries. E.g.
     `cmake -DIceT_DIR=$ICET/install/lib ..`
-  * There are some options to (de)activate features of the library if they are not needed
-    or not available on the system (like Cuda), which you can change with
-    theese lines before `..` (in `cmake ..`) or afterwards with `ccmake` or `cmake-gui`:
-    * `-DISAAC_CUDA=OFF` →  Deactivates CUDA.
-    * `-DISAAC_ALPAKA=ON` → Activates ALPAKA. The used accelerator of Alpaka can be
-      changed inside the file `example.cpp`. At default OpenMP version 2 is used as
-      accelerator. At least CUDA or Alpaka need to be activated. 
+  * There are some options to (de)activate features of the library if they are
+    not needed or not available on the system (like Cuda/HIP), which you can
+    change with these lines before `..` (in `cmake ..`) or afterwards with
+    `ccmake` or `cmake-gui`:
+    * `-Dalpaka_ACC_GPU_CUDA_ENABLE=ON` or `-Dalpaka_ACC_GPU_HIP_ENABLE=ON` →
+      Activates the CUDA / HIP accelerator in Alpaka. The used accelerator of
+      ISAAC can be changed inside the file `example.cpp`, where at default CUDA
+      is used as accelerator.
 * `make`
 
-Afterwards you get the executables `example_cuda`, `example_alpaka` or both.
+Afterwards you get the executable `isaac_example`.
 For running these examples you need a running isaac server.
 
 ### The server
