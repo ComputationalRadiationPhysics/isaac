@@ -41,6 +41,19 @@ be built yourself nevertheless or the distribution versions are outdated.
 * __libjpeg-turbo__ for (de)compressing the rendered image of the transmission:
   * _Debian/Ubuntu_:
     * `sudo apt-get install libjpeg-dev`
+  * _From Source_:
+    * You might need to install [__nasm__](https://nasm.us/), as building 
+      libjpeg-turbo requires it.
+    * `git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git`
+    * `cd libjpeg-turbo`
+    * `mkdir build && cd build`
+    * With admin rights and no other version of libjpeg-turbo installed:
+      * `cmake ..`
+      * `make`
+      * `sudo make install`
+    * Otherwise:
+      * `cmake .. -DCMAKE_INSTALL_PREFIX=$LIBJPEG_INSTALL_DIR`
+      * `make install`
 * __Jansson__ 2.12+ for the de- and encryption of the JSON messages transfered
   between server and client.
   * _Debian/Ubuntu_:
@@ -142,22 +155,23 @@ The ISAACConfig.cmake searches for these requirements. See
   * _Debian/Ubuntu_:
     * `sudo apt-get install libopenmpi-dev`
   * _From Source_:
-    * `git clone https://github.com/open-mpi/ompi.git`
-    * `cd ompi`
-    * `./autogen.pl`
+    * `wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.10.tar.gz`
+    * `tar -xzf openmpi-5.0.10.tar.gz`
+    * `rm openmpi-5.0.10.tar.gz`
+    * `cd openmpi-5.0.10`
+    * `mkdir build && cd build`
     * With admin rights and no other version of OpenMPI installed:
-      * `./configure`
+      * `../configure`
       * `make`
       * `sudo make install`
     * Otherwise:
-      * `mkdir install`
-      * `./configure --prefix=$MPI/install`, where `$MPI` is
-        the full (!) path of the openMPI directory.
+      * `../configure --prefix=$MPI_INSTALL_DIR`, where `$MPI_INSTALL_DIR` is
+        the full (!) path to the directory where OpenMPI should be installed.
       * `make install`
-      * Now a local version of OpenMPI is installed in the install directory in
-        the OpenMPI folder. Later while compiling an application using
-        MPI (including the ISAAC examples) add `$MPI/install` to the
-        CMake variable `CMAKE_MODULE_PATH` to use this version.
+      * Now, a local version of OpenMPI is installed in the specified install
+        directory. Later while compiling an application using MPI (including the
+        ISAAC examples) add `$MPI_INSTALL_DIR` to the CMake variable
+        `CMAKE_MODULE_PATH` to use this version.
 * __glm__ 1.0.0+ for the internal math types and functions
   * _From Source_:
     * `git clone https://github.com/g-truc/glm.git --depth 1 --branch 1.0.3`
