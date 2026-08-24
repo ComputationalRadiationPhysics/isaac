@@ -100,7 +100,7 @@ be built yourself nevertheless or the distribution versions are outdated.
 ### Requirements for the in situ library and the examples using it
 
 The ISAACConfig.cmake searches for these requirements. See
-`example/CMakeLists.txt` for an easy to adopt example.
+[`example/CMakeLists.txt`](./example/CMakeLists.txt) for an easy to adopt example.
 
 * __alpaka__ 2.0.0+ for the abstraction of the acceleration device:
   * _From Source_:
@@ -214,9 +214,9 @@ Building
 
 ### Installing the library
 
-To install the isaac library to use it in your project
-go to directory `lib` inside the isaac root folder, create a folder like
-`build` and do the classic cmake magic:
+To install the isaac library to use it in your project, go to directory `lib`
+inside the isaac root folder, create a folder like `build`, and do the classic 
+cmake magic:
 
 * `git clone https://github.com/ComputationalRadiationPhysics/isaac.git`
 * `cd isaac`
@@ -251,11 +251,11 @@ isaac (`cd isaac`) do:
 * `make install`
 
 Afterwards you get the executable `isaac_example`.
-For running these examples you need a running isaac server.
+To run this example, you need a running isaac server.
 
 ### The server
 
-The server resides in the direcoty `server` and also uses CMake:
+The server resides in the directory `server` and also uses CMake:
 
 * `cd isaac`
 * `cd server`
@@ -282,28 +282,32 @@ If you want to install the server type
 
 * (`sudo`) `make install`
 
-Change the installation directory with adding
+Change the installation directory by adding
 
 * `-DCMAKE_INSTALL_PREFIX=/your/path`
 
 in the initial `cmake ..`
 
-However, the server doesn't need to be installed and can also directly be called with
+However, the server doesn't need to be installed and can also directly be called
+from the build directory with
 
 * `./isaac`
 
-For more informations about parameters use `./isaac --help` or have
-a look in the __[server documentation](http://computationalradiationphysics.github.io/isaac/doc/server/index.html)__.
+For more informations about parameters use `./isaac --help` or have a look in
+the __[server documentation](https://computationalradiationphysics.github.io/isaac/doc/server/index.html)__.
 
 ### Testing
 
-To test the server and an example, just start the server with `./isaac`,
-connect to it with one of the HTML clients in the directory `client` (best
-is `interface.htm`) and start an example with `./example_cuda` or
-`./example_alpaka`. It should connect to the server running on localhost and be
-observable and steerable. You can run multiple instances of the example with
-`mpirun -c N ./example_KIND` with the number of instances `N` and `KIND`
-being `cuda` or `alpaka`. To exit the example, use the client or ctrl+C.
+To test the server and an example, just start the server with `./isaac`, connect
+to it with one of the HTML clients in the directory `client` (best is
+`visualisation.html`) and start an example with `./isaac_example`. It should
+connect to the server running on localhost and be observable and steerable. You
+can run multiple instances of the example with `mpirun -c N ./isaac_example`
+with the number of instances `N`. To exit the example, use the client or ctrl+C.
+
+If the client and the isaac server are not located on the same system, it might
+be required to create a tunnel between the two systems. In that case, you may
+want to have a look into the __[tunnel guide](./TUNNEL.md)__.
 
 ### Versions
 
@@ -331,5 +335,5 @@ be used.
 How to use in an own application
 --------------------------------
 
-For a deeper insight how to use ISAAC in a new application, have a look
-at the [library documentation](http://computationalradiationphysics.github.io/isaac/doc/library/index.html).
+For a deeper insight how to use ISAAC in a new application, have a look at the
+__[library documentation](https://computationalradiationphysics.github.io/isaac/doc/library/index.html)__.
