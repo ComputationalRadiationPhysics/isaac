@@ -100,20 +100,14 @@ add_definitions(-std=c++11 -march=native -mtune=native)
 
 add_executable(isaac ${HDRS} ${SRCS})
 
-find_package (Jansson CONFIG QUIET)
-if (Jansson_FOUND)
-	set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
-	set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
-else()
-	find_package (jansson CONFIG REQUIRED)
-	# required since 2.12
-	# interfacing cmake tagets with the old cmake variables we use in ISAAC
-	# since ISSAC has no CMake target we can not use target_link_library
-	get_target_property(JANSSON_LIBRARIES jansson::jansson LOCATION)
-	set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
-	get_target_property(JANSSON_INCLUDE_DIRS jansson::jansson INTERFACE_INCLUDE_DIRECTORIES)
-	set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
-endif()
+find_package (jansson CONFIG REQUIRED)
+# required since 2.12
+# interfacing cmake tagets with the old cmake variables we use in ISAAC
+# since ISSAC has no CMake target we can not use target_link_library
+get_target_property(JANSSON_LIBRARIES jansson::jansson LOCATION)
+set(LIBS ${LIBS} ${JANSSON_LIBRARIES})
+get_target_property(JANSSON_INCLUDE_DIRS jansson::jansson INTERFACE_INCLUDE_DIRECTORIES)
+set(INCLUDE ${INCLUDE} ${JANSSON_INCLUDE_DIRS})
 
 find_package(Libwebsockets 2.1.1 CONFIG REQUIRED)
 set(LIBS ${LIBS} ${LIBWEBSOCKETS_LIBRARIES})
