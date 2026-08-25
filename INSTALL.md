@@ -116,7 +116,7 @@ The ISAACConfig.cmake searches for these requirements. See
       The last option only must be included if acceleration on Nvidia GPUs is
       wanted. Go to the [alpaka manual](https://alpaka.readthedocs.io/en/stable/advanced/cmake.html#arguments)
       for infos on how to use other accelerators.
-    * `cmake --install .`
+    * `make install`
     * Later, while compiling an application using alpaka (including the ISAAC
       examples), add `-Dalpaka_DIR=$ALPAKA_INSTALL_DIR`, where
       `$ALPAKA_INSTALL_DIR` is the path of the alpaka install directory used
