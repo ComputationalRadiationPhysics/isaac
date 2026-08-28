@@ -109,6 +109,7 @@ errorCode InsituConnectorMaster::run()
                         insituConnector->jlcb.count = 0;
                         InsituConnectorContainer* d = new InsituConnectorContainer();
                         d->connector = insituConnector;
+                        d->group = NULL;
                         con_array[fdnum] = d;
                         fd_array[fdnum].fd = newsockfd;
                         fd_array[fdnum].events = POLLIN;
@@ -119,6 +120,8 @@ errorCode InsituConnectorMaster::run()
             }
             for(int i = 1; i < fdnum; i++)
             {
+                bool closed = false;
+                const bool socket_closed = (fd_array[i].revents & (POLLHUP | POLLERR | POLLNVAL)) != 0;
                 if(fd_array[i].revents & POLLIN)
                 {
                     while(1)
@@ -147,7 +150,6 @@ errorCode InsituConnectorMaster::run()
                     }
                     con_array[i]->connector->jlcb.pos = 0;
                     con_array[i]->connector->jlcb.buffer[con_array[i]->connector->jlcb.count] = 0;
-                    bool closed = false;
                     if(con_array[i]->connector->jlcb.count > 0)
                     {
                         con_array[i]->connector->jlcb.buffer[con_array[i]->connector->jlcb.count] = 0;
@@ -238,17 +240,26 @@ errorCode InsituConnectorMaster::run()
                         con_array[i]->connector->clientSendMessage(message);
                         closed = true;
                     }
-                    if(closed)
+                }
+                if(socket_closed && !closed)
+                {
+                    MessageContainer* message = new MessageContainer(EXIT_PLUGIN, json_object());
+                    json_object_set_new(message->json_root, "type", json_string("exit"));
+                    con_array[i]->connector->clientSendMessage(message);
+                    closed = true;
+                }
+                if(closed)
+                {
+                    close(fd_array[i].fd);
+                    fdnum--;
+                    for(int j = i; j < fdnum; j++)
                     {
-                        close(fd_array[i].fd);
-                        fdnum--;
-                        for(int j = i; j < fdnum; j++)
-                        {
-                            fd_array[j] = fd_array[j + 1];
-                            con_array[j] = con_array[j + 1];
-                        }
-                        memset(&(fd_array[fdnum]), 0, sizeof(fd_array[fdnum]));
+                        fd_array[j] = fd_array[j + 1];
+                        con_array[j] = con_array[j + 1];
                     }
+                    memset(&(fd_array[fdnum]), 0, sizeof(fd_array[fdnum]));
+                    con_array[fdnum] = NULL;
+                    i--;
                 }
             }
         }

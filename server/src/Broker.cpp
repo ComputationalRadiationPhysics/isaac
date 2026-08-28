@@ -430,36 +430,40 @@ errorCode Broker::run()
                     if(insituContainer->group)
                     {
                         InsituConnectorGroup* group = insituContainer->group;
-                        // Add id of group
-                        json_object_set_new(message->json_root, "id", json_integer(group->getID()));
-                        ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
-                        while(dc)
+                        if(group->master == insituContainer)
                         {
-                            dc->t->masterSendMessage(new MessageContainer(EXIT_PLUGIN, message->json_root, true));
-                            dc = dc->next;
-                        }
-                        for(auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
-                            (*it).second.connector->masterSendMessage(
-                                new ImageBufferContainer(GROUP_FINISHED, NULL, group, 1));
-                        // Now let's remove the whole group
-                        group->master->group = NULL;
-                        printf("Removed group %i\n", group->id);
-                        ThreadList<InsituConnectorGroup*>::ThreadListContainer_ptr it
-                            = insituConnectorGroupList.getFront();
-                        while(it)
-                        {
-                            if(it->t == group)
+                            // Add id of group
+                            json_object_set_new(message->json_root, "id", json_integer(group->getID()));
+                            ThreadList<MetaDataClient*>::ThreadListContainer_ptr dc = dataClientList.getFront();
+                            while(dc)
                             {
-                                pthread_t thread;
-                                pthread_create(
-                                    &thread,
-                                    NULL,
-                                    delete_pointer_later<InsituConnectorGroup>,
-                                    insituConnectorGroupList.remove(it));
-                                break;
+                                dc->t->masterSendMessage(new MessageContainer(EXIT_PLUGIN, message->json_root, true));
+                                dc = dc->next;
                             }
-                            it = it->next;
+                            for(auto it = imageConnectorList.begin(); it != imageConnectorList.end(); it++)
+                                (*it).second.connector->masterSendMessage(
+                                    new ImageBufferContainer(GROUP_FINISHED, NULL, group, 1));
+                            // Now let's remove the whole group
+                            group->master->group = NULL;
+                            printf("Removed group %i\n", group->id);
+                            ThreadList<InsituConnectorGroup*>::ThreadListContainer_ptr it
+                                = insituConnectorGroupList.getFront();
+                            while(it)
+                            {
+                                if(it->t == group)
+                                {
+                                    pthread_t thread;
+                                    pthread_create(
+                                        &thread,
+                                        NULL,
+                                        delete_pointer_later<InsituConnectorGroup>,
+                                        insituConnectorGroupList.remove(it));
+                                    break;
+                                }
+                                it = it->next;
+                            }
                         }
+                        insituContainer->group = NULL;
                     }
                     delete insituMaster.insituConnectorList.remove(insitu);
                     break;
