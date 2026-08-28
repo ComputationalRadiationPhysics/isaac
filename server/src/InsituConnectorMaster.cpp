@@ -105,6 +105,12 @@ errorCode InsituConnectorMaster::run()
                     newsockfd = accept(sockfd, (struct sockaddr*) &cli_addr, &clilen);
                     if(newsockfd >= 0)
                     {
+                        if(fdnum >= MAX_SOCKETS)
+                        {
+                            fprintf(stderr, "InsituConnectorMaster: Too many connections. Closing new connection.\n");
+                            close(newsockfd);
+                            continue;
+                        }
                         InsituConnector* insituConnector = new InsituConnector(newsockfd, nextFreeNumber++);
                         insituConnector->jlcb.count = 0;
                         InsituConnectorContainer* d = new InsituConnectorContainer();
@@ -126,25 +132,23 @@ errorCode InsituConnectorMaster::run()
                 {
                     while(1)
                     {
+                        int remaining = ISAAC_MAX_RECEIVE - con_array[i]->connector->jlcb.count - 1;
+                        if(remaining <= 0)
+                        {
+                            fprintf(
+                                stderr,
+                                "Fatal error: Socket received more bytes than the %d byte buffer can hold! To increase "
+                                "the allowed size set ISAAC_MAX_RECEIVE to a higher value.\n",
+                                ISAAC_MAX_RECEIVE);
+                            return -1;
+                        }
                         int add = recv(
                             fd_array[i].fd,
                             &(con_array[i]->connector->jlcb.buffer[con_array[i]->connector->jlcb.count]),
-                            4096,
+                            remaining > 4096 ? 4096 : remaining,
                             MSG_DONTWAIT);
                         if(add > 0)
-                        {
                             con_array[i]->connector->jlcb.count += add;
-                            if(con_array[i]->connector->jlcb.count > ISAAC_MAX_RECEIVE)
-                            {
-                                fprintf(
-                                    stderr,
-                                    "Fatal error: Socket received %d bytes but buffer is only %d bytes! To increase "
-                                    "the allowed size set ISAAC_MAX_RECEIVE to a higher value.\n",
-                                    con_array[i]->connector->jlcb.count,
-                                    ISAAC_MAX_RECEIVE);
-                                return -1;
-                            }
-                        }
                         else
                             break;
                     }

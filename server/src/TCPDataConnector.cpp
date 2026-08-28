@@ -100,9 +100,16 @@ errorCode TCPDataConnector::run()
                     newsockfd = accept(sockfd, (struct sockaddr*) &cli_addr, &clilen);
                     if(newsockfd >= 0)
                     {
+                        if(fdnum >= MAX_SOCKETS)
+                        {
+                            fprintf(stderr, "TCPDataConnector: Too many connections. Closing new connection.\n");
+                            close(newsockfd);
+                            continue;
+                        }
                         printf("TCPDataConnector: New connection, giving id %i\n", fdnum);
                         client_array[fdnum] = broker->addDataClient();
                         jlcb_array[fdnum] = new jlcb_container();
+                        jlcb_array[fdnum]->jlcb.count = 0;
                         fd_array[fdnum].fd = newsockfd;
                         fd_array[fdnum].events = POLLIN;
                         fdnum++;
@@ -113,6 +120,7 @@ errorCode TCPDataConnector::run()
         for(int i = 1; i < fdnum; i++)
         {
             bool closed = false;
+            const bool socket_closed = (fd_array[i].revents & (POLLHUP | POLLERR | POLLNVAL)) != 0;
             // Messages of children
             while(MessageContainer* message = client_array[i]->clientGetMessage())
             {
@@ -142,52 +150,71 @@ errorCode TCPDataConnector::run()
             {
                 while(1)
                 {
+                    int remaining = ISAAC_MAX_RECEIVE - jlcb_array[i]->jlcb.count - 1;
+                    if(remaining <= 0)
+                    {
+                        fprintf(
+                            stderr,
+                            "TCPDataConnector: Socket received more bytes than the %d byte buffer can hold. Closing connection.\n",
+                            ISAAC_MAX_RECEIVE);
+                        client_array[i]->clientSendMessage(new MessageContainer(CLOSED));
+                        closed = true;
+                        break;
+                    }
                     int add = recv(
                         fd_array[i].fd,
                         &(jlcb_array[i]->jlcb.buffer[jlcb_array[i]->jlcb.count]),
-                        4096,
+                        remaining > 4096 ? 4096 : remaining,
                         MSG_DONTWAIT);
                     if(add > 0)
                         jlcb_array[i]->jlcb.count += add;
                     else
                         break;
                 }
-                jlcb_array[i]->jlcb.pos = 0;
-                jlcb_array[i]->jlcb.buffer[jlcb_array[i]->jlcb.count] = 0;
-                if(jlcb_array[i]->jlcb.count > 0)
+                if(!closed)
                 {
+                    jlcb_array[i]->jlcb.pos = 0;
                     jlcb_array[i]->jlcb.buffer[jlcb_array[i]->jlcb.count] = 0;
-                    json_error_t error;
-                    int last_working_pos = 0;
-                    while(json_t* content = json_load_callback(
-                              json_load_callback_function,
-                              &jlcb_array[i]->jlcb,
-                              JSON_DISABLE_EOF_CHECK,
-                              &error))
+                    if(jlcb_array[i]->jlcb.count > 0)
                     {
-                        last_working_pos = jlcb_array[i]->jlcb.pos;
-                        MessageContainer* message = new MessageContainer(NONE, content);
-                        json_object_set_new(
-                            message->json_root,
-                            "url",
-                            json_string("127.0.0.1")); // TODO: Using real url
-                        client_array[i]->clientSendMessage(message);
+                        jlcb_array[i]->jlcb.buffer[jlcb_array[i]->jlcb.count] = 0;
+                        json_error_t error;
+                        int last_working_pos = 0;
+                        while(json_t* content = json_load_callback(
+                                  json_load_callback_function,
+                                  &jlcb_array[i]->jlcb,
+                                  JSON_DISABLE_EOF_CHECK,
+                                  &error))
+                        {
+                            last_working_pos = jlcb_array[i]->jlcb.pos;
+                            MessageContainer* message = new MessageContainer(NONE, content);
+                            json_object_set_new(
+                                message->json_root,
+                                "url",
+                                json_string("127.0.0.1")); // TODO: Using real url
+                            client_array[i]->clientSendMessage(message);
+                        }
+                        // If the whole json message was not received yet, we need to keep the start
+                        if(error.position != 1 || strcmp(error.text, "'[' or '{' expected near end of file") != 0)
+                        {
+                            for(int j = 0; j < jlcb_array[i]->jlcb.count - last_working_pos; j++)
+                                jlcb_array[i]->jlcb.buffer[j] = jlcb_array[i]->jlcb.buffer[j + last_working_pos];
+                            jlcb_array[i]->jlcb.count -= last_working_pos;
+                        }
+                        else
+                            jlcb_array[i]->jlcb.count = 0;
                     }
-                    // If the whole json message was not received yet, we need to keep the start
-                    if(error.position != 1 || strcmp(error.text, "'[' or '{' expected near end of file") != 0)
+                    else // Closed
                     {
-                        for(int j = 0; j < jlcb_array[i]->jlcb.count - last_working_pos; j++)
-                            jlcb_array[i]->jlcb.buffer[j] = jlcb_array[i]->jlcb.buffer[j + last_working_pos];
-                        jlcb_array[i]->jlcb.count -= last_working_pos;
+                        client_array[i]->clientSendMessage(new MessageContainer(CLOSED));
+                        closed = true;
                     }
-                    else
-                        jlcb_array[i]->jlcb.count = 0;
                 }
-                else // Closed
-                {
-                    client_array[i]->clientSendMessage(new MessageContainer(CLOSED));
-                    closed = true;
-                }
+            }
+            if(socket_closed && !closed)
+            {
+                client_array[i]->clientSendMessage(new MessageContainer(CLOSED));
+                closed = true;
             }
             if(closed)
             {
@@ -199,8 +226,12 @@ errorCode TCPDataConnector::run()
                 {
                     fd_array[j] = fd_array[j + 1];
                     client_array[j] = client_array[j + 1];
+                    jlcb_array[j] = jlcb_array[j + 1];
                 }
                 memset(&(fd_array[fdnum]), 0, sizeof(fd_array[fdnum]));
+                client_array[fdnum] = NULL;
+                jlcb_array[fdnum] = NULL;
+                i--;
             }
         }
     }
