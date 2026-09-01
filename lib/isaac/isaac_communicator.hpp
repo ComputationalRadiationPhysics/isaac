@@ -52,6 +52,7 @@ namespace isaac
             , port(port)
             , sockfd(0)
             , jpeg_quality(90)
+            , readThreadStarted(false)
             , registerMessage(NULL)
         {
             pthread_mutex_init(&deleteMessageMutex, NULL);
@@ -88,6 +89,7 @@ namespace isaac
             sockfd = socket(AF_INET, SOCK_STREAM, 0);
             if(sockfd < 0)
             {
+                sockfd = 0;
                 if(setting == ReturnAtError)
                 {
                     fprintf(stderr, "Could not create socket.\n");
@@ -107,6 +109,7 @@ namespace isaac
             if(connect(sockfd, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0)
             {
                 close(sockfd);
+                sockfd = 0;
                 if(setting == ReturnAtError)
                 {
                     fprintf(stderr, "Could not connect to %s.\n", url.c_str());
@@ -118,7 +121,7 @@ namespace isaac
                     return 1;
                 }
             }
-            pthread_create(&readThread, NULL, run_readAndSetMessages, this);
+            readThreadStarted = pthread_create(&readThread, NULL, run_readAndSetMessages, this) == 0;
             return 0;
         }
 
@@ -297,7 +300,10 @@ namespace isaac
             if(sockfd)
                 serverDisconnect();
             usleep(100000); // 100ms
-            pthread_cancel(readThread);
+            if(readThreadStarted)
+            {
+                pthread_cancel(readThread);
+            }
             pthread_mutex_destroy(&deleteMessageMutex);
         }
         void setMessage(json_t* content)
@@ -343,7 +349,8 @@ namespace isaac
         }
         static size_t json_load_callback_function(void* buffer, size_t buflen, void* data)
         {
-            return recv(*((isaac_int*) data), buffer, 1, 0);
+            ssize_t const received = recv(*((isaac_int*) data), buffer, buflen, 0);
+            return received > 0 ? static_cast<size_t>(received) : 0u;
         }
         static void* run_readAndSetMessages(void* communicator)
         {
@@ -359,6 +366,7 @@ namespace isaac
         std::list<json_t*> messageList;
         pthread_mutex_t deleteMessageMutex;
         pthread_t readThread;
+        bool readThreadStarted;
         json_t** registerMessage;
     };
 
