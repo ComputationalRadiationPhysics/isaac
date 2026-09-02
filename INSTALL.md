@@ -43,7 +43,8 @@ be built yourself nevertheless, or the distribution versions are outdated.
   * _From Source_:
     * You might need to install [__nasm__](https://nasm.us/), as building 
       libjpeg-turbo requires it.
-    * `git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git`
+    * `git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git --depth 1 
+      --branch 3.1.4.1`
     * `cd libjpeg-turbo`
     * `mkdir build && cd build`
     * With admin rights and no other version of libjpeg-turbo installed:
@@ -58,7 +59,8 @@ be built yourself nevertheless, or the distribution versions are outdated.
   * _Debian/Ubuntu_:
     * `sudo apt-get install libjansson-dev`
   * _From Source_:
-    * `git clone https://github.com/akheron/jansson.git`
+    * `git clone https://github.com/akheron/jansson.git --depth 1 
+      --branch v2.15.0`
     * `cd jansson`
     * `mkdir build && cd build`
     * With admin rights and no other version of jansson installed:
@@ -109,10 +111,12 @@ The ISAACConfig.cmake searches for these requirements. See
     * alpaka supports multiple accelerators. If one wants to run ISAAC on GPU,
       __Cuda__ or __HIP__ should be installed beforehand and activated (see
       below).
-    * `git clone https://github.com/alpaka-group/alpaka.git`
+    * `git clone https://github.com/alpaka-group/alpaka.git --depth 1 
+      --branch 2.1.1`
     * `cd alpaka`
     * `mkdir build && cd build`
-    * `cmake .. -DCMAKE_INSTALL_PREFIX=$ALPAKA_INSTALL_DIR -Dalpaka_ACC_GPU_CUDA_ENABLE=ON`.
+    * `cmake .. -DCMAKE_INSTALL_PREFIX=$ALPAKA_INSTALL_DIR
+      -Dalpaka_ACC_GPU_CUDA_ENABLE=ON`.
       The last option only must be included if acceleration on Nvidia GPUs is
       wanted. Go to the [alpaka manual](https://alpaka.readthedocs.io/en/stable/advanced/cmake.html#arguments)
       for infos on how to use other accelerators.
@@ -177,7 +181,8 @@ The ISAACConfig.cmake searches for these requirements. See
 
 * __libwebsockets__ 2.1.1+ for the connection between server and an HTML5 client:
   * _From Source_:
-    * `git clone https://github.com/warmcat/libwebsockets.git --depth 1 --branch v4.5-stable`
+    * `git clone https://github.com/warmcat/libwebsockets.git --depth 1
+      --branch v4.5-stable`
     * `cd libwebsockets`
     * `mkdir build && cd build`
     * With admin rights and no other version of libwebsockets installed:
@@ -207,7 +212,8 @@ The ISAACConfig.cmake searches for these requirements. See
   streams of a server without gStreamer. If gStreamer is not found, it is
   deactivated by default.
   * _Debian/Ubuntu_:
-    * `sudo apt-get install libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libgstreamer-plugins-good1.0-0 libgstreamer-plugins-bad1.0-0`
+    * `sudo apt-get install libgstreamer1.0-0 libgstreamer-plugins-base1.0-0
+      libgstreamer-plugins-good1.0-0 libgstreamer-plugins-bad1.0-0`
 
 Building
 --------
