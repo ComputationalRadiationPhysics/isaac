@@ -9,7 +9,7 @@ Requirements
 Most dependencies are part of most distributions. However, some need to
 be built yourself nevertheless, or the distribution versions are outdated.
 
-### Requirements for the server and the in situ library
+### Requirements for both, the server and the in situ library
 
 * __gcc__ / __g++__ for compiling the program at all. At least version 10
   should be used:
@@ -41,8 +41,8 @@ be built yourself nevertheless, or the distribution versions are outdated.
   * _Debian/Ubuntu_:
     * `sudo apt-get install libjpeg-dev`
   * _From Source_:
-    * You might need to install [__nasm__](https://nasm.us/), as building 
-      libjpeg-turbo requires it.
+    * You might want to install [__nasm__](https://nasm.us/) before compiling, 
+      as building libjpeg-turbo without it might reduce performance.
     * `git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git --depth 1 
       --branch 3.1.4.1`
     * `cd libjpeg-turbo`
@@ -99,12 +99,13 @@ be built yourself nevertheless, or the distribution versions are outdated.
         `-DBoost_DIR=$BOOST_INSTALL_DIR`, where `$BOOST_INSTALL_DIR` is the path
         of the Boost install directory used above.
 
-### Requirements for the in situ library and the examples using it
+### Requirements exclusively for the in situ library (and the examples using it)
 
 The ISAACConfig.cmake searches for these requirements. See
 [`example/CMakeLists.txt`](./example/CMakeLists.txt) for an easy to adopt example.
 
-* __alpaka__ 2.0.0+ for the abstraction of the acceleration device:
+* __alpaka__ 2.* for the abstraction of the acceleration device (3.0.0+ is currently
+  not supported):
   * _From Source_:
     * __Boost__ should be installed before this, as alpaka may use it as a
       dependency.
@@ -112,13 +113,13 @@ The ISAACConfig.cmake searches for these requirements. See
       __Cuda__ or __HIP__ should be installed beforehand and activated (see
       below).
     * `git clone https://github.com/alpaka-group/alpaka.git --depth 1 
-      --branch 2.1.1`
+      --branch 2.2.0`
     * `cd alpaka`
     * `mkdir build && cd build`
     * `cmake .. -DCMAKE_INSTALL_PREFIX=$ALPAKA_INSTALL_DIR
       -Dalpaka_ACC_GPU_CUDA_ENABLE=ON`.
       The last option only must be included if acceleration on Nvidia GPUs is
-      wanted. Go to the [alpaka manual](https://alpaka.readthedocs.io/en/stable/advanced/cmake.html#arguments)
+      wanted. Go to the [alpaka manual](https://alpaka.readthedocs.io/en/2.2.0/advanced/cmake.html#arguments)
       for infos on how to use other accelerators.
     * `make install`
     * Later, while compiling an application using alpaka (including the ISAAC
@@ -177,7 +178,7 @@ The ISAACConfig.cmake searches for these requirements. See
       your profile)
       * `export CMAKE_PREFIX_PATH=$GLM_INSTALL_DIR:$CMAKE_PREFIX_PATH`
 
-### Requirements for the server only
+### Requirements exclusively for the server
 
 * __libwebsockets__ 2.1.1+ for the connection between server and an HTML5 client:
   * _From Source_:
@@ -203,7 +204,8 @@ The ISAACConfig.cmake searches for these requirements. See
         install directory. Later, while compiling the ISAAC server using
         libwebsockets, add
         `-DLibwebsockets_DIR=$LIBWEBSOCKETS_INSTALL_DIR/lib/cmake/libwebsockets`,
-        where `$LIBWEBSOCKETS_INSTALL_DIR` is the path of the libwebsockets 
+        (or `$LIBWEBSOCKETS_INSTALL_DIR/lib64/...` on some systems) where
+        `$LIBWEBSOCKETS_INSTALL_DIR` is the path of the libwebsockets 
         install directory used above.
 * __gStreamer__ is only needed, if streaming over RTP or the Twitch plugin shall
   be used. It should be possible to build gStreamer yourself, but it
@@ -218,62 +220,120 @@ The ISAACConfig.cmake searches for these requirements. See
 Building
 --------
 
-### Installing the library
-
-To install the isaac library to use it in your project, go to directory `lib`
-inside the isaac root folder, create a folder like `build`, and do the classic 
-cmake magic:
+### Getting ISAAC from the source
 
 * `git clone https://github.com/ComputationalRadiationPhysics/isaac.git`
 * `cd isaac`
-* `cd lib`
-* `mkdir build && cd build`
-* `cmake -DCMAKE_INSTALL_PREFIX=$ISAAC_LIB_DIR ..`
-* (`sudo`) ` make install`
 
-You don't need to call `make` before `make install` as the template library
-does not need to be built until compiling the using application.
+
+### Adding paths
+
+When building the required dependencies from source, ISAAC may not find the
+needed libraries and CMake files without some help.
+It is possible to directly tell ISAAC where it can find the required directories
+via flags when building the example or your own application (for example,
+adding `-Djansson_DIR=$JANSSON_INSTALL_DIR/lib/cmake/jansson` to the CMake
+calls).
+
+Alternatively, you can add the dependencies to paths that are automatically
+searched through by the system when looking for CMake files or shared libraries.
+This is done by calling the following commands before running `make` in the next
+sections. This only needs to be done for the programs that you've built yourself.
+
+* CMake paths:
+  * `export CMAKE_PREFIX_PATH=$LIBJPEG_INSTALL_DIR:$CMAKE_PREFIX_PATH`
+  * `export CMAKE_PREFIX_PATH=$JANSSON_INSTALL_DIR:$CMAKE_PREFIX_PATH`
+  * `export CMAKE_PREFIX_PATH=$BOOST_INSTALL_DIR:$CMAKE_PREFIX_PATH`
+  * `export CMAKE_PREFIX_PATH=$ALPAKA_INSTALL_DIR:$CMAKE_PREFIX_PATH`
+  * `export CMAKE_PREFIX_PATH=$ICET_INSTALL_DIR:$CMAKE_PREFIX_PATH`
+  * `export CMAKE_PREFIX_PATH=$GLM_INSTALL_DIR:$CMAKE_PREFIX_PATH`
+  * `export CMAKE_PREFIX_PATH=$LIBWEBSOCKETS_INSTALL_DIR:$CMAKE_PREFIX_PATH`
+
+
+* Shared libraries:
+  * `export LD_LIBRARY_PATH=$LIBJPEG_INSTALL_DIR/lib:$LD_LIBRARY_PATH`
+  * `export LD_LIBRARY_PATH=$JANSSON_INSTALL_DIR/lib:$LD_LIBRARY_PATH`
+  * `export LD_LIBRARY_PATH=$BOOST_INSTALL_DIR/lib:$LD_LIBRARY_PATH`
+  * `export LD_LIBRARY_PATH=$ICET_INSTALL_DIR/lib:$LD_LIBRARY_PATH`
+  * `export LD_LIBRARY_PATH=$GLM_INSTALL_DIR/lib:$LD_LIBRARY_PATH`
+  * `export LD_LIBRARY_PATH=$LIBWEBSOCKETS_INSTALL_DIR/lib:$LD_LIBRARY_PATH`
+  * depending on the system, the subdirectory for some libraries may be called
+    `lib64` instead of `lib`. The commands above must be adjusted in that case.
+
+
+* GCC C-path (only needed for boost):
+  * `export CPATH=$BOOST_INSTALL_DIR/include:$CPATH`
+
+### Installing the library
+
+To install the ISAAC library to use it in your project, go to directory `lib`
+inside the ISAAC root folder, create a folder like `build`, and do the classic 
+cmake magic:
+
+* `cd lib` (from the ISAAC root folder) 
+* `mkdir build && cd build`
+* `cmake -DCMAKE_INSTALL_PREFIX=$ISAAC_LIB_DIR ..`, where `$ISAAC_LIB_DIR`
+  is the full path to the directory where the isaac library should be installed.
+* (`sudo`) `make install`
+
+You may want to add the library to your paths, so your application can find it:
+
+  * `export CMAKE_PREFIX_PATH=$ISAAC_LIB_DIR:$CMAKE_PREFIX_PATH`
+  * `export LD_LIBRARY_PATH=$ISAAC_LIB_DIR/lib:$LD_LIBRARY_PATH`
 
 ### The example
 
 The building of the examples works similar, but the root directory of
-the examples is the folder `example`, so after changing directory to
-isaac (`cd isaac`) do:
+the examples is the folder `example`, so after changing the directory to
+the ISAAC root folder, do:
 
-* `cd example`
+* `cd example` (from the ISAAC root folder) 
 * `mkdir build && cd build`
-* `cmake ..`
+* `cmake -DCMAKE_INSTALL_PREFIX=$ISAAC_EXAMPLE_DIR -Dalpaka_ACC_GPU_CUDA_ENABLE=ON ..`,
+  where `$ISAAC_EXAMPLE_DIR` is the full path to the directory where the isaac
+  example should be installed. The `alpaka_ACC_GPU_CUDA_ENABLE` flag only must
+  be included if acceleration on Nvidia GPUs is wanted.
   * Don't forget the maybe needed `-DLIB_DIR=…` parameters
     needed for local installed libraries. E.g.
     `cmake -DIceT_DIR=$ICET_INSTALL_DIR/lib ..`
   * There are some options to (de)activate features of the library if they are
     not needed or not available on the system (like Cuda/HIP), which you can
-    change with these lines before `..` (in `cmake ..`) or afterwards with
-    `ccmake` or `cmake-gui`:
+    change with these flags in `cmake ..` or afterwards with `ccmake` or 
+    `cmake-gui`:
     * `-Dalpaka_ACC_GPU_CUDA_ENABLE=ON` or `-Dalpaka_ACC_GPU_HIP_ENABLE=ON` →
       Activates the CUDA / HIP accelerator in Alpaka. The used accelerator of
       ISAAC can be changed inside the file `example.cpp`, where at default CUDA
       is used as accelerator.
-* `make install`
+* `make`
 
 Afterwards you get the executable `isaac_example`.
+If you want to install the example, type
+
+* (`sudo`) `make install`
+
+However, the example doesn't need to be installed and can also directly be called
+from the build directory with
+
+* `./isaac_example`
+
 To run this example, you need a running isaac server.
 
 ### The server
 
-The server resides in the directory `server` and also uses CMake:
+The server resides in the directory `server` in the ISAAC root folder and also
+uses CMake:
 
-* `cd isaac`
-* `cd server`
+* `cd server` (from the ISAAC root folder) 
 * `mkdir build && cd build`
-* `cmake ..`
+* `cmake -DCMAKE_INSTALL_PREFIX=$ISAAC_SERVER_DIR ..`, where `$ISAAC_SERVER_DIR`
+  is the full path to the directory where the isaac server should be installed.
   * Don't forget the maybe needed `-DLIB_DIR=…` parameters
     needed for local installed libraries. E.g.
     `cmake -DLibwebsockets_DIR=$LIBWEBSOCKETS_INSTALL_DIR/lib/cmake/libwebsockets ..`
   * There are some options to (de)activate features of the server if they are
     not needed or not available on the system (like Gstreamer), which you can
-    change with these lines before `..` (in `cmake ..`) or afterwards with
-    `ccmake` or `cmake-gui`:
+    change with these flags in `cmake ..` or afterwards with `ccmake` or 
+    `cmake-gui`:
     * `-DISAAC_GST=OFF` → Deactivates GStreamer (Default if not found).
     * `-DISAAC_JPEG=OFF` → Deactivates JPEG compression. As already mentioned:
       This is not advised and will most probably leave ISAAC in an unusable
@@ -284,15 +344,9 @@ The server resides in the directory `server` and also uses CMake:
       screen or even an X server installed.
 * `make`
 
-If you want to install the server type
+If you want to install the server, type
 
 * (`sudo`) `make install`
-
-Change the installation directory by adding
-
-* `-DCMAKE_INSTALL_PREFIX=/your/path`
-
-in the initial `cmake ..`
 
 However, the server doesn't need to be installed and can also directly be called
 from the build directory with
@@ -314,6 +368,11 @@ with the number of instances `N`. To exit the example, use the client or ctrl+C.
 If the client and the isaac server are not located on the same system, it might
 be required to create a tunnel between the two systems. In that case, you may
 want to have a look into the __[tunnel guide](./TUNNEL.md)__.
+You can set the adress and listening port of the server, the example is
+trying to connect to by calling the example and appending address and port to
+the call, e.g.
+
+* `./isaac_example 127.0.0.0 2460`.
 
 ### Versions
 
