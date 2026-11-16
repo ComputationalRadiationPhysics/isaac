@@ -2059,12 +2059,12 @@ namespace isaac
             {
                 if(rank == master)
                 {
-                    std::vector<char> receiveBuffer(numProc * ISAAC_MAX_RECEIVE);
+                    char receiveBuffer[numProc][ISAAC_MAX_RECEIVE];
                     MPI_Gather(
                         messageBuffer,
                         ISAAC_MAX_RECEIVE,
                         MPI_CHAR,
-                        receiveBuffer.data(),
+                        receiveBuffer,
                         ISAAC_MAX_RECEIVE,
                         MPI_CHAR,
                         master,
@@ -2075,7 +2075,7 @@ namespace isaac
                         {
                             continue;
                         }
-                        json_t* js = json_loads(&receiveBuffer[i * ISAAC_MAX_RECEIVE], 0, NULL);
+                        json_t* js = json_loads(receiveBuffer[i], 0, NULL);
                         mergeJSON(jsonRoot, js);
                         json_decref(js);
                     }

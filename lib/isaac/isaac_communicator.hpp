@@ -89,7 +89,6 @@ namespace isaac
             sockfd = socket(AF_INET, SOCK_STREAM, 0);
             if(sockfd < 0)
             {
-                sockfd = 0;
                 if(setting == ReturnAtError)
                 {
                     fprintf(stderr, "Could not create socket.\n");
@@ -109,7 +108,6 @@ namespace isaac
             if(connect(sockfd, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0)
             {
                 close(sockfd);
-                sockfd = 0;
                 if(setting == ReturnAtError)
                 {
                     fprintf(stderr, "Could not connect to %s.\n", url.c_str());
@@ -349,8 +347,7 @@ namespace isaac
         }
         static size_t json_load_callback_function(void* buffer, size_t buflen, void* data)
         {
-            ssize_t const received = recv(*((isaac_int*) data), buffer, buflen, 0);
-            return received > 0 ? static_cast<size_t>(received) : 0u;
+            return recv(*((isaac_int*) data), buffer, 1, 0);
         }
         static void* run_readAndSetMessages(void* communicator)
         {
