@@ -52,6 +52,7 @@ namespace isaac
             , port(port)
             , sockfd(0)
             , jpeg_quality(90)
+            , readThreadStarted(false)
             , registerMessage(NULL)
         {
             pthread_mutex_init(&deleteMessageMutex, NULL);
@@ -118,7 +119,7 @@ namespace isaac
                     return 1;
                 }
             }
-            pthread_create(&readThread, NULL, run_readAndSetMessages, this);
+            readThreadStarted = pthread_create(&readThread, NULL, run_readAndSetMessages, this) == 0;
             return 0;
         }
 
@@ -297,7 +298,10 @@ namespace isaac
             if(sockfd)
                 serverDisconnect();
             usleep(100000); // 100ms
-            pthread_cancel(readThread);
+            if(readThreadStarted)
+            {
+                pthread_cancel(readThread);
+            }
             pthread_mutex_destroy(&deleteMessageMutex);
         }
         void setMessage(json_t* content)
@@ -359,6 +363,7 @@ namespace isaac
         std::list<json_t*> messageList;
         pthread_mutex_t deleteMessageMutex;
         pthread_t readThread;
+        bool readThreadStarted;
         json_t** registerMessage;
     };
 
