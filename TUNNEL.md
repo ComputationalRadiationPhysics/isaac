@@ -79,17 +79,17 @@ in this screenshot:
 
 ![Putty screenshot 1](/documentation/tunnel_putty1.png?raw=true "Putty screenshot 1")
 
-Afterwards, you need to click Connection -> SSH -> Tunnels in the left menu
+Afterwards, you need to (**1**) click Connection -> SSH -> Tunnels in the left menu
 to get to this subwindow:
 
 ![Putty screenshot 2](/documentation/tunnel_putty2.png?raw=true "Putty screenshot 2")
 
 In this screenshot, you also see the client with the changed (!) port in the
-background. Enter the source port and the destination into PuTTY, as seen in the 
-picture.
+background. Enter the (**2**) source port and the destination into PuTTY, as 
+seen in the picture.
 Of course, `$ISAAC_SERVER` needs to be changed to the address of the system 
-running the ISAAC server right now. Then, click "Add" to enable the tunneling,
-and afterwards, "Open" to connect to the jump host. The window will close, and
+running the ISAAC server right now. Then, (**3**) click "Add" to enable the tunneling,
+and afterwards, (**4**) "Open" to connect to the jump host. The window will close, and
 a command line prompt will appear, asking for your username:
 
 ![Putty screenshot 3](/documentation/tunnel_putty3.png?raw=true "Putty screenshot 3")
