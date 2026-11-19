@@ -3,7 +3,7 @@
 ISAAC Tunnel Guide
 ==================
 
-The idea behind ISAAC is to install the server a system, which
+The idea behind ISAAC is to install the server on a system, which
 should be connectable both from the in-situ visualization running on
 computation nodes on a HPC cluster, as well as from the clients connecting from
 workstations in the local network or over the internet.
@@ -43,23 +43,23 @@ This opens a shell on the jump host, which will listen in the background
 on port 2559 and forward any communication on it to `$ISAAC_SERVER`
 on port 2459. `$USERNAME` is your username on the jump host, `$JUMP_HOST` the
 jump host used to access the server, and `$ISAAC_SERVER` the system in the jump
-hosts network on which ISAAC runs. This may be your head node, but also a
+hosts network on which ISAAC runs. This may be your head node, but can also be a
 dedicated ISAAC server on a compute node (see below).
 For the HZDR and a head node on its ROSI cluster, the command would be, for 
 example:
 
 * `ssh mustermann42@uts.hzdr.de -L 2559:rosi5:2459`
 
-After this, the HTML client can connect to localhost on port 2559 (see the
-left part of the second PuTTY screenshot), which will then be forwarded
-to `$ISAAC_SERVER` over the `$JUMP_HOST`.
+After this, the HTML client can connect to the localhost on port 2559 (see the
+left part of the second PuTTY screenshot), whose connection will then be
+forwarded to `$ISAAC_SERVER` via the `$JUMP_HOST`.
 
-If the ISAAC server runs on a compute node, which can only be accessed from the
+The ISAAC server may run on a compute node, which can only be accessed from the
 head node of the cluster, which itself is only accessible inside a local network
-via a jump host, you may need to make multiple proxy jumps from your machine to 
-the client on the compute node.
-For this, the `-J` flag can be used, which takes a chain of multiple jump hosts
-through which the connection is tunneled.
+via a jump host. In that case, you may need to make multiple proxy jumps from
+your machine to the client on the compute node.
+To accomplish this, the `-J` flag can be used, which takes a chain of multiple
+jump hosts through which the connection is tunneled.
 For a CPU node (here, cro001 as an example) on the ROSI cluster, this would look
 like:
 
