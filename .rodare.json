@@ -1,38 +1,62 @@
 {
     "creators": [
         {
-            "name": "Matthes, Alexander"
+            "name": "Debus, Alexander",
+            "affiliation": "HZDR",
+            "orcid": "0000-0002-3844-3697"
         },
         {
-            "name": "Meyer, Felix",
-            "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf"
+            "name": "Lenz, Julian",
+            "affiliation": "CASUS, HZDR",
+            "orcid": "0000-0001-5250-0005"
         },
         {
             "name": "Pausch, Richard",
-            "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+            "affiliation": "HZDR",
             "orcid": "0000-0001-7990-9564"
         },
         {
             "name": "Widera, René",
-            "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+            "affiliation": "HZDR",
             "orcid": "0000-0003-1642-0459"
         },
         {
+            "name": "Wrobel, Nico",
+            "affiliation": "CASUS, HZDR",
+            "orcid": "0009-0008-7039-6377"
+        }
+    ],
+    "contributors": [
+        {
+            "name": "Gerber, Vincent",
+            "type": "Other"
+        },
+        {
             "name": "Huebl, Axel",
-            "orcid": "0000-0003-1943-7141"
+            "orcid": "0000-0003-1943-7141",
+            "type": "Other"
         },
         {
-            "name": "Gerber, Vincent"
-        },
-        {
-            "name": "Zenker, Erik"
-        },
-        {
-            "name": "Kosukhin, Sergey"
+            "name": "Kosukhin, Sergey",
+            "type": "Other"
         },
         {
             "affiliation":"HZDR, TU Dresden",
-            "name":"Lebedev, Anton"
+            "name":"Lebedev, Anton",
+            "type":"Other"
+        },
+        {
+            "name": "Matthes, Alexander",
+            "type": "Other"
+        },
+        {
+            "name": "Meyer, Felix",
+            "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+            "type": "Other"
+        },
+        {
+            "name": "Zenker, Erik",
+            "type": "Other"
         }
     ],
     "title": "ISAAC - In Situ Animation of Accelerated Computations",
