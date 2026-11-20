@@ -8,23 +8,23 @@ In Situ Animation of Accelerated Computations
 About ISAAC
 -----------
 
-These days, many computation-intensive codes, like physics or biology simulations, 
-run on GPU-accelerated hardware, which is itself distributed in big compute
-clusters, communicating via MPI with each other. 
-The goal of ISAAC is to visualize this data without the need to copy it
-to the host, while using the high computation speed of these accelerators.
+Nowadays, many computationally intensive codes, such as those used for physics
+or biology simulations, are run on GPU-accelerated hardware. On large computing
+clusters, this hardware is distributed across multiple nodes, which communicate
+with each other via Message Passing Interface (MPI).
+The goal of ISAAC is to visualize this data without the need for expensive copy
+processes between accelerator and host. This allows ISAAC to fully take avantage
+of the high computation speed of these accelerators.
 
-ISAAC consists of two parts: The server and the in-situ library.
-Furthermore, a client which is able to show the transferred stream and meta data
-is needed. A reference HTML5 client is provided here,
-but needs to be adapted to specific simulations and is not part of ISAAC
-itself (but still hosted in the repository).
+ISAAC consists of three parts: The server, the in-situ library, and the client.
 
-Simulation code just has to add some calls and settings to the in-situ
-template library. After that, the server will notice when a simulation
+Simulation code just has to add some calls and settings to the **in-situ
+template library**. After that, the **server** will notice when a simulation
 is running and give the user some options to observe the computations
-_on the fly_. It is also possible to send meta data back to the
-simulation, e.g., to restart it with improved settings.
+_on the fly_ via a **client**. The client is able to show the transferred
+stream and meta data. It is also possible to send meta data back to the
+simulation, e.g., to restart it with improved settings. Multiple clients can
+connect to the same server and observe the streamed visualisations.
 
 Installing requirements, building and using in own application
 --------------------------------------------------------------
@@ -40,6 +40,8 @@ outdated_).
 Client
 ------
 
+A reference HTML5 client is provided here, but needs to be adapted to specific
+simulations.
 Inside the client directory, the HTML client `visualisation.html` can be found.
 
 It lets you connect to your visualisations directly from your web browser and
