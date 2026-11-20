@@ -8,60 +8,50 @@ In Situ Animation of Accelerated Computations
 About ISAAC
 -----------
 
-Many computations like physics or biologists simulations these days
-run on accelerated hardware like CUDA GPUs or Intel Xeon Phi, which are
-itself distributed in a big compute cluster communicating over MPI. The
-goal of ISAAC is to visualize this data without the need to download it
-to the host while using the high computation speed of the accelerator.
+Nowadays, many computationally intensive codes, such as those used for physics
+or biology simulations, are run on GPU-accelerated hardware. On large computing
+clusters, this hardware is distributed across multiple nodes, which communicate
+with each other via Message Passing Interface (MPI).
+The goal of ISAAC is to visualize this data without the need for expensive copy
+processes between accelerator and host. This allows ISAAC to fully take advantage
+of the high computation speed of these accelerators.
 
-ISAAC insists of two parts: The server and the insitu library.
-Furthermore there needs to be a client, which is able to show the
-transfered stream and meta data. A reference HTML5 client is provided,
-but needs to be adapted to specific simulations and is not part of ISAAC
-itself (but still in the repository).
+ISAAC consists of three parts: The server, the in-situ library, and the client.
 
-Simulation code has just to add some calls and settings to the insitu
-template library. After that the server will notice when a simulation
+Simulation code just has to add some calls and settings to the **in-situ
+template library**. After that, the **server** will notice when a simulation
 is running and give the user some options to observe the computations
-_on the fly_. It is also possible to send meta data back to the
-simulation, e.g. to restart it with improved settings.
+_on the fly_ via a **client**. The client is able to show the transferred
+stream and meta data. It is also possible to send meta data back to the
+simulation, e.g., to restart it with improved settings. Multiple clients can
+connect to the same server and observe the streamed visualizations.
 
 Installing requirements, building and using in own application
 --------------------------------------------------------------
 
 Please see in [INSTALL.md](./INSTALL.md) for installing, building and
-using ISAAC.
-If you need to install ISAAC on a server not accessible from the outside
+using ISAAC and its dependencies.
+If you need to install ISAAC on a server not accessible from the outside,
 you need to [tunnel the connections](./TUNNEL.md) of the clients.
 A more detailed __documentation__ about using ISAAC __can be
-[found here](http://computationalradiationphysics.github.io/isaac)__.
+[found here](https://computationalradiationphysics.github.io/isaac)__ (_currently
+outdated_).
 
 Client
 ------
 
-Inside the client directory lay three files:
-* interface.htm
-* interface_vlc.htm
-* interface_presentation.htm
+A reference HTML5 client is provided here, but needs to be adapted to specific
+simulations.
+Inside the client directory, the HTML client `visualisation.html` can be found.
 
-The very first uses direct JSON injection, but no real streaming protocol
-like RTP. The second can use RTP, but needs the (free) vlc browser plugin
-installed to work. Furthermore the server most be able to directly send
-UDP packages to you, which are blocked by most firewalls. Last but not
-least this adds some latency for the h264 encoding. However the stream itself
-will use way less bandwidth. The last client version is for presentation
-purposes, the table with meta data values is not shown, but some are shown
-directly in the stream box. E.g. if you visualize
+It lets you connect to your visualizations directly from your web browser and
+allows to change settings and steer the visualization. For visualizations of
 __[PIConGPU](https://github.com/ComputationalRadiationPhysics/picongpu)__
-with ISAAC enabled this will show you the count of particles and cells
-used.
+with ISAAC enabled, it will also display meta data like the cell count or 
+current time step.
 
-Known issues
-------------
-
-* If streaming over twitch or another rtmp compatible service is used,
-  but the rtmp port (1935) ist blocked or a wrong url passed, the server
-  will crash because of the underlying gStreamer rtmp implementation.
+As an alternative, a Python client for Jupyter Notebooks is also in development 
+and can be found __[here](https://github.com/ComputationalRadiationPhysics/isaac-python)__.
 
 Licensing
 ---------
