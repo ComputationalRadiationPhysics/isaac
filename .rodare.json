@@ -64,5 +64,5 @@
     "upload_type": "software",
     "license": "LGPL-3.0",
     "pub_id": "31686",
-    "description": "Many computations like physics or biologists simulations these days run on accelerated hardware like CUDA GPUs or Intel Xeon Phi, which are itself distributed in a big compute cluster communicating over MPI. The goal of ISAAC is to visualize this data without the need to download it to the host while using the high computation speed of the accelerator."
+    "description": "Nowadays, many computationally intensive codes, such as those used for physics or biology simulations, are run on GPU-accelerated hardware. On large computing clusters, this hardware is distributed across multiple nodes, which communicate with each other via Message Passing Interface (MPI). The goal of ISAAC is to visualize this data without the need for expensive copy processes between accelerator and host. This allows ISAAC to fully take advantage of the high computation speed of these accelerators."
 }
