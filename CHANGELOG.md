@@ -1,5 +1,29 @@
 # Changelog
 
+## [v1.7.0] - 2026-11-23
+
+This release is compatible with alpaka 2.1.0 - 2.2.X.
+
+* Library
+    - Port to alpaka2 #184 #190
+    - Fix value underflow in transfer functions #174
+    - Fix outdated CMake files #180 #188
+    - Fix error when compiling on CPU #194
+    - Library now requires CMake 3.25.2, Boost 1.70.0 and glm 1.0.0 #181 #188
+* Server
+    - Fix outdated CMake files #188
+    - Harden against lost connections from application #192
+    - Server now requires CMake 3.25.2 and Boost 1.70.0 #188
+* Web client
+    - Fix same simulation appearing multiple times in UI #191
+* Example
+    - Port to alpaka2 #184
+    - Fix outdated CMake files #188
+    - Example now requires CMake 3.25.2 #188
+* Documentation
+    - Overhaul install guide #172 #195
+    - Overhaul tunnel guide #197
+
 ## [v1.6.0] - 2022-05-19
 
 This release is compatible with alpaka 0.6.0 - 0.9.X.
