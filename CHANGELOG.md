@@ -1,6 +1,6 @@
 # Changelog
 
-## [v1.7.0] - 2026-11-20
+## [v1.7.0] - 2026-11-23
 
 This release is compatible with alpaka 2.1.0 - 2.2.X.
 
